@@ -1,0 +1,168 @@
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import type { TranscriptSegment } from "@/lib/types";
+
+// The Web Speech API is not in lib.dom, so declare the slice we use.
+type SpeechAlternative = { transcript: string; confidence: number };
+type SpeechResult = {
+  isFinal: boolean;
+  length: number;
+  [index: number]: SpeechAlternative;
+};
+type SpeechEvent = {
+  resultIndex: number;
+  results: { length: number; [index: number]: SpeechResult };
+};
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((e: SpeechEvent) => void) | null;
+  onerror: ((e: { error: string }) => void) | null;
+  onend: (() => void) | null;
+};
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+function getRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+/**
+ * Live transcript of the tutor's speech, from the browser's own recogniser.
+ *
+ * This is the zero-setup default. It is also the one part of the pipeline that
+ * leaves the device on Chrome (recognition is server-side there), so a
+ * deployment that must keep audio local should swap this for a local model or
+ * a self-hosted STT endpoint - see README.
+ */
+const subscribeNever = () => () => {};
+
+export function useSpeechTranscript(lang = "en-US") {
+  const [listening, setListening] = useState(false);
+  const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const [interim, setInterim] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const recRef = useRef<SpeechRecognitionLike | null>(null);
+  const startedAtRef = useRef(0);
+  const wantRef = useRef(false);
+  /** Speech time accumulated before the current listening span. */
+  const offsetRef = useRef(0);
+
+  // Read once on the client; false on the server so hydration matches.
+  const supported = useSyncExternalStore(
+    subscribeNever,
+    () => getRecognitionCtor() !== null,
+    () => false,
+  );
+
+  const listen = useCallback((fresh: boolean) => {
+    const Ctor = getRecognitionCtor();
+    if (!Ctor) {
+      setError("This browser has no speech recognition. Audio still records.");
+      return;
+    }
+    const rec = new Ctor();
+    rec.lang = lang;
+    rec.continuous = true;
+    rec.interimResults = true;
+
+    rec.onresult = (e) => {
+      let pending = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const result = e.results[i];
+        const alt = result[0];
+        if (!alt) continue;
+        if (result.isFinal) {
+          const text = alt.transcript.trim();
+          if (text) {
+            setSegments((prev) => [
+              ...prev,
+              {
+                t: Math.round(
+                  offsetRef.current + (performance.now() - startedAtRef.current),
+                ),
+                text,
+                confidence: alt.confidence,
+              },
+            ]);
+          }
+        } else {
+          pending += alt.transcript;
+        }
+      }
+      setInterim(pending);
+    };
+
+    rec.onerror = (e) => {
+      // "no-speech" and "aborted" are routine during a quiet stretch.
+      if (e.error !== "no-speech" && e.error !== "aborted") setError(e.error);
+    };
+
+    // Chrome ends the session on its own every so often; restart while wanted.
+    rec.onend = () => {
+      if (wantRef.current) {
+        try {
+          rec.start();
+        } catch {
+          setListening(false);
+        }
+      } else {
+        setListening(false);
+      }
+    };
+
+    startedAtRef.current = performance.now();
+    wantRef.current = true;
+    recRef.current = rec;
+    if (fresh) {
+      offsetRef.current = 0;
+      setSegments([]);
+    }
+    setInterim("");
+    setError(null);
+    try {
+      rec.start();
+      setListening(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not start recognition.");
+    }
+  }, [lang]);
+
+  /** Begin a new transcript, discarding anything already captured. */
+  const start = useCallback(() => listen(true), [listen]);
+
+  /** Carry on after a pause, keeping the segments captured so far. */
+  const resume = useCallback(() => listen(false), [listen]);
+
+  const stop = useCallback(() => {
+    if (wantRef.current) {
+      offsetRef.current += performance.now() - startedAtRef.current;
+    }
+    wantRef.current = false;
+    recRef.current?.stop();
+    setListening(false);
+    setInterim("");
+  }, []);
+
+  useEffect(() => () => {
+    wantRef.current = false;
+    recRef.current?.stop();
+  }, []);
+
+  return { supported, listening, segments, interim, error, start, resume, stop };
+}

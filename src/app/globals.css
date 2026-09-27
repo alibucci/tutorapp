@@ -1,0 +1,426 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   Tokens
+   ---------------------------------------------------------------------------
+   One light theme. Every foreground/background pair below clears WCAG AA; the
+   narrowest is muted text at 5.4:1.
+   =========================================================================== */
+
+:root {
+  /* Surfaces, from furthest back to closest. */
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --sunken: #f1f3f6;
+  --border: #e3e6ec;
+  --border-strong: #cfd4de;
+
+  /* Ink. */
+  --foreground: #15171c;
+  --muted: #5f6673;
+
+  /* One accent, one success. Nothing else carries meaning. */
+  --accent: #4a55c7;
+  --accent-hover: #3f49b4;
+  --accent-soft: #eef0fc;
+  --live: #0f7a56;
+  --live-soft: #e9f5f0;
+
+  /* Type scale. A single ratio, named by role rather than by size, so a
+     screen never has to invent one. */
+  --text-hero: 2.5rem;
+  --text-display: 1.75rem;
+  --text-title: 1.25rem;
+  --text-subtitle: 1.0625rem;
+  --text-body: 0.9375rem;
+  --text-small: 0.8125rem;
+  --text-caption: 0.75rem;
+  --text-eyebrow: 0.6875rem;
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-normal: 1.6;
+
+  /* Spacing. 4px base; screens compose from these, not from arbitrary values. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-14: 3.5rem;
+
+  --radius-sm: 0.375rem;
+  --radius: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(21 23 28 / 0.05);
+  --shadow: 0 1px 3px rgb(21 23 28 / 0.07), 0 8px 24px -12px rgb(21 23 28 / 0.12);
+
+  --ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+
+  /* Motion. The built-in CSS easings are too weak to read as intentional.
+     ease-in is never used: it delays the first movement, which is exactly the
+     moment the user is watching, so the interface feels sluggish. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-press: 140ms;
+  --dur-hover: 120ms;
+  --dur-enter: 200ms;
+}
+
+/* Density, not a second theme.
+   Families read one page once, often on a phone: give them air and larger type.
+   The tutor lives in the tool all day and wants to see more at once. */
+[data-density="comfortable"] {
+  --text-body: 1rem;
+  --text-subtitle: 1.1875rem;
+  --text-display: 1.875rem;
+  --text-hero: 2.75rem;
+  --leading-normal: 1.65;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-live: var(--live);
+  --color-live-soft: var(--live-soft);
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ===========================================================================
+   Base
+   =========================================================================== */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* One visible focus ring for every interactive thing, not just inputs. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--radius-sm);
+}
+
+/* Reduced motion means fewer and gentler animations, not none: opacity and
+   colour still aid comprehension, so only movement is removed. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-property: opacity, background-color, border-color, color !important;
+    transition-duration: 120ms !important;
+  }
+  .stagger > * { animation: none !important; opacity: 1 !important; }
+}
+
+/* ===========================================================================
+   Type
+   Roles, not sizes. A screen picks the role and inherits the rhythm.
+   =========================================================================== */
+
+/* Exactly one element per screen wears this. */
+.t-hero {
+  font-size: var(--text-hero);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  font-weight: 620;
+}
+.t-display {
+  font-size: var(--text-display);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.021em;
+  font-weight: 600;
+}
+.t-title {
+  font-size: var(--text-title);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.014em;
+  font-weight: 600;
+}
+.t-subtitle {
+  font-size: var(--text-subtitle);
+  line-height: var(--leading-snug);
+  letter-spacing: -0.008em;
+  font-weight: 550;
+}
+.t-body { font-size: var(--text-body); line-height: var(--leading-normal); }
+.t-small { font-size: var(--text-small); line-height: var(--leading-snug); }
+.t-caption { font-size: var(--text-caption); line-height: var(--leading-snug); }
+.t-eyebrow {
+  font-size: var(--text-eyebrow);
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.t-lead {
+  font-size: var(--text-display);
+  line-height: 1.35;
+  letter-spacing: -0.016em;
+  font-weight: 450;
+  max-width: 34ch;
+}
+.t-muted { color: var(--muted); }
+.measure { max-width: 62ch; }
+.t-num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+
+/* ===========================================================================
+   Layout
+   =========================================================================== */
+
+.page { width: 100%; margin-inline: auto; padding-inline: var(--space-4); }
+.page-narrow { max-width: 34rem; }
+.page-wide { max-width: 56rem; }
+
+/* Vertical rhythm between top-level blocks of a screen. */
+.stack > * + * { margin-top: var(--space-6); }
+.stack-lg > * + * { margin-top: var(--space-10); }
+.stack-sm > * + * { margin-top: var(--space-3); }
+
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
+
+/* ===========================================================================
+   Components
+   =========================================================================== */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.card-pad { padding: var(--space-5); }
+.card-quiet { background: transparent; border-style: dashed; box-shadow: none; }
+.card-accent { border-color: color-mix(in oklab, var(--accent) 35%, var(--border)); background: var(--accent-soft); }
+
+/* The one focal surface per screen. Tint plus a lifted shadow does the work
+   that a second accent colour would otherwise have to do. */
+.card-focus {
+  border-color: color-mix(in oklab, var(--accent) 22%, var(--border));
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in oklab, var(--accent-soft) 85%, var(--surface)) 0%,
+      var(--surface) 62%
+    );
+  box-shadow: var(--shadow);
+}
+
+/* A single number carrying a count. Used once, where the payoff lives. */
+.stat {
+  font-size: var(--text-hero);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  color: var(--live);
+}
+
+/* Secondary items: listed, not carded, so they cannot compete with the focus. */
+.minor {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+.minor + .minor { border-top: 1px solid var(--border); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.badge-lg { height: 2rem; width: 2rem; font-size: var(--text-body); background: var(--accent); color: #fff; }
+.badge-sm { height: 1.375rem; width: 1.375rem; font-size: var(--text-caption); background: var(--sunken); color: var(--muted); }
+
+.rows > * + * { border-top: 1px solid var(--border); }
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+}
+.row-link { transition: background-color var(--dur-hover) ease; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius);
+  padding: 0.5625rem var(--space-4);
+  font-size: var(--text-small);
+  font-weight: 550;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-hover) ease,
+    border-color var(--dur-hover) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+/* Instant confirmation that the interface heard the press. */
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-lg { padding: 0.75rem var(--space-5); font-size: var(--text-body); }
+.btn-sm { padding: 0.375rem var(--space-3); font-size: var(--text-caption); }
+
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:active:not(:disabled) { background: var(--accent-hover); }
+
+.btn-quiet { border: 1px solid var(--border-strong); background: var(--surface); color: var(--foreground); }
+
+.btn-ghost { color: var(--muted); }
+
+.field {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 0.5625rem var(--space-3);
+  font: inherit;
+  font-size: var(--text-body);
+  color: var(--foreground);
+}
+.field::placeholder { color: color-mix(in oklab, var(--muted) 70%, transparent); }
+.field:disabled { background: var(--sunken); cursor: not-allowed; }
+
+.label { display: block; font-size: var(--text-small); font-weight: 550; margin-bottom: var(--space-2); }
+.hint { display: block; font-size: var(--text-caption); line-height: var(--leading-snug); color: var(--muted); margin-top: var(--space-2); }
+.field-group > * + * { margin-top: var(--space-4); }
+
+.choice {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-hover) ease,
+    background-color var(--dur-hover) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+.choice-on { border-color: var(--accent); background: var(--accent-soft); }
+.choice:active { transform: scale(0.99); }
+
+/* Touch devices fire hover on tap, so a tapped row would stay highlighted.
+   Gate every hover state behind a real pointer. */
+@media (hover: hover) and (pointer: fine) {
+  .row-link:hover { background: var(--sunken); }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-quiet:hover:not(:disabled) { background: var(--sunken); }
+  .btn-ghost:hover:not(:disabled) { background: var(--sunken); color: var(--foreground); }
+  .choice:hover { border-color: var(--border-strong); }
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  padding: 0.3125rem var(--space-3);
+  font-size: var(--text-small);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.pill-done { border-color: color-mix(in oklab, var(--live) 40%, transparent); background: var(--live-soft); color: var(--live); }
+
+.note { border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-small); line-height: var(--leading-snug); }
+.note-accent { background: var(--accent-soft); color: var(--foreground); }
+.note-warn { background: var(--accent-soft); border: 1px solid var(--accent); }
+.note-quiet { background: var(--sunken); color: var(--muted); }
+
+.empty {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-10) var(--space-5);
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+
+.meter { position: relative; height: 0.5rem; width: 100%; overflow: hidden; border-radius: var(--radius-pill); background: var(--sunken); }
+/* Driven off scaleX rather than width: this updates ~24x a second while
+   recording, and width would trigger layout on every frame. */
+.meter-fill {
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transition: transform 80ms linear, background-color var(--dur-hover) ease;
+}
+
+/* ===========================================================================
+   Motion
+   Only things a person sees occasionally animate. Nothing that is triggered
+   from the keyboard or many times an hour does.
+   =========================================================================== */
+
+/* Occasional, and prevents a banner appearing out of nowhere mid-lesson. */
+.enter {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--dur-enter) var(--ease-out),
+    transform var(--dur-enter) var(--ease-out);
+}
+@starting-style {
+  .enter { opacity: 0; transform: translateY(-4px); }
+}
+
+/* Modal: stays centred because it is not anchored to a trigger, and never
+   starts from scale(0) - nothing in the real world appears from nothing. */
+.overlay {
+  opacity: 1;
+  transition: opacity var(--dur-enter) var(--ease-out);
+}
+@starting-style { .overlay { opacity: 0; } }
+
+.dialog {
+  opacity: 1;
+  transform: scale(1);
+  transform-origin: center;
+  transition:
+    opacity var(--dur-enter) var(--ease-out),
+    transform var(--dur-enter) var(--ease-out);
+}
+@starting-style { .dialog { opacity: 0; transform: scale(0.96); } }
+
+/* A child opens their goals rarely, so a short cascade is affordable delight.
+   Delays stay under 80ms apart; longer reads as the page being slow. */
+.stagger > * {
+  opacity: 0;
+  animation: rise 320ms var(--ease-out) forwards;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 60ms; }
+.stagger > *:nth-child(3) { animation-delay: 120ms; }
+.stagger > *:nth-child(4) { animation-delay: 180ms; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
