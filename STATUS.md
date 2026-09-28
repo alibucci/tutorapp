@@ -10,9 +10,16 @@ Last updated: 2026-09-27
 ## The short version
 
 The whole pipeline exists and runs end to end. **No real lesson has ever gone
-through it.** Everything involving a microphone, a browser, or a real person is
-written but untested; everything involving the server and the model has been
-exercised with real requests.
+through it**, but as of 28 September every layer has been proven separately:
+
+- the server path, by an automated run with real model calls (30 checks, all
+  passing — `npm run smoke`)
+- the capture path, by hand on macOS via `/check`: microphone, the gate running
+  in the AudioWorklet, the Opus recorder, wake lock, and a live transcript in
+  Safari
+
+What has not been done is the two joined together — one lesson, recorded,
+debriefed and reviewed by a person.
 
 Treat it as ready to pilot, not ready to ship.
 
@@ -97,15 +104,24 @@ The per-lesson gate is a few ticks; the weekly one is about thirty seconds.
 
 None of this can be tested without a browser, a microphone and a person:
 
-- Microphone capture and device selection
-- The gate in the AudioWorklet — threshold, hold time, gain ramp
-- The level meter
-- Screen Wake Lock, and auto-pause when the screen goes off
-- Manual pause and resume
+Verified by hand on macOS through `/check`, which is not the same as verified
+during a lesson:
+
+- Microphone capture and device selection — **works**
+- The gate in the AudioWorklet — **works**; the level meter is driven by
+  messages from the worklet, so a moving bar proves the whole audio graph
+- The Opus recorder and wake lock APIs — **available**
+- The live transcript — **works in Safari** (Apple's engine). A Chromium build
+  that is not Chrome or Edge fails with a misleading `network` error.
+
+Still untouched:
+
+- Threshold, hold time and gain ramp under real room conditions
+- Auto-pause when the screen goes off, and manual pause and resume
 - Interruption logging
-- The live transcript, in any language
 - Audio upload and playback
 - Every form and button, as an actual click rather than an API call
+- Anything at all on a phone
 
 ### Never attempted
 
@@ -152,10 +168,12 @@ Not bugs — things deliberately not built yet, in rough priority order.
    The actual signed paperwork lives wherever you put it.
 3. **One machine, files on disk.** No backup, no migrations, no second instance.
    `src/lib/store.ts` is the only file that knows this.
-4. **The transcript goes through Google.** Chrome's Web Speech API sends audio to
-   Google's servers. **This likely does not work at all on site without a VPN,
-   and needs checking before the pilot** — if it fails, there is no transcript,
-   and without a transcript nothing downstream has anything to read.
+4. **The transcript leaves the device.** Where it goes depends on the browser:
+   Chrome and Edge send audio to Google, Safari sends it to Apple. **Verified
+   working in Safari on macOS**, which matters because it removes the Google
+   dependency from the critical path. Neither engine is on-device, so a
+   deployment with hard data-residency rules still needs a local or self-hosted
+   recogniser.
 5. **Level is not identity.** The gate cuts by loudness. A loud child near the
    microphone crosses it. Fine in a closed room with two people; not a guarantee
    anywhere else.

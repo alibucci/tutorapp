@@ -90,10 +90,12 @@ single voice, and a fifth of the browser default over mobile data.
 - **Gate timing.** `holdMs` is 700 ms and the gain ramp is 20 ms. Too short clips
   the first syllable; too long leaks the room between sentences.
 - **Browser noise suppression varies by platform** and may fight the gate.
-- **The live transcript is not on-device.** Chrome's Web Speech API sends audio
-  to Google. To keep audio local, replace `src/hooks/useSpeechTranscript.ts`
-  with a local model (whisper.cpp via WASM) or a self-hosted endpoint; nothing
-  downstream cares where segments come from.
+- **The transcript leaves the device, and where it goes depends on the
+  browser.** Chrome and Edge send audio to Google; Safari sends it to Apple.
+  Neither is on-device. To keep audio local, replace
+  `src/hooks/useSpeechTranscript.ts` with a local model (whisper.cpp via WASM)
+  or a self-hosted endpoint; nothing downstream cares where segments come
+  from.
 
 ## Phones, locked screens and backgrounding
 
@@ -167,8 +169,11 @@ plain HTTP is not a secure context, so `getUserMedia` is blocked outright.
 `npm run smoke` drives the whole server path end to end against a running dev
 server, including real model calls. It cleans up after itself.
 
-Chrome or Edge: the live transcript uses the Web Speech API, which Safari and
-Firefox do not implement. Audio still records everywhere — only the transcript
+Safari, Chrome or Edge. The live transcript uses the Web Speech API, and the
+engine behind it differs: Chrome and Edge send audio to Google, **Safari sends
+it to Apple**, and other Chromium builds (Brave, Arc, Vivaldi) ship without
+either and fail with a misleading `network` error. Firefox has no support at
+all. Where Google is unreachable, Safari is the one that still works. Audio still records everywhere — only the transcript
 is missing.
 
 Everything is written to `data/` as JSON plus audio blobs. That directory is

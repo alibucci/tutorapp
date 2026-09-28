@@ -44,10 +44,14 @@ function getRecognitionCtor(): SpeechRecognitionCtor | null {
 /**
  * Live transcript of the tutor's speech, from the browser's own recogniser.
  *
- * This is the zero-setup default. It is also the one part of the pipeline that
- * leaves the device on Chrome (recognition is server-side there), so a
- * deployment that must keep audio local should swap this for a local model or
- * a self-hosted STT endpoint - see README.
+ * Zero setup, but the engine behind it differs by browser and that matters:
+ * Chrome and Edge send audio to Google, Safari sends it to Apple, and other
+ * Chromium builds have neither and fail outright. Where Google is unreachable,
+ * Safari is the one that keeps working.
+ *
+ * For a deployment that must keep audio on the device regardless, swap this for
+ * a local model or a self-hosted endpoint - nothing downstream cares where the
+ * segments come from.
  */
 const subscribeNever = () => () => {};
 

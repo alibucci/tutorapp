@@ -112,16 +112,31 @@ export function MicCheck() {
         : /\bSafari\//.test(ua) ? "Safari"
         : /\bFirefox\//.test(ua) ? "Firefox"
         : "unknown");
-    // Only real Chrome and Edge ship the keys the speech service needs. Other
-    // Chromium builds expose the API and then fail with a network error, which
-    // reads as a connectivity problem and is not one.
-    const trusted = /^(Google Chrome|Chrome|Microsoft Edge|Edge)$/.test(guess);
+    // Which engine does the transcription decides both whether it works and
+    // where the audio goes. Safari hands it to Apple; Chrome and Edge hand it
+    // to Google; other Chromium builds ship without the keys for either and
+    // fail with a misleading "network" error.
+    const engine: Record<string, { state: State; detail: string }> = {
+      Safari: {
+        state: "pass",
+        detail:
+          "Safari — transcription runs through Apple, not Google, so it keeps working where Google is unreachable.",
+      },
+      Chrome: { state: "pass", detail: "Chrome — transcription runs through Google." },
+      "Google Chrome": { state: "pass", detail: "Chrome — transcription runs through Google." },
+      Edge: { state: "pass", detail: "Edge — transcription runs through Google." },
+      "Microsoft Edge": { state: "pass", detail: "Edge — transcription runs through Google." },
+      Firefox: {
+        state: "fail",
+        detail: "Firefox has no speech recognition. Audio would record with no transcript.",
+      },
+    };
+    const known = engine[guess];
     add(
       "Browser",
-      trusted ? "pass" : "warn",
-      trusted
-        ? guess
-        : `${guess} — Chromium builds other than Chrome and Edge usually cannot transcribe at all, and fail with a misleading "network" error. Test in Google Chrome before blaming the connection.`,
+      known?.state ?? "warn",
+      known?.detail ??
+        `${guess} — Chromium builds other than Chrome and Edge ship without speech keys and fail with a misleading "network" error. Safari and Chrome both work.`,
     );
 
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
