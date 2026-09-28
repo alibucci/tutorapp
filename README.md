@@ -159,6 +159,14 @@ npm run dev
 Sign in at `/login` as the superadmin, create a tutor, and hand them the one-time
 password shown. Nobody can sign themselves up.
 
+Open `/check` on the recording device first — it reports exactly which parts of
+the capture path work there, and lets you test the microphone and the
+recogniser. To record from a phone use `npm run dev:https`: a LAN address over
+plain HTTP is not a secure context, so `getUserMedia` is blocked outright.
+
+`npm run smoke` drives the whole server path end to end against a running dev
+server, including real model calls. It cleans up after itself.
+
 Chrome or Edge: the live transcript uses the Web Speech API, which Safari and
 Firefox do not implement. Audio still records everywhere — only the transcript
 is missing.

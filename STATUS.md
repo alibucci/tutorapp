@@ -181,6 +181,30 @@ Not bugs — things deliberately not built yet, in rough priority order.
 
 ---
 
+## Checking it yourself
+
+```bash
+npm run dev          # one terminal
+npm run smoke        # another
+```
+
+`smoke` drives the whole server path against the running app: sign-in, tenant
+isolation, consent, all four model calls, both approval gates, and what a family
+can and cannot see. It makes real DeepSeek requests, so it costs a few cents and
+takes about a minute — that is deliberate, a mocked run would prove nothing. It
+deletes the records it creates. **30 checks, all passing as of this writing.**
+
+For the browser half, open **`/check`** on the device that will actually record.
+It reports secure context, microphone access, the AudioWorklet, the gate module,
+the recorder, speech recognition and wake lock — then lets you test the mic and
+run the recogniser in your language. That last test is the important one: if no
+words appear, there is no transcript, and nothing downstream has anything to
+read.
+
+To record from a phone, the page must be served over HTTPS — a LAN address over
+plain HTTP cannot touch a microphone at all, and the browser gives no visible
+reason. Use `npm run dev:https`.
+
 ## Trying it
 
 ```bash
