@@ -36,7 +36,10 @@ re-checks ownership: guessing an id returns 404, not someone else's audio.
 ## Who gets recorded
 
 Consent decides, and the server decides from the stored record — a client cannot
-ask for more than the student's consent allows.
+ask for more than the student's consent allows. Consent is granted through its
+own action, never as a field on a general update, and the server stamps the
+time; the API routes accept an explicit list of fields and ignore everything
+else, so no request can reach `capture` or `recordingConsent` directly.
 
 | | Capture | The gate is… |
 |---|---|---|

@@ -12,7 +12,7 @@ Last updated: 2026-09-27
 The whole pipeline exists and runs end to end. **No real lesson has ever gone
 through it**, but as of 28 September every layer has been proven separately:
 
-- the server path, by an automated run with real model calls (48 checks, all
+- the server path, by an automated run with real model calls (58 checks, all
   passing — `npm run smoke`)
 - the capture path, by hand on macOS via `/check`: microphone, the gate running
   in the AudioWorklet, the Opus recorder, wake lock, and a live transcript in
@@ -102,6 +102,11 @@ The per-lesson gate is a few ticks; the weekly one is about thirty seconds.
 - **Audio round trip.** A file is uploaded, read back byte for byte, served as
   webm, and kept separate from the debrief recording. Another tutor and an
   anonymous visitor both get 404.
+- **What a tutor may write.** Consent cannot be forged, a lesson's capture mode
+  cannot be set from outside, a lesson cannot be reassigned to another student
+  and its summary cannot be planted. Consent is granted through its own action
+  with a server-stamped time, and can be withdrawn. Family links can be
+  replaced, and the old ones stop working.
 - **Account security.** A tutor can change the password they were issued; the
   old one stops working and every other session of theirs is signed out while
   the tab they are in stays. Suspending a tutor kills their live session on the
@@ -218,7 +223,7 @@ npm run smoke        # another
 isolation, consent, all four model calls, both approval gates, and what a family
 can and cannot see. It makes real DeepSeek requests, so it costs a few cents and
 takes about a minute — that is deliberate, a mocked run would prove nothing. It
-deletes the records it creates. **48 checks, all passing as of this writing.**
+deletes the records it creates. **58 checks, all passing as of this writing.**
 
 For the browser half, open **`/check`** on the device that will actually record.
 It reports secure context, microphone access, the AudioWorklet, the gate module,

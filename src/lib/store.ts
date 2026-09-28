@@ -97,7 +97,7 @@ export async function listTutors(): Promise<Tutor[]> {
 // --- students --------------------------------------------------------------
 
 /** URL-safe and long enough that a link is not guessable. */
-function accessKey() {
+export function accessKey() {
   return randomBytes(16).toString("base64url");
 }
 

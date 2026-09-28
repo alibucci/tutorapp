@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Student } from "@/lib/types";
 
@@ -8,7 +9,9 @@ import type { Student } from "@/lib/types";
  * whether these views are wanted at all; real auth comes after that.
  */
 export function ShareLinks({ student }: { student: Student }) {
+  const router = useRouter();
   const [copied, setCopied] = useState<string | null>(null);
+  const [rotating, setRotating] = useState(false);
 
   const links = [
     {
@@ -28,6 +31,17 @@ export function ShareLinks({ student }: { student: Student }) {
     await navigator.clipboard.writeText(url);
     setCopied(path);
     window.setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function rotate() {
+    setRotating(true);
+    await fetch(`/api/students/${student.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rotateLinks: true }),
+    });
+    router.refresh();
+    setRotating(false);
   }
 
   return (
@@ -52,6 +66,17 @@ export function ShareLinks({ student }: { student: Student }) {
           </li>
         ))}
       </ul>
+      <button
+        onClick={() => void rotate()}
+        disabled={rotating}
+        className="btn btn-quiet btn-sm"
+      >
+        {rotating ? "Replacing…" : "Replace both links"}
+      </button>
+      <p className="hint">
+        A link that has been shared cannot be taken back. Replacing them breaks
+        the old ones immediately — use this if one goes somewhere it should not.
+      </p>
     </section>
   );
 }

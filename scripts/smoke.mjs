@@ -189,6 +189,59 @@ await a(`/api/reports/${report.json.id}`, patch({ approved: true }));
 const parentAfter = (await anon(`/p/${keys.parentKey}`)).text;
 check("parent sees the note after approval", !parentAfter.includes("No notes yet"));
 
+// --- what a tutor may write ------------------------------------------------
+// Both of these were exploitable: a blanket Partial<> on the two PATCH routes
+// let a tutor forge consent and set capture directly, walking past the rule
+// that capture is derived from consent on the server.
+{
+  const victim = (await a("/api/students", post({ name: "Smoke Student C" }))).json;
+  check("a new student has no consent", !victim.recordingConsent);
+
+  await a(`/api/students/${victim.id}`, patch({
+    recordingConsent: { grantedAt: "2020-01-01T00:00:00Z", grantedBy: "FORGED" },
+  }));
+  const after = (await a(`/api/students/${victim.id}`)).json;
+  check("consent cannot be forged through the student PATCH",
+    !after.recordingConsent, JSON.stringify(after.recordingConsent));
+
+  const lesson = (await a("/api/lessons", post({
+    title: "Probe", mode: "classroom", studentId: victim.id,
+  }))).json;
+  check("no consent still means tutor-only", lesson.capture === "tutor");
+
+  await a(`/api/lessons/${lesson.id}`, patch({ capture: "both" }));
+  check("capture cannot be set through the lesson PATCH",
+    (await a(`/api/lessons/${lesson.id}`)).json.capture === "tutor");
+
+  await a(`/api/lessons/${lesson.id}`, patch({ studentId: sB.id, summary: { covered: ["forged"] } }));
+  const untouched = (await a(`/api/lessons/${lesson.id}`)).json;
+  check("a lesson cannot be reassigned or its summary forged",
+    untouched.studentId === victim.id && !untouched.summary);
+
+  // Consent is grantable through its own action, with a server-stamped time.
+  await a(`/api/students/${victim.id}`, patch({ consentFrom: "A real parent" }));
+  const granted = (await a(`/api/students/${victim.id}`)).json;
+  check("consent can be granted properly",
+    granted.recordingConsent?.grantedBy === "A real parent");
+  check("the grant time comes from the server",
+    new Date(granted.recordingConsent.grantedAt).getFullYear() >= 2026);
+
+  // And withdrawn.
+  await a(`/api/students/${victim.id}`, patch({ consentFrom: null }));
+  check("consent can be withdrawn",
+    !(await a(`/api/students/${victim.id}`)).json.recordingConsent);
+
+  // Rotating a link has to break the old one.
+  const before = (await a(`/api/students/${victim.id}`)).json;
+  const oldPage = await anon(`/s/${before.studentKey}`);
+  await a(`/api/students/${victim.id}`, patch({ rotateLinks: true }));
+  const rotated = (await a(`/api/students/${victim.id}`)).json;
+  check("rotating replaces both links",
+    rotated.studentKey !== before.studentKey && rotated.parentKey !== before.parentKey);
+  check("the old link stops working",
+    oldPage.status === 200 && (await anon(`/s/${before.studentKey}`)).status === 404);
+}
+
 // --- account security -----------------------------------------------------
 {
   // A second session, opened before the change, to prove revocation works.

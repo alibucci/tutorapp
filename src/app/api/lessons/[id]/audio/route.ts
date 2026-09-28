@@ -7,6 +7,12 @@ import { audioPath, saveAudio, updateLesson } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
 
+/**
+ * A lesson at 24 kbit/s is 5-7 MB an hour, so this is generous even for a long
+ * one. Without a ceiling a single request can fill the disk or the heap.
+ */
+const MAX_UPLOAD_BYTES = 64 * 1024 * 1024;
+
 /** Upload the tutor's recording for a lesson or its debrief. */
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
@@ -21,6 +27,18 @@ export async function POST(request: Request, { params }: Params) {
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No audio in request." }, { status: 400 });
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: "That recording is too large." },
+      { status: 413 },
+    );
+  }
+  if (!file.type.startsWith("audio/")) {
+    return NextResponse.json(
+      { error: "That is not an audio file." },
+      { status: 415 },
+    );
   }
 
   const ext = file.type.includes("mp4") ? "m4a" : file.type.includes("ogg") ? "ogg" : "webm";
