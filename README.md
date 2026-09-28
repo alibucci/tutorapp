@@ -267,7 +267,9 @@ movement. Nothing triggered many times an hour animates at all.
 
 - **No delivery.** Reports do not reach anyone; a parent has to open a link.
 - **Links are the family credential.** Rotatable, but not an account.
-- **Single machine.** Files on disk, no backup, no migrations.
+- **Single machine.** Files on disk, no migrations, no second instance.
+  `deploy/backup.sh` covers backups once someone installs the cron entry and
+  points `BACKUP_REMOTE` off the box — until then there is still only one copy.
 - **Foreign services in the path.** The transcript goes through Google's
   recogniser and the four model calls go to DeepSeek. For a deployment where
   data must stay in one jurisdiction, both need replacing — the capture layer
