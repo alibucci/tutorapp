@@ -179,6 +179,10 @@ either and fail with a misleading `network` error. Firefox has no support at
 all. Where Google is unreachable, Safari is the one that still works. Audio still records everywhere — only the transcript
 is missing.
 
+Audio streams to the server a second at a time while the lesson runs, so a
+crashed tab costs the last second rather than the whole lesson, and there is no
+upload to sit through at the end. See `deploy/` for hosting, TLS and backups.
+
 Everything is written to `data/` as JSON plus audio blobs. That directory is
 gitignored and is the only persistence layer; swap `src/lib/store.ts` for a real
 database without touching a single caller.

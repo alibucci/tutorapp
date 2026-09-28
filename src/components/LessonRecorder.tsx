@@ -8,7 +8,6 @@ import { MicPicker } from "@/components/MicPicker";
 import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
 import { useTutorRecorder } from "@/hooks/useTutorRecorder";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import { uploadAudio } from "@/lib/client";
 import { INTERRUPTION_LABEL, type Lesson } from "@/lib/types";
 
 export function LessonRecorder({ lesson }: { lesson: Lesson }) {
@@ -31,7 +30,11 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   );
 
   const speech = useSpeechTranscript(lesson.language);
-  const rec = useTutorRecorder({ gate, onAutoPause: () => speech.stop() });
+  const rec = useTutorRecorder({
+    gate,
+    onAutoPause: () => speech.stop(),
+    upload: { lessonId: lesson.id, kind: "lesson" },
+  });
   const wakeLock = useWakeLock();
 
   // Ask for the mic as soon as the page opens so the meter is live.
@@ -40,43 +43,6 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     // arm is stable enough for a one-shot on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // When the recording stops, the blob lands asynchronously - save then.
-  useEffect(() => {
-    if (rec.state !== "stopped" || !rec.blob || saving) return;
-
-    let cancelled = false;
-    async function save(blob: Blob) {
-      setSaving(true);
-      setSaveError(null);
-      try {
-        await uploadAudio(lesson.id, "lesson", blob);
-        const res = await fetch(`/api/lessons/${lesson.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            transcript: speech.segments,
-            interruptions: rec.interruptions,
-            endedAt: new Date().toISOString(),
-            recordedMs: Math.round(rec.openMs),
-          }),
-        });
-        if (!res.ok) throw new Error("Could not save the lesson.");
-        if (!cancelled) router.push(`/lesson/${lesson.id}/debrief`);
-      } catch (e) {
-        if (!cancelled) {
-          setSaveError(e instanceof Error ? e.message : "Saving failed.");
-          setSaving(false);
-        }
-      }
-    }
-
-    void save(rec.blob);
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rec.state, rec.blob]);
 
   const recording = rec.state === "recording";
   const paused = rec.state === "paused";
@@ -94,11 +60,42 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     await rec.start();
   }
 
-  function end() {
+  async function end() {
     setConfirmingEnd(false);
     speech.stop();
-    rec.stop();
-    void wakeLock.release();
+    setSaving(true);
+    setSaveError(null);
+
+    // The audio is already on the server; only the transcript and the timings
+    // are still here. Waiting for the tail of the queue takes a moment, not
+    // the minute a whole-file upload used to.
+    const complete = await rec.stop();
+
+    try {
+      const res = await fetch(`/api/lessons/${lesson.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: speech.segments,
+          interruptions: rec.interruptions,
+          endedAt: new Date().toISOString(),
+          recordedMs: Math.round(rec.openMs),
+        }),
+      });
+      if (!res.ok) throw new Error("Could not save the lesson.");
+      void wakeLock.release();
+      if (!complete) {
+        setSaveError(
+          "Some audio did not reach the server. The recording has gaps - check it before relying on it.",
+        );
+        setSaving(false);
+        return;
+      }
+      router.push(`/lesson/${lesson.id}/debrief`);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Saving failed.");
+      setSaving(false);
+    }
   }
 
   function pause() {
@@ -207,6 +204,14 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         </div>
       )}
 
+      {live && (rec.pending > 2 || rec.uploadFailed) && (
+        <p className={`note ${rec.uploadFailed ? "note-warn" : "note-quiet"}`}>
+          {rec.uploadFailed
+            ? "Some audio did not reach the server. The recording will have gaps."
+            : `${rec.pending} seconds of audio waiting to upload — the connection is slow.`}
+        </p>
+      )}
+
       {rec.interruptions.length > 0 && (
         <div className="enter card card-accent card-pad t-small">
           <p className="font-medium">This recording was interrupted.</p>
@@ -273,7 +278,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         body={`${formatMs(rec.elapsedMs)} recorded. This stops the recording and takes you to the debrief - it cannot be resumed afterwards.`}
         confirmLabel="End lesson"
         cancelLabel="Keep recording"
-        onConfirm={end}
+        onConfirm={() => void end()}
         onCancel={() => setConfirmingEnd(false)}
       />
 

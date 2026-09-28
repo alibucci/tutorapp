@@ -6,7 +6,6 @@ import { LevelMeter } from "@/components/LevelMeter";
 import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
 import { useTutorRecorder } from "@/hooks/useTutorRecorder";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import { uploadAudio } from "@/lib/client";
 import {
   DEBRIEF_PROMPTS,
   DEBRIEF_TOTAL_SECONDS,
@@ -18,7 +17,9 @@ type Phase = "ready" | "running" | "review";
 
 export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const router = useRouter();
-  const rec = useTutorRecorder();
+  const rec = useTutorRecorder({
+    upload: { lessonId: lesson.id, kind: "debrief" },
+  });
   const speech = useSpeechTranscript(lesson.language);
   const wakeLock = useWakeLock();
 
@@ -43,7 +44,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
   const finish = useCallback(() => {
     speech.stop();
-    rec.stop();
+    void rec.stop();
     void wakeLock.release();
     setPhase("review");
   }, [rec, speech, wakeLock]);
@@ -118,7 +119,6 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     setSaving(true);
     setError(null);
     try {
-      if (rec.blob) await uploadAudio(lesson.id, "debrief", rec.blob);
       const res = await fetch(`/api/lessons/${lesson.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

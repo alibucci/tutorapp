@@ -233,15 +233,33 @@ export async function listReports(studentId?: string): Promise<ParentReport[]> {
 
 // --- audio -----------------------------------------------------------------
 
-export async function saveAudio(
+/**
+ * Append one chunk of a recording.
+ *
+ * The recorder emits a chunk a second and they are written as they arrive, so a
+ * crashed tab costs the last second rather than the whole lesson. Sequence 0
+ * starts the file - re-recording a lesson replaces it rather than appending to
+ * what was there.
+ *
+ * MediaRecorder's first chunk carries the container header and the rest are
+ * continuation clusters, so concatenating them in order is exactly what the
+ * browser would have produced in one blob.
+ */
+export async function appendAudio(
   lessonId: string,
   kind: "lesson" | "debrief",
   data: ArrayBuffer,
   ext: string,
+  seq: number,
 ): Promise<string> {
   await ensureDirs();
   const name = `${lessonId}-${kind}.${ext}`;
-  await fs.writeFile(path.join(AUDIO_DIR, name), Buffer.from(data));
+  const full = path.join(AUDIO_DIR, name);
+  const buffer = Buffer.from(data);
+
+  if (seq === 0) await fs.writeFile(full, buffer);
+  else await fs.appendFile(full, buffer);
+
   return name;
 }
 

@@ -83,19 +83,51 @@ function renderWeek(lessons: Lesson[], skills: Skill[]): string {
   ].join("\n");
 }
 
-/** Monday 00:00 of the week containing `date`, and the Sunday that closes it. */
-export function weekBounds(date: Date): { start: string; end: string } {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const dayFromMonday = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - dayFromMonday);
-  const end = new Date(d);
-  end.setDate(end.getDate() + 6);
-  return { start: toDate(d), end: toDate(end) };
+/**
+ * Which calendar week a lesson belongs to, in one fixed timezone.
+ *
+ * This used to read the server clock, so the answer depended on where the
+ * process happened to run. Hong Kong and Shanghai are both UTC+8, so it would
+ * have looked correct right up until someone moved the box, and then weekly
+ * notes would have started cutting in the wrong place with no visible cause.
+ *
+ * Week boundaries are calendar dates, not instants, so everything below works
+ * on Y-M-D strings once the timezone has been applied.
+ */
+export const REPORT_TIMEZONE = process.env.REPORT_TIMEZONE ?? "Asia/Shanghai";
+
+const DATE_IN_ZONE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: REPORT_TIMEZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const WEEKDAY_IN_ZONE = new Intl.DateTimeFormat("en-US", {
+  timeZone: REPORT_TIMEZONE,
+  weekday: "short",
+});
+
+const MONDAY_FIRST = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Shift a plain Y-M-D by whole days, with no timezone in play. */
+function shiftDays(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const moved = new Date(Date.UTC(y, m - 1, d + days));
+  return moved.toISOString().slice(0, 10);
 }
 
-function toDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** The Monday and Sunday of the week containing `date`, in REPORT_TIMEZONE. */
+export function weekBounds(date: Date): { start: string; end: string } {
+  const today = DATE_IN_ZONE.format(date);
+  const fromMonday = MONDAY_FIRST.indexOf(WEEKDAY_IN_ZONE.format(date));
+  const start = shiftDays(today, -fromMonday);
+  return { start, end: shiftDays(start, 6) };
+}
+
+/** The calendar day a lesson falls on, in the same zone. */
+export function lessonDay(createdAt: string): string {
+  return DATE_IN_ZONE.format(new Date(createdAt));
 }
 
 export function lessonsInWeek(
@@ -105,7 +137,7 @@ export function lessonsInWeek(
 ): Lesson[] {
   return lessons
     .filter((l) => {
-      const day = l.createdAt.slice(0, 10);
+      const day = lessonDay(l.createdAt);
       return day >= start && day <= end;
     })
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));

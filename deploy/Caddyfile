@@ -1,0 +1,37 @@
+# Terminates TLS and proxies to the Next.js process.
+#
+# TLS is not a nicety here: getUserMedia and the speech recogniser both refuse
+# to run outside a secure context, so the app on plain HTTP has no microphone
+# at all - and the browser reports nothing the tutor can act on. Caddy gets and
+# renews a certificate on its own, which is the whole reason it is here.
+#
+#   caddy run --config /etc/caddy/Caddyfile
+
+tutorsignal.example.com {
+	encode zstd gzip
+
+	# Recording chunks arrive once a second; the default buffer would add
+	# latency for no benefit.
+	reverse_proxy 127.0.0.1:3000 {
+		flush_interval -1
+	}
+
+	# The app sets no third-party requests of its own, so the policy can be
+	# strict. `unsafe-inline` on styles is what Next's streamed CSS needs.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+	}
+
+	# A family link in a referrer header would hand the address to whatever
+	# site a parent visits next. Referrer-Policy above already covers it; this
+	# keeps the links out of the access log as well.
+	log {
+		output file /var/log/caddy/tutorsignal.log
+		format json
+		level INFO
+	}
+}

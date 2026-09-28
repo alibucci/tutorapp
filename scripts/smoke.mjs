@@ -307,10 +307,11 @@ const fakeAudio = Buffer.from([
   ...Array.from({ length: 2048 }, (_, i) => i % 256),
 ]);
 
-async function upload(client, lessonId, kind) {
+async function upload(client, lessonId, kind, seq = 0, body = fakeAudio) {
   const form = new FormData();
   form.append("kind", kind);
-  form.append("audio", new Blob([fakeAudio], { type: "audio/webm" }), `${kind}.webm`);
+  form.append("seq", String(seq));
+  form.append("audio", new Blob([body], { type: "audio/webm" }), `${kind}.webm`);
   const res = await fetch(`${BASE}/api/lessons/${lessonId}/audio`, {
     method: "POST",
     body: form,
@@ -345,16 +346,36 @@ const bCookie = (await fetch(`${BASE}/api/auth`, {
 })).headers.get("set-cookie").split(";")[0];
 
 check("lesson audio uploads",
-  (await upload({ cookie: aCookie }, lessonA.id, "lesson")) === 200);
+  (await upload({ cookie: aCookie }, lessonA.id, "lesson", 0)) === 200);
 check("debrief audio uploads",
-  (await upload({ cookie: aCookie }, lessonA.id, "debrief")) === 200);
+  (await upload({ cookie: aCookie }, lessonA.id, "debrief", 0)) === 200);
 
+// Streaming: chunks arrive one at a time and are appended in order.
+const chunks = [
+  Buffer.from([0x1a, 0x45, 0xdf, 0xa3, ...Array.from({ length: 300 }, (_, i) => i % 256)]),
+  Buffer.from(Array.from({ length: 400 }, (_, i) => (i * 7) % 256)),
+  Buffer.from(Array.from({ length: 500 }, (_, i) => (i * 13) % 256)),
+];
+for (let i = 0; i < chunks.length; i++) {
+  await upload({ cookie: aCookie }, lessonA.id, "lesson", i, chunks[i]);
+}
+const streamed = Buffer.from(await (await fetch(
+  `${BASE}/api/lessons/${lessonA.id}/audio`, { headers: { cookie: aCookie } },
+)).arrayBuffer());
+check("streamed chunks land in order and concatenate",
+  streamed.equals(Buffer.concat(chunks)),
+  `${streamed.length} bytes vs ${Buffer.concat(chunks).length}`);
+
+// Sequence 0 must start the file over, not append to the previous take.
+await upload({ cookie: aCookie }, lessonA.id, "lesson", 0, fakeAudio);
 const read = await fetch(`${BASE}/api/lessons/${lessonA.id}/audio`, {
   headers: { cookie: aCookie },
 });
 const readBack = Buffer.from(await read.arrayBuffer());
-check("audio reads back byte for byte", readBack.equals(fakeAudio),
+check("re-recording replaces rather than appends", readBack.equals(fakeAudio),
   `${readBack.length} bytes vs ${fakeAudio.length}`);
+check("a negative chunk number is refused",
+  (await upload({ cookie: aCookie }, lessonA.id, "lesson", -1)) === 400);
 check("audio is served as webm",
   (read.headers.get("content-type") ?? "").includes("webm"));
 

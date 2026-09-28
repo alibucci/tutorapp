@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChunkUploader } from "@/lib/client";
 import type { CaptureInterruption } from "@/lib/types";
 
 export type GateOptions = {
@@ -25,6 +26,11 @@ type Options = {
   gate?: GateOptions | null;
   /** Fired when the recording pauses itself, so callers can stop their own work. */
   onAutoPause?: (reason: NonNullable<AutoPauseReason>) => void;
+  /**
+   * Where to stream chunks. Without it the recorder still works but nothing is
+   * kept - which is what the device check page wants.
+   */
+  upload?: { lessonId: string; kind: "lesson" | "debrief" };
 };
 
 type MeterMessage = {
@@ -48,7 +54,7 @@ const WORKLET_URL = "/tutor-gate-worklet.js";
  * rather than passing silently.
  */
 export function useTutorRecorder(options: Options = {}) {
-  const { gate = null, onAutoPause } = options;
+  const { gate = null, onAutoPause, upload } = options;
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
@@ -58,15 +64,17 @@ export function useTutorRecorder(options: Options = {}) {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [openMs, setOpenMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [blob, setBlob] = useState<Blob | null>(null);
   const [interruptions, setInterruptions] = useState<CaptureInterruption[]>([]);
+  /** Chunks still on their way to the server, and whether any were lost. */
+  const [pending, setPending] = useState(0);
+  const [uploadFailed, setUploadFailed] = useState(false);
   const [autoPaused, setAutoPaused] = useState<AutoPauseReason>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const nodeRef = useRef<AudioWorkletNode | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
+  const uploaderRef = useRef<ChunkUploader | null>(null);
   const moduleLoadedRef = useRef(false);
   const recordingRef = useRef(false);
   const onAutoPauseRef = useRef(onAutoPause);
@@ -169,12 +177,12 @@ export function useTutorRecorder(options: Options = {}) {
           // is uploaded over mobile data.
           audioBitsPerSecond: 24000,
         });
-        chunksRef.current = [];
+        // Each chunk goes out as it arrives rather than accumulating in the
+        // tab, so nothing is waiting to be lost and there is no upload to sit
+        // through at the end of a lesson.
         recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunksRef.current.push(e.data);
-        };
-        recorder.onstop = () => {
-          setBlob(new Blob(chunksRef.current, { type: recorder.mimeType }));
+          if (e.data.size === 0) return;
+          uploaderRef.current?.add(e.data);
         };
         recorderRef.current = recorder;
 
@@ -201,8 +209,14 @@ export function useTutorRecorder(options: Options = {}) {
     const ctx = ctxRef.current;
     if (ctx && ctx.state !== "running") await ctx.resume();
 
-    chunksRef.current = [];
-    setBlob(null);
+    uploaderRef.current = upload
+      ? new ChunkUploader(upload.lessonId, upload.kind, (state) => {
+          setPending(state.pending);
+          setUploadFailed(state.failed);
+        })
+      : null;
+    setPending(0);
+    setUploadFailed(false);
     setElapsedMs(0);
     setOpenMs(0);
     setInterruptions([]);
@@ -211,7 +225,7 @@ export function useTutorRecorder(options: Options = {}) {
     nodeRef.current?.port.postMessage({ type: "start" });
     recorder.start(1000);
     setState("recording");
-  }, []);
+  }, [upload]);
 
   const pause = useCallback(
     (reason: AutoPauseReason = null) => {
@@ -240,13 +254,16 @@ export function useTutorRecorder(options: Options = {}) {
     setState("recording");
   }, []);
 
-  const stop = useCallback(() => {
+  /** Stops, then waits for the tail of the queue. Resolves false if any chunk
+   *  was lost, so the caller can tell the tutor rather than pretend. */
+  const stop = useCallback(async (): Promise<boolean> => {
     const recorder = recorderRef.current;
-    if (!recorder || recorder.state === "inactive") return;
+    if (!recorder || recorder.state === "inactive") return true;
     recordingRef.current = false;
     nodeRef.current?.port.postMessage({ type: "stop" });
     recorder.stop();
     setState("stopped");
+    return (await uploaderRef.current?.flush()) ?? true;
   }, []);
 
   // A hidden page means the screen went off or the tutor switched apps. The
@@ -287,7 +304,8 @@ export function useTutorRecorder(options: Options = {}) {
     elapsedMs,
     openMs,
     error,
-    blob,
+    pending,
+    uploadFailed,
     interruptions,
     autoPaused,
     arm,

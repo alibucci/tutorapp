@@ -12,7 +12,7 @@ Last updated: 2026-09-27
 The whole pipeline exists and runs end to end. **No real lesson has ever gone
 through it**, but as of 28 September every layer has been proven separately:
 
-- the server path, by an automated run with real model calls (58 checks, all
+- the server path, by an automated run with real model calls (60 checks, all
   passing — `npm run smoke`)
 - the capture path, by hand on macOS via `/check`: microphone, the gate running
   in the AudioWorklet, the Opus recorder, wake lock, and a live transcript in
@@ -179,8 +179,10 @@ Not bugs — things deliberately not built yet, in rough priority order.
    first thing to build after the pilot.
 2. **The consent document is not recorded.** The app stores a name and a date.
    The actual signed paperwork lives wherever you put it.
-3. **One machine, files on disk.** No backup, no migrations, no second instance.
-   `src/lib/store.ts` is the only file that knows this.
+3. **One machine, files on disk.** No migrations, no second instance.
+   `src/lib/store.ts` is the only file that knows this. Backups are handled by
+   `deploy/backup.sh`, but only once someone installs the cron entry and points
+   `BACKUP_REMOTE` somewhere off the box.
 4. **The transcript leaves the device.** Where it goes depends on the browser:
    Chrome and Edge send audio to Google, Safari sends it to Apple. **Verified
    working in Safari on macOS**, which matters because it removes the Google
@@ -223,7 +225,7 @@ npm run smoke        # another
 isolation, consent, all four model calls, both approval gates, and what a family
 can and cannot see. It makes real DeepSeek requests, so it costs a few cents and
 takes about a minute — that is deliberate, a mocked run would prove nothing. It
-deletes the records it creates. **58 checks, all passing as of this writing.**
+deletes the records it creates. **60 checks, all passing as of this writing.**
 
 For the browser half, open **`/check`** on the device that will actually record.
 It reports secure context, microphone access, the AudioWorklet, the gate module,
