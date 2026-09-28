@@ -79,4 +79,6 @@ Restoring is `tar xzf` over an empty `data/`.
   It creates records and deletes them again, but it does write to the live
   store, so do it before real lessons exist.
 - Confirm the timezone: week boundaries follow `REPORT_TIMEZONE`, default
-  `Asia/Shanghai`, not the server clock.
+  `Asia/Shanghai`, not the server clock. Set it in `.env.local` explicitly even
+  when the default is right, so moving the box later cannot change it silently.
+- Have each tutor open `/account` and replace the password you issued them.

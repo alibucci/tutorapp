@@ -41,6 +41,12 @@ which is why it does not feel like extra work.
 - **Don't correct the transcript in your head.** The recogniser will mangle
   words. Ignore it during the lesson; fix the debrief afterwards.
 
+## First time only
+
+Change your password at **Your account** — the link is your name in the top
+corner. You were given a one-time password by whoever set up your account, and
+they still know it.
+
 ## Setting up (30 seconds)
 
 1. Pick the right **microphone**. Watch the level bar move when you speak before
@@ -52,6 +58,20 @@ which is why it does not feel like extra work.
 3. Check the **live transcript** produces words in the first minute. If it is
    blank, stop and fix it — audio alone is not enough.
 4. **Keep the screen on.** If it goes dark the recording pauses and tells you.
+
+If you want to check a new laptop or phone before a real lesson, open **/check**
+on it. It tests the microphone and the transcript in about thirty seconds.
+
+## If something goes wrong mid-lesson
+
+Audio uploads as you go rather than all at once at the end, so a crashed tab
+costs a second or two, not the lesson.
+
+- **"N seconds of audio waiting to upload"** — the connection is slow. It is
+  catching up; carry on teaching.
+- **"Some audio did not reach the server"** — the recording will have gaps.
+  Finish the lesson, then be more thorough than usual in the debrief, because
+  it is now the better record of what happened.
 
 ## The debrief
 

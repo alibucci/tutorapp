@@ -23,6 +23,12 @@ Three audiences, three route groups, and no self-registration anywhere.
 | **Tutor** `(tutor)` | email + password issued by the superadmin | only their own students, lessons, audio and drafts |
 | **Student / parent** `(guest)` | an unguessable link | one page of approved content, nothing else |
 
+A tutor changes their issued password at `/account`; doing so signs out every
+other session of theirs, which is the point of replacing a password somebody
+else once read out. Suspending a tutor or resetting their password has the same
+effect, because a session carries the account's token version and it is
+re-checked on every request rather than trusted for a fortnight.
+
 Tutors get passwords because they handle the raw material daily. Families get
 links instead: a nine-year-old with a password is a support queue, and a parent
 will not keep an account either. A family link only ever shows content a tutor
@@ -202,6 +208,9 @@ database without touching a single caller.
    draft and approve, and the two family links to copy.
 6. **`/s/[key]`** and **`/p/[key]`** — what the child and the parent actually see.
 
+Outside that loop: **`/account`** for a tutor to replace the one-time password
+they were issued, and **`/check`** to test a device before recording on it.
+
 ## Layout
 
 ```
@@ -214,6 +223,7 @@ src/lib/diarize.ts               Who said each line, and the talk ratio
 src/lib/summarize.ts             The tutor's write-up
 src/lib/skills.ts                The student model and its proposed changes
 src/lib/parentReport.ts          The weekly note
+src/lib/client.ts                Streams recorder chunks, in order, with retry
 
 public/tutor-gate-worklet.js     The gate, on the audio thread
 src/hooks/useTutorRecorder.ts    Mic capture, worklet wiring, interruption log
@@ -225,6 +235,10 @@ src/app/(admin)/                 Superadmin
 src/app/(tutor)/                 The tutor's workspace
 src/app/(guest)/                 Student and parent pages
 src/app/api/                     REST for all of the above
+src/app/check/                   Device diagnostics, no login needed
+
+scripts/smoke.mjs                End-to-end check of the server path
+deploy/                          Caddyfile, backup script, hosting notes
 ```
 
 ## Design
