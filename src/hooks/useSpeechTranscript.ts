@@ -51,6 +51,31 @@ function getRecognitionCtor(): SpeechRecognitionCtor | null {
  */
 const subscribeNever = () => () => {};
 
+/**
+ * What the recogniser's error codes actually mean for this app.
+ *
+ * The raw codes are one word each and read like transcript output when shown to
+ * a person, which is worse than useless - `network` in particular looks like a
+ * transcribed word.
+ */
+export function explainSpeechError(code: string): string {
+  switch (code) {
+    case "network":
+      return "The recogniser could not reach its server. Chrome sends audio to Google to transcribe it, and this fails for two very different reasons: a Chromium-based browser built without Google's speech keys (Brave, Arc, Vivaldi, plain Chromium) never works at all, while real Chrome fails only when Google is unreachable. Try genuine Google Chrome before concluding the network is at fault.";
+    case "not-allowed":
+    case "service-not-allowed":
+      return "The browser refused microphone access for speech recognition. Check the site permissions, and note that some managed browsers disable it outright.";
+    case "audio-capture":
+      return "No microphone was available to the recogniser.";
+    case "language-not-supported":
+      return "This browser cannot recognise the selected language. Try another, or use a different speech engine.";
+    case "bad-grammar":
+      return "The recogniser rejected its configuration.";
+    default:
+      return `Speech recognition stopped: ${code}.`;
+  }
+}
+
 export function useSpeechTranscript(lang = "en-US") {
   const [listening, setListening] = useState(false);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
@@ -110,7 +135,9 @@ export function useSpeechTranscript(lang = "en-US") {
 
     rec.onerror = (e) => {
       // "no-speech" and "aborted" are routine during a quiet stretch.
-      if (e.error !== "no-speech" && e.error !== "aborted") setError(e.error);
+      if (e.error !== "no-speech" && e.error !== "aborted") {
+        setError(explainSpeechError(e.error));
+      }
     };
 
     // Chrome ends the session on its own every so often; restart while wanted.

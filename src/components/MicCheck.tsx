@@ -97,6 +97,33 @@ export function MicCheck() {
       add("Recorder", "fail", "MediaRecorder is missing");
     }
 
+    const ua = navigator.userAgent;
+    const brands =
+      (navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } })
+        .userAgentData?.brands?.map((b) => b.brand) ?? [];
+    const named = brands.find(
+      (b) => !/Not.?A.?Brand|Chromium/i.test(b),
+    );
+    const guess = named
+      ?? (/\bArc\//.test(ua) ? "Arc"
+        : /\bBrave\//.test(ua) ? "Brave"
+        : /\bEdg\//.test(ua) ? "Edge"
+        : /\bChrome\//.test(ua) ? "Chrome"
+        : /\bSafari\//.test(ua) ? "Safari"
+        : /\bFirefox\//.test(ua) ? "Firefox"
+        : "unknown");
+    // Only real Chrome and Edge ship the keys the speech service needs. Other
+    // Chromium builds expose the API and then fail with a network error, which
+    // reads as a connectivity problem and is not one.
+    const trusted = /^(Google Chrome|Chrome|Microsoft Edge|Edge)$/.test(guess);
+    add(
+      "Browser",
+      trusted ? "pass" : "warn",
+      trusted
+        ? guess
+        : `${guess} — Chromium builds other than Chrome and Edge usually cannot transcribe at all, and fail with a misleading "network" error. Test in Google Chrome before blaming the connection.`,
+    );
+
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
     const hasSpeech = Boolean(w.SpeechRecognition ?? w.webkitSpeechRecognition);
     add(
@@ -235,6 +262,7 @@ export function MicCheck() {
 
         {(speech.segments.length > 0 || speech.interim) && (
           <div className="card card-pad" style={{ background: "var(--sunken)" }}>
+            <p className="t-eyebrow mb-2">Heard</p>
             {speech.segments.map((s, i) => (
               <p key={i} className="t-body">
                 {s.text}
@@ -252,7 +280,17 @@ export function MicCheck() {
           </p>
         )}
 
-        {speech.error && <p className="note note-warn">{speech.error}</p>}
+        {speech.error && (
+          <div className="card card-pad" style={{ borderColor: "var(--accent)" }}>
+            <p className="t-subtitle">Speech recognition failed</p>
+            <p className="t-body t-muted mt-2">{speech.error}</p>
+            <p className="t-small mt-3">
+              Without a transcript the lesson cannot be summarised, topics
+              cannot be updated, and no parent note can be written. Audio would
+              still record, but nothing would read it.
+            </p>
+          </div>
+        )}
 
         {!listening && speech.segments.length > 0 && (
           <p className="note note-accent">
