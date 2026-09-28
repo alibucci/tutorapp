@@ -12,7 +12,7 @@ Last updated: 2026-09-27
 The whole pipeline exists and runs end to end. **No real lesson has ever gone
 through it**, but as of 28 September every layer has been proven separately:
 
-- the server path, by an automated run with real model calls (30 checks, all
+- the server path, by an automated run with real model calls (37 checks, all
   passing — `npm run smoke`)
 - the capture path, by hand on macOS via `/check`: microphone, the gate running
   in the AudioWorklet, the Opus recorder, wake lock, and a live transcript in
@@ -99,6 +99,9 @@ The per-lesson gate is a few ticks; the weekly one is about thirty seconds.
   the tutor.
 - **No leakage to families.** Checked the rendered student page for the tutor's
   internal reasoning field, raw status values, and diagnostic language. Clean.
+- **Audio round trip.** A file is uploaded, read back byte for byte, served as
+  webm, and kept separate from the debrief recording. Another tutor and an
+  anonymous visitor both get 404.
 
 ### Written, never run against real hardware
 
@@ -119,7 +122,6 @@ Still untouched:
 - Threshold, hold time and gain ramp under real room conditions
 - Auto-pause when the screen goes off, and manual pause and resume
 - Interruption logging
-- Audio upload and playback
 - Every form and button, as an actual click rather than an API call
 - Anything at all on a phone
 
@@ -210,7 +212,7 @@ npm run smoke        # another
 isolation, consent, all four model calls, both approval gates, and what a family
 can and cannot see. It makes real DeepSeek requests, so it costs a few cents and
 takes about a minute — that is deliberate, a mocked run would prove nothing. It
-deletes the records it creates. **30 checks, all passing as of this writing.**
+deletes the records it creates. **37 checks, all passing as of this writing.**
 
 For the browser half, open **`/check`** on the device that will actually record.
 It reports secure context, microphone access, the AudioWorklet, the gate module,

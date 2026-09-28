@@ -185,6 +185,67 @@ await a(`/api/reports/${report.json.id}`, patch({ approved: true }));
 const parentAfter = (await anon(`/p/${keys.parentKey}`)).text;
 check("parent sees the note after approval", !parentAfter.includes("No notes yet"));
 
+// --- audio round trip -----------------------------------------------------
+// The one server path nothing else touches. A bug here loses a whole lesson's
+// recording silently, so it is worth a real upload and a real read-back.
+const fakeAudio = Buffer.from([
+  0x1a, 0x45, 0xdf, 0xa3, // EBML header, enough to look like webm
+  ...Array.from({ length: 2048 }, (_, i) => i % 256),
+]);
+
+async function upload(client, lessonId, kind) {
+  const form = new FormData();
+  form.append("kind", kind);
+  form.append("audio", new Blob([fakeAudio], { type: "audio/webm" }), `${kind}.webm`);
+  const res = await fetch(`${BASE}/api/lessons/${lessonId}/audio`, {
+    method: "POST",
+    body: form,
+    headers: { cookie: client.cookie },
+    redirect: "manual",
+  });
+  return res.status;
+}
+
+// The actor helper hides its cookie, so grab one the plain way for FormData -
+// setting Content-Type by hand would break the multipart boundary.
+const aCookie = (await fetch(`${BASE}/api/auth`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email: t1.email, password: t1.password }),
+})).headers.get("set-cookie").split(";")[0];
+
+const bCookie = (await fetch(`${BASE}/api/auth`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email: t2.email, password: t2.password }),
+})).headers.get("set-cookie").split(";")[0];
+
+check("lesson audio uploads",
+  (await upload({ cookie: aCookie }, lessonA.id, "lesson")) === 200);
+check("debrief audio uploads",
+  (await upload({ cookie: aCookie }, lessonA.id, "debrief")) === 200);
+
+const read = await fetch(`${BASE}/api/lessons/${lessonA.id}/audio`, {
+  headers: { cookie: aCookie },
+});
+const readBack = Buffer.from(await read.arrayBuffer());
+check("audio reads back byte for byte", readBack.equals(fakeAudio),
+  `${readBack.length} bytes vs ${fakeAudio.length}`);
+check("audio is served as webm",
+  (read.headers.get("content-type") ?? "").includes("webm"));
+
+const debriefRead = await fetch(`${BASE}/api/lessons/${lessonA.id}/audio?kind=debrief`, {
+  headers: { cookie: aCookie },
+});
+check("debrief audio is a separate file", debriefRead.status === 200);
+
+check("another tutor cannot download the audio",
+  (await fetch(`${BASE}/api/lessons/${lessonA.id}/audio`, {
+    headers: { cookie: bCookie }, redirect: "manual",
+  })).status === 404);
+check("anonymous cannot download the audio",
+  (await fetch(`${BASE}/api/lessons/${lessonA.id}/audio`, { redirect: "manual" })).status === 404);
+
 // --- leakage --------------------------------------------------------------
 const reason = proposed.json.changes[0]?.reason ?? "";
 check("the tutor's private reasoning never reaches the student",
@@ -213,6 +274,12 @@ for (const [dir, matches] of [
     } catch { /* leave anything unreadable alone */ }
   }
 }
+try {
+  for (const f of readdirSync("data/audio")) {
+    if (f.startsWith(lessonA.id)) { rmSync(join("data/audio", f)); removed++; }
+  }
+} catch { /* no audio dir yet */ }
+
 console.log(`\n  cleaned up ${removed} records it created`);
 
 console.log(`\n  ${pass} passed, ${fail} failed\n`);
