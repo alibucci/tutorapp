@@ -7,6 +7,7 @@ import {
 } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getTutor } from "./store";
 
 /**
  * Sessions for the two roles that log in.
@@ -22,7 +23,13 @@ import { redirect } from "next/navigation";
  */
 
 export type Role = "admin" | "tutor";
-export type Session = { role: Role; id: string; name: string };
+export type Session = {
+  role: Role;
+  id: string;
+  name: string;
+  /** Tutors only: the tutor's tokenVersion when this session was issued. */
+  v?: number;
+};
 
 const COOKIE = "tutor_session";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
@@ -82,7 +89,12 @@ function decode(token: string | undefined): Session | null {
       | (Session & { exp: number })
       | null;
     if (!claims || claims.exp < Date.now()) return null;
-    return { role: claims.role, id: claims.id, name: claims.name };
+    return {
+      role: claims.role,
+      id: claims.id,
+      name: claims.name,
+      v: claims.v,
+    };
   } catch {
     return null;
   }
@@ -103,12 +115,30 @@ export async function endSession(): Promise<void> {
   (await cookies()).delete(COOKIE);
 }
 
+/**
+ * The signed cookie proves who issued it, not that the account is still good.
+ *
+ * A suspended tutor, a reset password or a self-service password change all
+ * have to take effect now rather than in fourteen days, so a tutor session is
+ * re-checked against the stored record. That is one small file read on a
+ * request that almost always reads the store anyway.
+ *
+ * Admin sessions need no lookup - those credentials live in the environment.
+ */
 export async function getSession(): Promise<Session | null> {
+  let session: Session | null;
   try {
-    return decode((await cookies()).get(COOKIE)?.value);
+    session = decode((await cookies()).get(COOKIE)?.value);
   } catch {
     return null;
   }
+  if (!session || session.role !== "tutor") return session;
+
+  const tutor = await getTutor(session.id);
+  if (!tutor || !tutor.active || tutor.tokenVersion !== session.v) return null;
+
+  // The name can change under an old cookie; trust the record.
+  return { ...session, name: tutor.name };
 }
 
 // --- guards, used next to the data rather than in proxy.ts -----------------
@@ -151,6 +181,45 @@ export function checkAdmin(email: string, password: string): Session | null {
 /** A one-time password for a tutor the superadmin has just created. */
 export function temporaryPassword(): string {
   return randomBytes(6).toString("base64url");
+}
+
+export { MIN_PASSWORD_LENGTH } from "./auth-constants";
+
+// --- login throttling ------------------------------------------------------
+
+/**
+ * In-process, per identifier. Enough for a pilot of five people on one server:
+ * it stops a script, and it resets when the process does. A second server or a
+ * determined attacker needs this moved into the store.
+ *
+ * The two limits are deliberately far apart. Guessing one account's password is
+ * the attack worth stopping hard, so the per-email limit is strict. The per-IP
+ * limit only exists to slow enumeration across many accounts, and it has to
+ * stay loose: a whole school behind one NAT shares an address, and a strict
+ * limit there would lock out the people who typed their password correctly.
+ */
+const WINDOW_MS = 15 * 60 * 1000;
+const LIMITS: Record<string, number> = { email: 10, ip: 60 };
+const attempts = new Map<string, number[]>();
+
+function limitFor(key: string): number {
+  return LIMITS[key.split(":")[0]] ?? 10;
+}
+
+export function tooManyAttempts(key: string): boolean {
+  const now = Date.now();
+  const recent = (attempts.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
+  attempts.set(key, recent);
+  return recent.length >= limitFor(key);
+}
+
+export function recordAttempt(key: string): void {
+  const now = Date.now();
+  attempts.set(key, [...(attempts.get(key) ?? []).filter((t) => now - t < WINDOW_MS), now]);
+}
+
+export function clearAttempts(key: string): void {
+  attempts.delete(key);
 }
 
 export { randomUUID };

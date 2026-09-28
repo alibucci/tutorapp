@@ -151,6 +151,12 @@ export type Tutor = {
   passwordHash: string;
   /** Set until the tutor picks their own password. */
   mustChangePassword: boolean;
+  /**
+   * Bumped whenever every existing session should stop working: a suspension,
+   * an admin password reset, or the tutor changing their own password. Sessions
+   * carry the value they were issued with, so an old cookie stops matching.
+   */
+  tokenVersion: number;
   active: boolean;
   createdAt: string;
 };

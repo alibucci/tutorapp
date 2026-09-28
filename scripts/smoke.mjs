@@ -26,6 +26,9 @@ const env = Object.fromEntries(
 let pass = 0;
 let fail = 0;
 
+/** Tutor A's live password - the account section replaces it mid-run. */
+let passwordA;
+
 function check(label, ok, detail = "") {
   if (ok) { pass++; console.log(`  ok    ${label}`); }
   else { fail++; console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ""}`); }
@@ -95,6 +98,7 @@ const mk = async (name) =>
 const t1 = await mk("Smokeone");
 const t2 = await mk("Smoketwo");
 check("superadmin creates tutors", Boolean(t1?.password && t2?.password));
+passwordA = t1.password;
 check("password hashes never leave the server",
   !JSON.stringify((await admin("/api/tutors")).json).includes("passwordHash"));
 
@@ -185,6 +189,63 @@ await a(`/api/reports/${report.json.id}`, patch({ approved: true }));
 const parentAfter = (await anon(`/p/${keys.parentKey}`)).text;
 check("parent sees the note after approval", !parentAfter.includes("No notes yet"));
 
+// --- account security -----------------------------------------------------
+{
+  // A second session, opened before the change, to prove revocation works.
+  const other = actor();
+  await other("/api/auth", post({ email: t1.email, password: t1.password }));
+
+  // A tutor who cannot change the password they were handed is stuck on a
+  // password someone else knows.
+  const weak = await a("/api/account", patch({
+    currentPassword: t1.password, newPassword: "short",
+  }));
+  check("a too-short password is refused", weak.status === 400);
+
+  const wrong = await a("/api/account", patch({
+    currentPassword: "not-it", newPassword: "a-long-enough-one",
+  }));
+  check("the wrong current password is refused", wrong.status === 401);
+
+  const NEW = "smoke-new-password";
+  const changed = await a("/api/account", patch({
+    currentPassword: t1.password, newPassword: NEW,
+  }));
+  check("a tutor can change their own password", changed.status === 200);
+
+  const oldLogin = actor();
+  check("the old password stops working",
+    (await oldLogin("/api/auth", post({ email: t1.email, password: t1.password }))).status === 401);
+
+  const newLogin = actor();
+  const ok = await newLogin("/api/auth", post({ email: t1.email, password: NEW }));
+  check("the new password works", ok.json?.role === "tutor");
+  check("the change clears the must-change flag", ok.json?.mustChangePassword === false);
+  passwordA = NEW;
+
+  // The tab that made the change keeps working on purpose; every other one
+  // must not. `other` signed in before the change, so it is the real test.
+  check("changing the password signs other sessions out",
+    (await other("/api/students")).status === 403);
+  check("the tab that changed it stays signed in",
+    (await a("/api/students")).status === 200);
+}
+
+{
+  // Suspending has to take effect now, not when the cookie expires.
+  const live = actor();
+  await live("/api/auth", post({ email: t2.email, password: t2.password }));
+  check("a tutor's session works before suspension",
+    (await live("/api/students")).status === 200);
+
+  const t2id = (await admin("/api/tutors")).json.find((t) => t.email === t2.email).id;
+  await admin(`/api/tutors/${t2id}`, patch({ active: false }));
+  check("suspending kills the live session immediately",
+    (await live("/api/students")).status === 403);
+
+  await admin(`/api/tutors/${t2id}`, patch({ active: true }));
+}
+
 // --- audio round trip -----------------------------------------------------
 // The one server path nothing else touches. A bug here loses a whole lesson's
 // recording silently, so it is worth a real upload and a real read-back.
@@ -208,10 +269,20 @@ async function upload(client, lessonId, kind) {
 
 // The actor helper hides its cookie, so grab one the plain way for FormData -
 // setting Content-Type by hand would break the multipart boundary.
+function cookieFrom(res, who) {
+  const set = res.headers.get("set-cookie");
+  if (!set) {
+    console.log(`  FAIL  could not sign ${who} in for the audio checks`);
+    fail++;
+    return "";
+  }
+  return set.split(";")[0];
+}
+
 const aCookie = (await fetch(`${BASE}/api/auth`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email: t1.email, password: t1.password }),
+  body: JSON.stringify({ email: t1.email, password: passwordA }),
 })).headers.get("set-cookie").split(";")[0];
 
 const bCookie = (await fetch(`${BASE}/api/auth`, {
@@ -253,6 +324,21 @@ check("the tutor's private reasoning never reaches the student",
 check("the parent gets no lesson diagnostics",
   !parentAfter.includes(sum?.struggles?.[0]?.evidence ?? "@@none@@"));
 check("a wrong family key is a 404", (await anon("/s/not-a-real-key")).status === 404);
+
+{
+  // Last, because tripping a limit would block the logins every other
+  // check needs. One address, one account, fourteen wrong guesses.
+  const attacker = actor();
+  let sawLimit = false;
+  for (let i = 0; i < 14; i++) {
+    const res = await attacker("/api/auth", post({
+      email: "nobody-smoke@smoke.test", password: `guess-${i}`,
+    }));
+    if (res.status === 429) { sawLimit = true; break; }
+  }
+  check("repeated failed logins are throttled", sawLimit);
+}
+
 
 // --- clean up after itself ------------------------------------------------
 // The run writes real records; leaving them behind would pollute the tutor's

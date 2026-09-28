@@ -12,7 +12,7 @@ Last updated: 2026-09-27
 The whole pipeline exists and runs end to end. **No real lesson has ever gone
 through it**, but as of 28 September every layer has been proven separately:
 
-- the server path, by an automated run with real model calls (37 checks, all
+- the server path, by an automated run with real model calls (48 checks, all
   passing — `npm run smoke`)
 - the capture path, by hand on macOS via `/check`: microphone, the gate running
   in the AudioWorklet, the Opus recorder, wake lock, and a live transcript in
@@ -102,6 +102,11 @@ The per-lesson gate is a few ticks; the weekly one is about thirty seconds.
 - **Audio round trip.** A file is uploaded, read back byte for byte, served as
   webm, and kept separate from the debrief recording. Another tutor and an
   anonymous visitor both get 404.
+- **Account security.** A tutor can change the password they were issued; the
+  old one stops working and every other session of theirs is signed out while
+  the tab they are in stays. Suspending a tutor kills their live session on the
+  next request rather than when the cookie expires. Repeated failed logins
+  against one account are throttled.
 
 ### Written, never run against real hardware
 
@@ -150,6 +155,7 @@ turns up in the pilot.
 | **Parent notes are weekly, not per lesson** | Per lesson is noisy, turns every session into a verdict, and sends single-lesson model errors straight to a parent. A week averages both out and shows trajectory, which is what a parent is actually asking about. |
 | **Student and parent see different things** | A child needs two or three things to do. A parent needs to know whether their money is working. Same data, different question. |
 | **Parent tone: explicit strengths, growth framing for gaps** | A report of pure negatives is a churn machine; a report of pure positives is useless and a parent can tell. |
+| **Sessions are re-checked against the store on every request** | A signed cookie proves who issued it, not that the account is still good. Suspending someone has to take effect now. The cost is one small file read on requests that mostly read the store anyway. |
 | **Links, not accounts, for families** | A nine-year-old with a password is a support queue. A leaked link is worth one approved weekly note, and it can be rotated. |
 | **Superadmin creates tutors; tutors create their own students** | Trusting a tutor is a real decision and belongs to you. Adding a student is operational — gating it would leave a tutor stuck mid-lesson. |
 | **Speaker labelling from the text, not the acoustics** | Two people in a closed room: who asks and who answers is usually obvious from the dialogue. Costs nothing, needs no on-device model, no voice enrolment. Acoustic matching is the fallback if this proves unreliable. |
@@ -212,7 +218,7 @@ npm run smoke        # another
 isolation, consent, all four model calls, both approval gates, and what a family
 can and cannot see. It makes real DeepSeek requests, so it costs a few cents and
 takes about a minute — that is deliberate, a mocked run would prove nothing. It
-deletes the records it creates. **37 checks, all passing as of this writing.**
+deletes the records it creates. **48 checks, all passing as of this writing.**
 
 For the browser half, open **`/check`** on the device that will actually record.
 It reports secure context, microphone access, the AudioWorklet, the gate module,

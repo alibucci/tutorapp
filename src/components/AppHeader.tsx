@@ -6,10 +6,12 @@ export function AppHeader({
   name,
   context,
   action,
+  accountHref,
 }: {
   name: string;
   context?: string;
   action?: { href: string; label: string };
+  accountHref?: string;
 }) {
   return (
     <header className="border-b border-line bg-surface">
@@ -24,7 +26,7 @@ export function AppHeader({
               {action.label}
             </Link>
           )}
-          <SignOut name={name} />
+          <SignOut name={name} accountHref={accountHref} />
         </div>
       </div>
     </header>

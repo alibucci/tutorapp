@@ -54,6 +54,7 @@ export async function createTutor(
     name: input.name,
     passwordHash: input.passwordHash,
     mustChangePassword: true,
+    tokenVersion: 1,
     active: true,
     createdAt: new Date().toISOString(),
   };

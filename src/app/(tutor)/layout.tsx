@@ -19,6 +19,7 @@ export default async function TutorLayout({
       <AppHeader
         name={session.name}
         action={{ href: "/lesson/new", label: "New lesson" }}
+        accountHref="/account"
       />
       <div className="page page-wide flex-1 py-8">{children}</div>
     </>

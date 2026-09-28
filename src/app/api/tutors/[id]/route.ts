@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession, hashPassword, temporaryPassword } from "@/lib/auth";
-import { updateTutor } from "@/lib/store";
+import { getTutor, updateTutor } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,11 +16,18 @@ export async function PATCH(request: Request, { params }: Params) {
     resetPassword?: boolean;
   };
 
+  const current = await getTutor(id);
+  if (!current) {
+    return NextResponse.json({ error: "No such tutor." }, { status: 404 });
+  }
+
   if (body.resetPassword) {
     const password = temporaryPassword();
+    // Whoever was signed in with the old password is signed out now.
     const tutor = await updateTutor(id, {
       passwordHash: hashPassword(password),
       mustChangePassword: true,
+      tokenVersion: current.tokenVersion + 1,
     });
     if (!tutor) {
       return NextResponse.json({ error: "No such tutor." }, { status: 404 });
@@ -29,7 +36,11 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   if (typeof body.active === "boolean") {
-    const tutor = await updateTutor(id, { active: body.active });
+    // A suspension has to take effect now, not when the cookie expires.
+    const tutor = await updateTutor(id, {
+      active: body.active,
+      tokenVersion: current.tokenVersion + 1,
+    });
     if (!tutor) {
       return NextResponse.json({ error: "No such tutor." }, { status: 404 });
     }
