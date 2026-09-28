@@ -29,6 +29,8 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const [answers, setAnswers] = useState<DebriefAnswer[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** False once a chunk of the debrief failed to reach the server. */
+  const [audioComplete, setAudioComplete] = useState(true);
 
   /** Start ms (relative to the debrief) of each prompt, so a tutor can advance early. */
   const boundariesRef = useRef<number[]>([]);
@@ -44,9 +46,11 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
   const finish = useCallback(() => {
     speech.stop();
-    void rec.stop();
     void wakeLock.release();
     setPhase("review");
+    // The tutor moves on to editing while the tail of the queue drains; a lost
+    // chunk surfaces on this screen rather than nowhere.
+    void rec.stop().then(setAudioComplete);
   }, [rec, speech, wakeLock]);
 
   const advance = useCallback(() => {
@@ -213,6 +217,13 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
         Transcribed from what you said. Fix anything the recogniser got wrong -
         it goes straight into the summary.
       </p>
+
+      {!audioComplete && (
+        <p className="note note-warn">
+          Some of the debrief audio did not reach the server. The text below is
+          what matters, so check it carefully before saving.
+        </p>
+      )}
 
       {DEBRIEF_PROMPTS.map((prompt, i) => (
         <label key={prompt.id} className="block">
