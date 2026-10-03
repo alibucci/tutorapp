@@ -7,7 +7,7 @@
 #
 #   caddy run --config /etc/caddy/Caddyfile
 
-tutorsignal.example.com {
+aloudli.com, www.aloudli.com {
 	encode zstd gzip
 
 	# Recording chunks arrive once a second; the default buffer would add
@@ -30,7 +30,7 @@ tutorsignal.example.com {
 	# site a parent visits next. Referrer-Policy above already covers it; this
 	# keeps the links out of the access log as well.
 	log {
-		output file /var/log/caddy/tutorsignal.log
+		output file /var/log/caddy/aloudli.log
 		format json
 		level INFO
 	}

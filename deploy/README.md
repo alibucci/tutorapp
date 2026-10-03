@@ -51,6 +51,15 @@ cp deploy/Caddyfile /etc/caddy/Caddyfile
 systemctl reload caddy
 ```
 
+DNS first, or Caddy cannot prove it owns the name. At the registrar, **delete any
+URL redirect** — that is a parking feature and it conflicts with pointing the
+domain at a real server — then add two A records:
+
+```
+A   @     47.242.7.151
+A   www   47.242.7.151
+```
+
 Then open `/check` on a real device and confirm **Secure context: OK**.
 
 ## Backups
