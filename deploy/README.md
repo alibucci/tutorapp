@@ -10,12 +10,33 @@ decides whether the app loads at eight in the evening.
 
 ## Setup
 
+Ubuntu's own `nodejs` package is 18.19, and Next needs 20.9 or newer — the
+build fails with a version error rather than anything informative, so take Node
+from NodeSource.
+
 ```bash
-# Node 20+, git, caddy, ffmpeg (ffmpeg only if you add silence trimming later)
+# swap first: 2 GB of RAM is tight for a Next build and it will be killed
+# mid-compile with nothing in the log to explain it
+fallocate -l 2G /swapfile && chmod 600 /swapfile
+mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+# Node 22 LTS
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt install -y nodejs git
+
+# Caddy, from its own repo
+apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | tee /etc/apt/sources.list.d/caddy-stable.list
+apt update && apt install -y caddy
+
 git clone https://github.com/alibucci/tutorapp /opt/tutorapp
 cd /opt/tutorapp
 npm ci
-cp .env.example .env.local   # fill in all four values
+cp .env.example .env.local   # fill in all four required values
 npm run build
 ```
 
