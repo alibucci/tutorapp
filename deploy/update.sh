@@ -39,7 +39,12 @@ fi
 echo "==> installing"
 npm ci --no-audit --no-fund
 
+# Turbopack caches compiled chunks in .next, and a build that failed on a
+# missing module leaves one behind that keeps failing with the same chunk hash
+# long after the module is installed. Updates are rare and the rebuild is a
+# minute; determinism is worth more.
 echo "==> building"
+rm -rf .next
 npm run build
 
 # data/ belongs to the service and must stay writable by it; everything else
