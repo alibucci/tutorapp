@@ -52,10 +52,19 @@ else, so no request can reach `capture` or `recordingConsent` directly.
 | **Consent on file** | both voices | a noise floor only |
 | **No consent** | the tutor alone | the privacy boundary |
 
-**Tutor-only** is the conservative mode, and it still works: corrections and
-teaching signals are spoken out loud anyway, so recording the tutor captures the
-lesson's substance without capturing a child. What it cannot give you is the
-student's own wording, their response latency, or anything about pronunciation.
+**Tutor-only** is the conservative mode. Corrections and teaching signals are
+spoken out loud anyway, so recording the tutor captures the lesson's substance
+without capturing a child. What it cannot give you is the student's own wording,
+their response latency, or anything about pronunciation.
+
+**It also takes no transcript at all.** The browser's recogniser takes the
+microphone itself — the Web Speech API cannot be handed a `MediaStream` — so it
+hears the room rather than the gated signal, and would transcribe a child whose
+parents consented to nothing. The audio file is clean because the gate sits
+before the recorder; the transcript never could be. So in this mode the
+60-second debrief is the entire record, and the server drops a transcript even
+if a client sends one. Moving transcription to the server, reading the gated
+file, is what removes this limitation.
 
 **Both voices** needs one microphone between the two people, which means the
 student sits further from it than the tutor. The gate threshold therefore drops
@@ -99,6 +108,8 @@ single voice, and a fifth of the browser default over mobile data.
 - **Gate timing.** `holdMs` is 700 ms and the gain ramp is 20 ms. Too short clips
   the first syllable; too long leaks the room between sentences.
 - **Browser noise suppression varies by platform** and may fight the gate.
+- **A transcript is only taken where the student consented.** See above: the
+  browser recogniser cannot respect the gate.
 - **The transcript leaves the device, and where it goes depends on the
   browser.** Chrome and Edge send audio to Google; Safari sends it to Apple.
   Neither is on-device. To keep audio local, replace

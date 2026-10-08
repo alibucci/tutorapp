@@ -50,6 +50,15 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const body = (await request.json()) as Record<string, unknown>;
-  const lesson = await updateLesson(id, allowed(body));
+  const patch = allowed(body);
+
+  // The browser's recogniser takes the microphone itself and cannot be handed
+  // the gated stream, so in tutor-only mode its transcript contains whatever
+  // else was said in the room - including a child whose parents consented to
+  // nothing. The audio file is clean because the gate sits before the
+  // recorder; the transcript never was. Refuse to store it.
+  if (found.lesson.capture === "tutor") delete patch.transcript;
+
+  const lesson = await updateLesson(id, patch);
   return NextResponse.json(lesson);
 }

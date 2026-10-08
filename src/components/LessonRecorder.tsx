@@ -48,6 +48,11 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   const paused = rec.state === "paused";
   const live = recording || paused;
 
+  // Only run the recogniser where the student is a consenting participant.
+  // It listens to the room, not to the gated stream, so in tutor-only mode it
+  // would transcribe people who never agreed to be recorded.
+  const transcribes = capturesStudent;
+
   async function begin() {
     // Taken before recording so a lock cannot land in the gap.
     await wakeLock.acquire();
@@ -56,7 +61,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ startedAt: new Date().toISOString() }),
     });
-    speech.start();
+    if (transcribes) speech.start();
     await rec.start();
   }
 
@@ -76,7 +81,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          transcript: speech.segments,
+          transcript: transcribes ? speech.segments : [],
           interruptions: rec.interruptions,
           endedAt: new Date().toISOString(),
           recordedMs: Math.round(rec.openMs),
@@ -107,7 +112,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     // The lock is gone after the screen went off - take it again first.
     await wakeLock.acquire();
     await rec.resume();
-    speech.resume();
+    if (transcribes) speech.resume();
   }
 
   return (
@@ -121,7 +126,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
       >
         {capturesStudent
           ? "Recording both voices - yours and the student's."
-          : "Recording your voice only. The student is not recorded."}
+          : "Recording your voice only. No transcript is taken, because the recogniser listens to the room rather than to the filtered signal."}
       </p>
 
       <section className="space-y-4 card p-5">
@@ -286,7 +291,9 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
 
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="t-subtitle">Live transcript</h2>
+          <h2 className="t-subtitle">
+            {transcribes ? "Live transcript" : "Transcript"}
+          </h2>
           <span className="t-caption t-muted">
             {speech.supported
               ? speech.listening

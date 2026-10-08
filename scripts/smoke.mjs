@@ -135,6 +135,12 @@ const lessonA = (await a("/api/lessons", post({
 }))).json;
 check("consent gives capture=both", lessonA?.capture === "both");
 
+await a(`/api/lessons/${lessonA.id}`, patch({
+  transcript: [{ t: 0, text: "with consent this is kept" }],
+}));
+check("a consented lesson still stores its transcript",
+  (await a(`/api/lessons/${lessonA.id}`)).json.transcript.length === 1);
+
 const forced = (await b("/api/lessons", post({
   title: "Forced", mode: "classroom", studentId: sB.id, capture: "both",
 }))).json;
@@ -212,6 +218,15 @@ check("parent sees the note after approval", !parentAfter.includes("No notes yet
   await a(`/api/lessons/${lesson.id}`, patch({ capture: "both" }));
   check("capture cannot be set through the lesson PATCH",
     (await a(`/api/lessons/${lesson.id}`)).json.capture === "tutor");
+
+  // The browser recogniser cannot be fed the gated stream, so in tutor-only
+  // mode its transcript holds whoever else was in the room. The server refuses
+  // it even if a client sends one.
+  await a(`/api/lessons/${lesson.id}`, patch({
+    transcript: [{ t: 0, text: "a child who consented to nothing" }],
+  }));
+  check("a tutor-only lesson will not store a transcript",
+    (await a(`/api/lessons/${lesson.id}`)).json.transcript.length === 0);
 
   await a(`/api/lessons/${lesson.id}`, patch({ studentId: sB.id, summary: { covered: ["forged"] } }));
   const untouched = (await a(`/api/lessons/${lesson.id}`)).json;

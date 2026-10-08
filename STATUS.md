@@ -12,7 +12,7 @@ Last updated: 2026-09-27
 The whole pipeline exists and runs end to end. **No real lesson has ever gone
 through it**, but as of 28 September every layer has been proven separately:
 
-- the server path, by an automated run with real model calls (60 checks, all
+- the server path, by an automated run with real model calls (62 checks, all
   passing — `npm run smoke`)
 - the capture path, by hand on macOS via `/check`: microphone, the gate running
   in the AudioWorklet, the Opus recorder, wake lock, and a live transcript in
@@ -162,6 +162,7 @@ turns up in the pilot.
 | **Parent tone: explicit strengths, growth framing for gaps** | A report of pure negatives is a churn machine; a report of pure positives is useless and a parent can tell. |
 | **Sessions are re-checked against the store on every request** | A signed cookie proves who issued it, not that the account is still good. Suspending someone has to take effect now. The cost is one small file read on requests that mostly read the store anyway. |
 | **Audio streams while the lesson runs** | It used to be held in the tab and sent as one file at the end: a crashed tab lost everything, and the tutor waited through an upload at the moment they were trying to leave. Chunks go out in order and a lost one is reported rather than hidden. |
+| **No transcript at all in tutor-only mode** | Found on the first real lesson. The Web Speech API grabs the microphone itself and cannot be given the gated stream, so its transcript held the student's words while the audio file did not. Storing a child's speech on the strength of a guarantee that only ever covered the audio was the wrong way round, so the transcript goes until server-side recognition reads the gated file instead. |
 | **Links, not accounts, for families** | A nine-year-old with a password is a support queue. A leaked link is worth one approved weekly note, and it can be rotated. |
 | **Superadmin creates tutors; tutors create their own students** | Trusting a tutor is a real decision and belongs to you. Adding a student is operational — gating it would leave a tutor stuck mid-lesson. |
 | **Speaker labelling from the text, not the acoustics** | Two people in a closed room: who asks and who answers is usually obvious from the dialogue. Costs nothing, needs no on-device model, no voice enrolment. Acoustic matching is the fallback if this proves unreliable. |
