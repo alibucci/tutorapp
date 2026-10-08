@@ -83,6 +83,17 @@ A   www   47.242.7.151
 
 Then open `/check` on a real device and confirm **Secure context: OK**.
 
+## Updating
+
+```bash
+sudo bash /opt/tutorapp/deploy/update.sh
+```
+
+Pull, install, build, fix ownership, restart, and check the app answers before
+declaring success. Doing these by hand goes wrong on ownership: the service
+runs as `tutorapp` while git and npm run as root, and each leaves files behind
+owned by whoever ran it.
+
 ## Backups
 
 `data/` is lesson recordings, transcripts and notes about children, on one disk
