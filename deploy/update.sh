@@ -33,8 +33,11 @@ else
 	echo "    $before -> $after"
 fi
 
+# Not --omit=dev: the build needs Tailwind's PostCSS plugin and TypeScript,
+# and both live in devDependencies. Omitting them fails at the CSS step with a
+# missing-module error that points at globals.css rather than at the install.
 echo "==> installing"
-npm ci --omit=dev --no-audit --no-fund 2>/dev/null || npm ci --no-audit --no-fund
+npm ci --no-audit --no-fund
 
 echo "==> building"
 npm run build
