@@ -15,7 +15,9 @@
 
 set -euo pipefail
 
-HOST="${DEPLOY_HOST:-root@47.242.7.151}"
+# Alibaba's images disable root over SSH, so log in as the ordinary user and
+# raise privilege on the far side. sudo is NOPASSWD there by default.
+HOST="${DEPLOY_HOST:-admin@47.242.7.151}"
 APP_DIR="${DEPLOY_DIR:-/opt/tutorapp}"
 APP_USER="${DEPLOY_USER:-tutorapp}"
 
@@ -49,7 +51,7 @@ scp -q "$tarball" "$HOST:/tmp/release.tar.gz"
 rm -f "$tarball"
 
 echo "==> switching over"
-ssh "$HOST" APP_DIR="$APP_DIR" APP_USER="$APP_USER" STAMP="$stamp" 'bash -s' <<'REMOTE'
+ssh "$HOST" "sudo APP_DIR='$APP_DIR' APP_USER='$APP_USER' STAMP='$stamp' bash -s" <<'REMOTE'
 set -euo pipefail
 
 release="$APP_DIR/releases/$STAMP"

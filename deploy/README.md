@@ -95,6 +95,14 @@ From your own machine, in the project root:
 npm run release
 ```
 
+It logs in as `admin` and raises privilege there, because the image disables
+root over SSH. Set up a key first or it will ask for the password on every
+step:
+
+```bash
+ssh-copy-id admin@47.242.7.151
+```
+
 Typecheck, lint, build, package, upload, switch the `current` symlink, restart,
 and verify the app answers — rolling back to the previous release if it does
 not. Downtime is a restart, not a build.
