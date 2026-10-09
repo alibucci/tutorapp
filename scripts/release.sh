@@ -42,8 +42,10 @@ if [ -e .next/standalone/data ]; then
 	exit 1
 fi
 
+# macOS writes its own extended attributes into the archive and GNU tar on the
+# far side warns about every single file, burying the output that matters.
 echo "==> packaging"
-tar -czf "$tarball" -C .next/standalone .
+COPYFILE_DISABLE=1 tar --no-xattrs -czf "$tarball" -C .next/standalone .
 echo "    $(du -h "$tarball" | cut -f1)"
 
 echo "==> uploading"
@@ -56,7 +58,7 @@ set -euo pipefail
 
 release="$APP_DIR/releases/$STAMP"
 mkdir -p "$release"
-tar -xzf /tmp/release.tar.gz -C "$release"
+tar -xzf /tmp/release.tar.gz -C "$release" --warning=no-unknown-keyword
 rm -f /tmp/release.tar.gz
 
 # Secrets and the lesson store stay outside the release and are linked in, so
