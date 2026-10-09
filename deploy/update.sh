@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# Pull, rebuild, restart. Run as root:  sudo bash /opt/tutorapp/deploy/update.sh
+# Pull, rebuild, restart. Run as root:
+#
+#   systemd-run --unit=tutorapp-update --collect bash /opt/tutorapp/deploy/update.sh
+#   journalctl -u tutorapp-update -f          # Ctrl-C only stops watching
+#
+# Run it that way rather than in the foreground. The build takes about two
+# minutes on this box, and a dropped SSH session SIGHUPs anything running in
+# it: the build dies between stopping the app and restoring it, and the site
+# stays down until someone notices. As a transient unit it survives the
+# disconnect, and `recover` below puts things back if it dies anyway.
 #
 # The ownership shuffle is the point. The app runs as `tutorapp`, but git and
 # npm have to run as root, and every one of them leaves files owned by whoever
@@ -18,6 +27,18 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 cd "$APP_DIR"
+
+# Anything that kills this script between stopping the app and starting it
+# again leaves the site down with its build moved aside. Put it back.
+recover() {
+	echo "!!! interrupted - restoring the previous build" >&2
+	rm -rf "$APP_DIR/.next"
+	[ -d "$APP_DIR/.next.prev" ] && mv "$APP_DIR/.next.prev" "$APP_DIR/.next"
+	chown -R "$APP_USER:$APP_USER" "$APP_DIR" 2>/dev/null || true
+	systemctl start tutorapp || true
+	exit 1
+}
+trap recover HUP INT TERM
 
 # git refuses to touch a repository owned by someone else.
 git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true

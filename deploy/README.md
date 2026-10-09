@@ -86,8 +86,14 @@ Then open `/check` on a real device and confirm **Secure context: OK**.
 ## Updating
 
 ```bash
-sudo bash /opt/tutorapp/deploy/update.sh
+sudo systemd-run --unit=tutorapp-update --collect bash /opt/tutorapp/deploy/update.sh
+sudo journalctl -u tutorapp-update -f     # Ctrl-C only stops watching
 ```
+
+Not in the foreground. The build takes about two minutes here, and a dropped
+SSH session kills anything running in it — including a build that has already
+stopped the app and moved its build aside, which leaves the site down. As a
+transient unit it survives the disconnect.
 
 Pull, install, build, fix ownership, restart, and check the app answers before
 declaring success. Doing these by hand goes wrong on ownership: the service
