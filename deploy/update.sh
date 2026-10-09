@@ -40,8 +40,11 @@ recover() {
 }
 trap recover HUP INT TERM
 
-# git refuses to touch a repository owned by someone else.
-git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+# git refuses to touch a repository owned by someone else, and the app
+# directory belongs to the service user. Pass the exception per command rather
+# than writing it to a config file: under systemd-run HOME is not /root, so a
+# --global setting made in a shell is not read here.
+git() { command git -c "safe.directory=$APP_DIR" "$@"; }
 
 echo "==> pulling"
 before="$(git rev-parse --short HEAD)"
