@@ -39,21 +39,40 @@ fi
 echo "==> installing"
 npm ci --no-audit --no-fund
 
-# Turbopack caches compiled chunks in .next, and a build that failed on a
-# missing module leaves one behind that keeps failing with the same chunk hash
-# long after the module is installed. Updates are rare and the rebuild is a
-# minute; determinism is worth more.
+# Building beside a running app on a 2 GB box puts both into swap and takes the
+# site down for the length of the build. Stopping first gives the build the
+# whole machine and makes the outage short and predictable instead of long and
+# mysterious.
+echo "==> stopping app for the build"
+systemctl stop tutorapp || true
+
+# Turbopack caches compiled chunks, and a build that failed on a missing module
+# leaves one behind that keeps failing with the same chunk hash long after the
+# module is installed. Move the old build aside rather than delete it, so a
+# failed build can be rolled back to something that runs.
 echo "==> building"
-rm -rf .next
-npm run build
+rm -rf .next.prev
+[ -d .next ] && mv .next .next.prev
+
+# Cap the heap: unbounded, Node grows until the box swaps and the build crawls.
+if NODE_OPTIONS="--max-old-space-size=1536" npm run build; then
+	rm -rf .next.prev
+else
+	echo "!!! build failed - restoring the previous build" >&2
+	rm -rf .next
+	[ -d .next.prev ] && mv .next.prev .next
+	chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+	systemctl start tutorapp || true
+	exit 1
+fi
 
 # data/ belongs to the service and must stay writable by it; everything else
 # only needs to be readable.
 echo "==> fixing ownership"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
-echo "==> restarting"
-systemctl restart tutorapp
+echo "==> starting"
+systemctl start tutorapp
 sleep 3
 systemctl is-active --quiet tutorapp || { journalctl -u tutorapp -n 30 --no-pager; exit 1; }
 
