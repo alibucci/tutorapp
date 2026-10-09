@@ -91,6 +91,17 @@ export function useSpeechTranscript(lang = "en-US") {
   const wantRef = useRef(false);
   /** Speech time accumulated before the current listening span. */
   const offsetRef = useRef(0);
+  /** What the caller says is happening now, e.g. which prompt is on screen. */
+  const tagRef = useRef<string | undefined>(undefined);
+  /**
+   * The tag captured when the current utterance started.
+   *
+   * A final result arrives whenever the recogniser decides it is done, which
+   * on a continuous minute of speech can be all at once at the end. Attributing
+   * by arrival puts everything in the last bucket, so an utterance is tagged by
+   * when it *began* - the first interim text after a silence.
+   */
+  const utteranceTagRef = useRef<string | undefined>(undefined);
 
   // Read once on the client; false on the server so hydration matches.
   const supported = useSyncExternalStore(
@@ -127,12 +138,20 @@ export function useSpeechTranscript(lang = "en-US") {
                 ),
                 text,
                 confidence: alt.confidence,
+                tag: utteranceTagRef.current ?? tagRef.current,
               },
             ]);
           }
         } else {
           pending += alt.transcript;
         }
+      }
+      // An utterance starts the moment interim text appears after silence;
+      // that is the moment whose context we want to remember.
+      if (pending && utteranceTagRef.current === undefined) {
+        utteranceTagRef.current = tagRef.current;
+      } else if (!pending) {
+        utteranceTagRef.current = undefined;
       }
       setInterim(pending);
     };
@@ -195,5 +214,20 @@ export function useSpeechTranscript(lang = "en-US") {
     recRef.current?.stop();
   }, []);
 
-  return { supported, listening, segments, interim, error, start, resume, stop };
+  /** Label what follows, so late-arriving text lands under the right prompt. */
+  const setTag = useCallback((tag: string | undefined) => {
+    tagRef.current = tag;
+  }, []);
+
+  return {
+    supported,
+    listening,
+    segments,
+    interim,
+    error,
+    start,
+    resume,
+    stop,
+    setTag,
+  };
 }

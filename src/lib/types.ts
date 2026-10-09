@@ -29,6 +29,12 @@ export type TranscriptSegment = {
   confidence?: number;
   /** Filled in after the lesson, only when both voices were recorded. */
   speaker?: Speaker;
+  /**
+   * Which debrief prompt was on screen when this utterance began. Set by the
+   * caller rather than derived from `t`, because `t` is when the recogniser
+   * handed the text over, which can be most of a minute after it was said.
+   */
+  tag?: string;
 };
 
 /**

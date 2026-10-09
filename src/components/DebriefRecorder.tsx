@@ -26,7 +26,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const [phase, setPhase] = useState<Phase>("ready");
   const [index, setIndex] = useState(0);
   const [remaining, setRemaining] = useState<number>(DEBRIEF_PROMPTS[0].seconds);
-  const [answers, setAnswers] = useState<DebriefAnswer[]>([]);
+  const [edits, setEdits] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** False once a chunk of the debrief failed to reach the server. */
@@ -60,11 +60,12 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
       return;
     }
     indexRef.current = next;
+    speech.setTag(DEBRIEF_PROMPTS[next].id);
     boundariesRef.current.push(performance.now() - startedAtRef.current);
     deadlineRef.current = performance.now() + DEBRIEF_PROMPTS[next].seconds * 1000;
     setIndex(next);
     setRemaining(DEBRIEF_PROMPTS[next].seconds);
-  }, [finish]);
+  }, [finish, speech]);
 
   // Driven off a wall-clock deadline rather than counted ticks: a backgrounded
   // tab has its timers throttled to about one call a minute, and a decremented
@@ -88,22 +89,21 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     return () => window.clearInterval(id);
   }, [phase, advance, finish]);
 
-  // Split the transcript across prompts by when each one was on screen.
-  useEffect(() => {
-    if (phase !== "review") return;
-    const bounds = boundariesRef.current;
-    setAnswers(
-      DEBRIEF_PROMPTS.map((prompt, i) => {
-        const from = i === 0 ? 0 : (bounds[i - 1] ?? Infinity);
-        const to = bounds[i] ?? Infinity;
-        const text = speech.segments
-          .filter((s) => s.t >= from && s.t < to)
-          .map((s) => s.text)
-          .join(" ");
-        return { promptId: prompt.id, text };
-      }),
-    );
-  }, [phase, speech.segments]);
+  /**
+   * What the tutor typed over the top, keyed by prompt. Everything else is
+   * derived from the transcript on each render rather than copied into state
+   * once, because the recogniser can still be handing over the last utterance
+   * while the review screen is already up - a snapshot would miss it.
+   */
+  const answers: DebriefAnswer[] = DEBRIEF_PROMPTS.map((prompt) => ({
+    promptId: prompt.id,
+    text:
+      edits[prompt.id] ??
+      speech.segments
+        .filter((s) => s.tag === prompt.id)
+        .map((s) => s.text)
+        .join(" "),
+  }));
 
   async function begin() {
     await wakeLock.acquire();
@@ -114,6 +114,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
       performance.now() + DEBRIEF_PROMPTS[0].seconds * 1000;
     setIndex(0);
     setRemaining(DEBRIEF_PROMPTS[0].seconds);
+    speech.setTag(DEBRIEF_PROMPTS[0].id);
     speech.start();
     await rec.start();
     setPhase("running");
@@ -231,11 +232,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
           <textarea
             value={answers[i]?.text ?? ""}
             onChange={(e) =>
-              setAnswers((prev) =>
-                prev.map((a) =>
-                  a.promptId === prompt.id ? { ...a, text: e.target.value } : a,
-                ),
-              )
+              setEdits((prev) => ({ ...prev, [prompt.id]: e.target.value }))
             }
             rows={3}
             className="field"
