@@ -48,10 +48,14 @@ Run it under a supervisor so it comes back after a reboot:
 After=network.target
 
 [Service]
-WorkingDirectory=/opt/tutorapp
-ExecStart=/usr/bin/npm start
+# `current` is a symlink to the live release, so a rollback is one symlink and
+# a restart. The standalone bundle carries its own server; there is no npm.
+WorkingDirectory=/opt/tutorapp/current
+ExecStart=/usr/bin/node server.js
 Restart=always
 Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
 User=tutorapp
 
 [Install]
@@ -83,24 +87,47 @@ A   www   47.242.7.151
 
 Then open `/check` on a real device and confirm **Secure context: OK**.
 
-## Updating
+## Releasing
+
+From your own machine, in the project root:
 
 ```bash
-sudo systemd-run --unit=tutorapp-update --collect bash /opt/tutorapp/deploy/update.sh
-sudo journalctl -u tutorapp-update -f     # Ctrl-C only stops watching
+npm run release
 ```
 
-Not in the foreground. The build takes about two minutes here, and a dropped
-SSH session kills anything running in it — including a build that has already
-stopped the app and moved its build aside, which leaves the site down. As a
-transient unit it survives the disconnect.
+Typecheck, lint, build, package, upload, switch the `current` symlink, restart,
+and verify the app answers — rolling back to the previous release if it does
+not. Downtime is a restart, not a build.
 
-Pull, install, build, fix ownership, restart, and check the app answers before
-declaring success. Doing these by hand goes wrong on ownership: the service
-runs as `tutorapp` while git and npm run as root, and each leaves files behind
-owned by whoever ran it.
+**The server does not build.** It did, and five separate failures appeared only
+there: a cold Turbopack cache, 2 GB of memory, `HOME` under `systemd-run`, a
+dropped SSH session, missing dev dependencies. None reproduce on a development
+machine and each took the site down while it was diagnosed. `output:
+"standalone"` emits a bundle that runs with no `npm install` at all.
 
-## Backups
+Layout on the server:
+
+```
+/opt/tutorapp/
+  .env.local          secrets, never shipped
+  data/               lessons, never shipped
+  releases/<stamp>/   one extracted bundle each
+  current -> releases/<stamp>
+```
+
+`.env.local` and `data` are symlinked into each release, so a rollback cannot
+lose them and a release cannot carry them. The last three releases are kept:
+
+```bash
+ln -sfn /opt/tutorapp/releases/<stamp> /opt/tutorapp/current
+systemctl restart tutorapp
+```
+
+`deploy/update.sh` still builds on the server. It is the fallback for when you
+cannot reach the box from a machine that can build, and it is slower and more
+fragile.
+
+## Backups## Backups
 
 `data/` is lesson recordings, transcripts and notes about children, on one disk
 with no replication.
