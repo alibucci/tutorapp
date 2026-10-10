@@ -36,9 +36,9 @@ export async function lessonFor(
 }
 
 /**
- * Who may see a lesson's homework: the tutor who owns the student, the child
- * signed in, or anyone holding the child's private link. Parents are not on
- * the list - the homework is the child's.
+ * Who may see a lesson's homework: the tutor who owns the student, the
+ * family signed in, or anyone holding the child's private link. The parent's
+ * private link is not enough - that link is for weekly notes only.
  */
 export async function homeworkFor(
   lessonId: string,
@@ -54,7 +54,7 @@ export async function homeworkFor(
 
   const family = await getFamilySession();
   const child =
-    (family?.role === "student" && family.id === student.id) ||
+    family?.id === student.id ||
     (key !== null && key.length > 0 && key === student.studentKey);
   // The child sees homework only once the tutor has sent it.
   if (child && lesson.homework?.sentAt) return { lesson, student, tutor: false };

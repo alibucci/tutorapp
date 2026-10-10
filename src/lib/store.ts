@@ -149,21 +149,14 @@ export async function listStudents(tutorId?: string): Promise<Student[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Find whose child or parent login a username belongs to. */
+/** Find the family a username belongs to. */
 export async function getStudentByUsername(
   username: string,
-): Promise<{ student: Student; role: "student" | "parent" } | null> {
+): Promise<Student | null> {
   const wanted = username.trim().toLowerCase();
   if (!wanted) return null;
-  for (const student of await readAll<Student>(STUDENT_DIR)) {
-    if (student.logins?.student?.username === wanted) {
-      return { student, role: "student" };
-    }
-    if (student.logins?.parent?.username === wanted) {
-      return { student, role: "parent" };
-    }
-  }
-  return null;
+  const students = await readAll<Student>(STUDENT_DIR);
+  return students.find((s) => s.login?.username === wanted) ?? null;
 }
 
 /** Resolve one of the shareable links back to its student. */

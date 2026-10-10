@@ -71,9 +71,6 @@ export type LessonSummary = {
   nextLesson: string[];
   /** Suggested focus line for the homework, addressed to the child. */
   homeworkFocus?: string;
-  /** Share of spoken words that came from the student, 0..1. Only meaningful
-   *  when both voices were recorded. */
-  studentWordShare?: number;
   generatedAt: string;
   model: string;
 };
@@ -192,16 +189,18 @@ export type Student = {
   /** Opaque URL keys - a link is one way in, an account the other. */
   studentKey: string;
   parentKey: string;
-  /** Sign-ins the tutor has made for the child and the parent. */
-  logins?: { student?: FamilyLogin; parent?: FamilyLogin };
+  /** One sign-in the child and the parent share, made by the tutor. */
+  login?: FamilyLogin;
   /** Id from GAME_STYLES - what the child's homework looks like. */
   gameStyle?: string;
   skills: Skill[];
 };
 
 /**
- * A username and password the tutor creates and hands over. Children have no
- * email, so it is a username; the tutor resets it when it is forgotten.
+ * A username and password the tutor creates and hands to the family. One per
+ * student, shared by the child and the parent - a family uses one phone and
+ * one WeChat, and two passwords would just mean one forgotten. Children have
+ * no email, so it is a username; the tutor resets it when it is forgotten.
  */
 export type FamilyLogin = {
   username: string;

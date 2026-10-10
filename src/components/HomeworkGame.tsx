@@ -1,27 +1,25 @@
 "use client";
 
-import { Press_Start_2P } from "next/font/google";
 import Link from "next/link";
 import { useState } from "react";
+import { pixelFont } from "@/lib/fonts";
 import type { GameStyle } from "@/lib/gameStyles";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type HomeworkAnswers } from "@/lib/types";
 
-// Self-hosted at build time - nothing is fetched from Google by the browser,
-// which matters for children in China.
-const pixel = Press_Start_2P({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-pixel",
-});
 
-const STEPS = HOMEWORK_TASKS.length + 1;
+const TASKS = [
+  ...HOMEWORK_TASKS.map((t) => ({ id: t.id, prompt: t.prompt, hint: t.hint })),
+  { id: "adjectives", prompt: ADJECTIVES_TASK, hint: "One word in each box." },
+];
+const XP_PER_TASK = 10;
 
 /**
- * The child's homework, dressed as a game.
+ * The child's homework, dressed as the game they chose.
  *
- * One task per screen with the picture always in view - a child should never
- * scroll to find what they are describing. Progress is a bar that fills, not a
- * "2 of 3", because that is what the games they play do.
+ * The whole screen belongs to the game - no app chrome - because it should feel
+ * like opening a game, not a form. One task per screen with the picture always
+ * in view, so a child never scrolls to find what they are describing. Progress
+ * is shown the way the game shows it: a hotbar slot per task and an XP bar.
  */
 export function HomeworkGame({
   lessonId,
@@ -41,16 +39,16 @@ export function HomeworkGame({
   backHref: string;
   answered?: HomeworkAnswers;
 }) {
-  const [step, setStep] = useState(answered ? STEPS + 1 : 0);
+  // 0 = intro, 1..TASKS.length = a task, TASKS.length + 1 = done.
+  const [step, setStep] = useState(answered ? TASKS.length + 1 : 0);
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [adjectives, setAdjectives] = useState(["", "", ""]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const task = step >= 1 && step <= HOMEWORK_TASKS.length ? HOMEWORK_TASKS[step - 1] : null;
-  const onAdjectives = step === STEPS;
-  const done = step > STEPS;
-  const progress = Math.min(step, STEPS) / STEPS;
+  const task = step >= 1 && step <= TASKS.length ? TASKS[step - 1] : null;
+  const done = step > TASKS.length;
+  const completed = done ? TASKS.length : Math.max(0, step - 1);
 
   async function submit() {
     setBusy(true);
@@ -71,105 +69,153 @@ export function HomeworkGame({
       setError(body.error ?? "Something went wrong. Try again.");
       return;
     }
-    setStep(STEPS + 1);
+    setStep(TASKS.length + 1);
   }
 
   return (
-    <div className={`game game-${style.id} ${pixel.variable}`}>
-      <div className="game-bar" aria-label="Progress">
-        <div className="game-bar-fill" style={{ width: `${progress * 100}%` }} />
-        <span className="game-bar-label">
-          {Math.round(progress * 30)} {style.words.reward}
-        </span>
-      </div>
-
-      {/* eslint-disable-next-line @next/next/no-img-element -- private upload */}
-      <img src={imageSrc} alt="Your homework picture" className="game-picture" />
-
-      {step === 0 && (
-        <div className="game-panel">
-          <p className="game-title">New quest!</p>
-          {focus && <p className="game-text mt-3">{focus}</p>}
-          <button onClick={() => setStep(1)} className="game-button mt-5">
-            {style.words.start}
-          </button>
-        </div>
-      )}
-
-      {task && (
-        <div className="game-panel" key={task.id}>
-          <p className="game-label">
-            {style.words.step} {step}
-          </p>
-          <p className="game-title mt-2">{task.prompt}</p>
-          <p className="game-hint mt-2">{task.hint}</p>
-          <textarea
-            value={texts[task.id] ?? ""}
-            onChange={(e) => setTexts((t) => ({ ...t, [task.id]: e.target.value }))}
-            rows={5}
-            autoCapitalize="sentences"
-            className="game-input mt-4"
-          />
-          <button
-            onClick={() => setStep(step + 1)}
-            disabled={!(texts[task.id] ?? "").trim()}
-            className="game-button mt-4"
-          >
-            Next
-          </button>
-        </div>
-      )}
-
-      {onAdjectives && (
-        <div className="game-panel">
-          <p className="game-label">
-            {style.words.step} {step}
-          </p>
-          <p className="game-title mt-2">{ADJECTIVES_TASK}</p>
-          <div className="mt-4 space-y-3">
-            {adjectives.map((value, i) => (
-              <input
-                key={i}
-                value={value}
-                onChange={(e) =>
-                  setAdjectives((a) => a.map((v, j) => (j === i ? e.target.value : v)))
-                }
-                placeholder={`Adjective ${i + 1}`}
-                autoCapitalize="none"
-                className="game-input"
-              />
-            ))}
-          </div>
-          {error && <p className="game-hint mt-3">{error}</p>}
-          <button
-            onClick={() => void submit()}
-            disabled={busy || adjectives.some((a) => !a.trim())}
-            className="game-button mt-4"
-          >
-            {busy ? "…" : style.words.submit}
-          </button>
-        </div>
-      )}
-
-      {done && (
-        <div className="game-panel text-center">
-          <p className="game-title">{style.words.done}</p>
-          <p className="game-text mt-3">+30 {style.words.reward}</p>
-          <p className="game-hint mt-2">Your tutor will read your answers.</p>
-          <Link href={backHref} className="game-button mt-5 inline-block">
-            Back
+    <div className={`game game-${style.id} ${pixelFont.variable}`}>
+      <div className="game-inner" data-answering={task ? "" : undefined}>
+        <div className="flex items-center justify-between">
+          <Link href={backHref} className="game-small">
+            ← Back
           </Link>
+          <span className="game-small">{style.name}</span>
         </div>
-      )}
 
-      {step > 0 && !done && (
-        <button
-          onClick={() => setStep(step - 1)}
-          className="game-back mt-3"
-        >
-          ← Back
-        </button>
-      )}
+        <div className="game-frame">
+          {/* eslint-disable-next-line @next/next/no-img-element -- private upload */}
+          <img src={imageSrc} alt="Your homework picture" className="game-picture" />
+        </div>
+
+        {step === 0 && (
+          <div className="game-panel">
+            <p className="game-title">New quest!</p>
+            <p className="game-text mt-3">
+              Look at the picture. {TASKS.length} tasks, {TASKS.length * XP_PER_TASK}{" "}
+              {style.words.reward}.
+            </p>
+            {focus && (
+              <p className="game-tip mt-3">
+                <span className="game-small">Tip</span> {focus}
+              </p>
+            )}
+            <button onClick={() => setStep(1)} className="game-button mt-5">
+              {style.words.start}
+            </button>
+          </div>
+        )}
+
+        {task && task.id !== "adjectives" && (
+          <div className="game-panel" key={task.id}>
+            <p className="game-small game-step">
+              {style.words.step} {step}
+            </p>
+            <p className="game-title mt-2">{task.prompt}</p>
+            <p className="game-hint mt-2">{task.hint}</p>
+            <textarea
+              value={texts[task.id] ?? ""}
+              onChange={(e) => setTexts((t) => ({ ...t, [task.id]: e.target.value }))}
+              rows={5}
+              autoCapitalize="sentences"
+              className="game-input mt-4"
+            />
+            <div className="mt-4 flex gap-3">
+              <button onClick={() => setStep(step - 1)} className="game-button game-button-small">
+                ←
+              </button>
+              <button
+                onClick={() => setStep(step + 1)}
+                disabled={!(texts[task.id] ?? "").trim()}
+                className="game-button"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        {task?.id === "adjectives" && (
+          <div className="game-panel">
+            <p className="game-small game-step">
+              {style.words.step} {step}
+            </p>
+            <p className="game-title mt-2">{task.prompt}</p>
+            <p className="game-hint mt-2">{task.hint}</p>
+            <div className="mt-4 space-y-3">
+              {adjectives.map((value, i) => (
+                <input
+                  key={i}
+                  value={value}
+                  onChange={(e) =>
+                    setAdjectives((a) => a.map((v, j) => (j === i ? e.target.value : v)))
+                  }
+                  placeholder={`Adjective ${i + 1}`}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  className="game-input"
+                />
+              ))}
+            </div>
+            {error && <p className="game-error mt-3">{error}</p>}
+            <div className="mt-4 flex gap-3">
+              <button onClick={() => setStep(step - 1)} className="game-button game-button-small">
+                ←
+              </button>
+              <button
+                onClick={() => void submit()}
+                disabled={busy || adjectives.some((a) => !a.trim())}
+                className="game-button"
+              >
+                {busy ? "…" : style.words.submit}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {done && (
+          <div className="game-toast" role="status">
+            <span aria-hidden className="game-toast-icon" />
+            <span>
+              <span className="game-toast-title">Achievement get!</span>
+              <span className="game-toast-text">{style.words.done}</span>
+            </span>
+          </div>
+        )}
+        {done && (
+          <div className="game-panel">
+            <p className="game-text">
+              +{TASKS.length * XP_PER_TASK} {style.words.reward}. Your tutor will
+              read your answers.
+            </p>
+            <Link href={backHref} className="game-button mt-4 block">
+              Back
+            </Link>
+          </div>
+        )}
+
+        {/* The hotbar: one slot per task, the current one selected. */}
+        <div className="game-hud">
+          <p className="game-level">{completed * XP_PER_TASK}</p>
+          <div className="game-xp" aria-label={`${completed} of ${TASKS.length} done`}>
+            <div
+              className="game-xp-fill"
+              style={{ width: `${(completed / TASKS.length) * 100}%` }}
+            />
+          </div>
+          <ol className="game-hotbar">
+            {TASKS.map((t, i) => (
+              <li
+                key={t.id}
+                className={`game-slot ${step === i + 1 ? "game-slot-on" : ""} ${
+                  i < completed ? "game-slot-done" : ""
+                }`}
+              >
+                {i + 1}
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
     </div>
   );
 }

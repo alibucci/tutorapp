@@ -25,8 +25,8 @@ Four audiences, and no self-registration anywhere.
 |---|---|---|
 | **Superadmin** `(admin)` | credentials in `.env.local` | tutor accounts and each tutor's students; creates, suspends and resets tutors |
 | **Tutor** `(tutor)` | email + password issued by the superadmin | only their own students, lessons and drafts |
-| **Student** `(family)` `/me`, or `(guest)` `/s/[key]` | username + password from the tutor, or a private link | their topics and homework the tutor has sent |
-| **Parent** `(family)` `/family`, or `(guest)` `/p/[key]` | username + password from the tutor, or a private link | weekly notes the tutor has approved |
+| **Family** `(family)` `/me` + `/family` | one username + password from the tutor, shared by child and parent | two tabs: the child's topics and homework, and the parent's weekly notes |
+| **Student / parent** `(guest)` `/s/[key]`, `/p/[key]` | a private link each | the same pages, without a password |
 
 A tutor changes their issued password at `/account`; doing so signs out every
 other session of theirs, which is the point of replacing a password somebody
@@ -34,9 +34,10 @@ else once read out. Suspending a tutor or resetting their password has the same
 effect, because a session carries the account's token version and it is
 re-checked on every request rather than trusted for a fortnight.
 
-Children and parents sign in with a **username**, not an email - a child has
-none. The tutor creates the sign-in on the student's page, sees the password
-once, and copies it as a ready-made message. A reset keeps the username and
+A child and their parent share **one sign-in** - a family uses one phone and
+one WeChat. It is a **username**, not an email, because a child has none. The
+tutor creates it on the student's page, sees the password once, and copies it
+as a ready-made message. A reset keeps the username and
 signs out every device. Passwords are generated readable (`k7mp-q2xr-h9td`: no
 capitals, no 0/o/1/l/i) because they get typed on phones.
 
@@ -237,9 +238,9 @@ database without touching a single caller.
    WeChat (edit the English and the Chinese is translated again).
 5. **`/student/[id]`** — topics over time, game style, sign-ins for the child
    and the parent, the weekly note, and the private links.
-6. **`/me`**, **`/family`** (signed in) or **`/s/[key]`**, **`/p/[key]`** (by
-   link) — what the child and the parent see. Homework opens as a game in the
-   student's style.
+6. **`/me`** and **`/family`** (one family sign-in, two tabs) or **`/s/[key]`**,
+   **`/p/[key]`** (by link) — what the child and the parent see. Homework opens
+   full-screen as a game in the student's style.
 
 Homework is the same every time: describe the picture, say what happens next,
 give three adjectives. The child types the answers and hands in once; the tutor
@@ -259,7 +260,7 @@ src/lib/store.ts                 File-backed persistence (swap for a DB)
 src/lib/auth.ts                  Passwords, session cookies, role guards
 src/lib/access.ts                Ownership checks, next to the data
 src/lib/llm.ts                   The only place a model is called
-src/lib/diarize.ts               Who said each line, and the talk ratio
+src/lib/diarize.ts               Who said each line
 src/lib/summarize.ts             The tutor's write-up
 src/lib/skills.ts                The student model and its proposed changes
 src/lib/parentReport.ts          The weekly note

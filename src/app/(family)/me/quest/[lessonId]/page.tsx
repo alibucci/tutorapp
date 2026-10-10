@@ -10,7 +10,7 @@ export default async function MyQuest({
 }: {
   params: Promise<{ lessonId: string }>;
 }) {
-  await requireFamily("student");
+  await requireFamily();
   const { lessonId } = await params;
   return <QuestPage lessonId={lessonId} backHref="/me" />;
 }

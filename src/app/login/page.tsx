@@ -8,8 +8,7 @@ export const metadata = { title: "Sign in" };
 
 export default async function LoginPage() {
   if (await getSession()) redirect("/");
-  const family = await getFamilySession();
-  if (family) redirect(family.role === "student" ? "/me" : "/family");
+  if (await getFamilySession()) redirect("/me");
   return (
     <main
       data-density="comfortable"

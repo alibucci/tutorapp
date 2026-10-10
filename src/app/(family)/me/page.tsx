@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "What I'm working on" };
 
 export default async function MyHome() {
-  const session = await requireFamily("student");
+  const session = await requireFamily();
   const student = await getStudent(session.id);
   if (!student) notFound();
   return (

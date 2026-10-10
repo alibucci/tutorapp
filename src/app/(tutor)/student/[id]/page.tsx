@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FamilyLogins } from "@/components/FamilyLogins";
+import { FamilyLogin } from "@/components/FamilyLogin";
 import { GameStylePicker } from "@/components/GameStylePicker";
 import { ReportsPanel } from "@/components/ReportsPanel";
 import { ShareLinks } from "@/components/ShareLinks";
@@ -49,20 +49,10 @@ export default async function StudentPage({
 
       <ReportsPanel student={student} reports={reports} />
 
-      <FamilyLogins
+      <FamilyLogin
         studentId={student.id}
-        rows={[
-          {
-            who: "student",
-            label: student.name,
-            username: student.logins?.student?.username,
-          },
-          {
-            who: "parent",
-            label: `${student.name}'s parent`,
-            username: student.logins?.parent?.username,
-          },
-        ]}
+        studentName={student.name}
+        username={student.login?.username}
       />
 
       <ShareLinks student={student} />

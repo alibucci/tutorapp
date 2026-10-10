@@ -109,4 +109,7 @@ You were in the room; the model was not.
 |---|---|
 | **You** | everything — transcript, summary, all of it. No audio is kept. |
 | **Student** | homework **after you send it**, and topics to work on **after you apply** |
-| **Parent** | one weekly note, **after you approve** |
+| **Parent** | one weekly note, **after you approve**, plus the message you paste into WeChat |
+
+The child and the parent share one sign-in, which you create on the student's
+page (**Family sign-in**). Inside there are two tabs, one for each of them.

@@ -437,18 +437,33 @@ body {
 
 /* ---------------------------------------------------------------------------
    Homework games. `.game` is the frame every style shares; `.game-<id>` is one
-   look from src/lib/gameStyles.ts. A new style is a new block below.
+   look from src/lib/gameStyles.ts. A new style is a new block below, plus its
+   textures in public/game/<id>/.
    --------------------------------------------------------------------------- */
 
+/* The game owns the whole screen - no app header, no page background. */
 .game {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.game-inner {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  max-width: 30rem;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) var(--space-6);
 }
 
 .game-picture {
+  display: block;
   width: 100%;
-  max-height: 42vh;
+  max-height: 38vh;
   object-fit: contain;
 }
 
@@ -460,132 +475,274 @@ body {
   padding: var(--space-3);
 }
 
-.game-button:disabled {
-  opacity: 0.5;
-}
+.game-button:disabled { opacity: 0.55; }
 
-.game-back {
-  align-self: flex-start;
-}
+/* While typing, the picture gives up room so the keyboard and the button
+   both fit on a phone. */
+.game-inner[data-answering] .game-picture { max-height: 24vh; }
 
-/* Minecraft: stone panels, a grass-and-dirt picture frame, a green XP bar and
-   the blocky font for anything short. Long text stays in the system font -
-   the pixel font is unreadable past a few words. */
+.game-hud { margin-top: auto; padding-top: var(--space-2); }
+
+/* Minecraft. Modelled on the game's own menus: darkened dirt behind
+   everything, light-grey beveled inventory panels, grey stone buttons with a
+   white label and a hard shadow, a yellow title, the green XP bar with its
+   level number, and the hotbar. The blocky font is for short words only - a
+   child cannot read a paragraph in it - so prompts and answers stay in the
+   system font. */
 .game-minecraft {
-  --mc-stone: #7d7d7d;
-  --mc-stone-dark: #3a3a3a;
-  --mc-stone-light: #c6c6c6;
-  --mc-grass: #5b9b2c;
-  --mc-dirt: #866043;
+  --mc-panel: #c6c6c6;
+  --mc-panel-light: #ffffff;
+  --mc-panel-dark: #555555;
+  --mc-ink: #3f3f3f;
+  --mc-button: #6f6f6f;
+  --mc-yellow: #ffff55;
   --mc-xp: #80ff20;
-  --mc-ink: #1d1d1d;
+  color: #fff;
+  background-color: #3b2a1d;
+  background-image:
+    linear-gradient(rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.55)),
+    url("/game/minecraft/dirt.svg");
+  background-size: auto, 64px 64px;
+  image-rendering: pixelated;
 }
 
+.game-minecraft .game-small,
 .game-minecraft .game-title,
-.game-minecraft .game-label,
 .game-minecraft .game-button,
-.game-minecraft .game-bar-label {
+.game-minecraft .game-level,
+.game-minecraft .game-slot,
+.game-minecraft .game-toast-title,
+.game-minecraft .game-toast-text {
   font-family: var(--font-pixel), monospace;
+  -webkit-font-smoothing: none;
 }
 
-.game-minecraft .game-picture {
-  border: 6px solid var(--mc-dirt);
-  border-top-color: var(--mc-grass);
-  background: #000;
-  image-rendering: auto;
+.game-minecraft .game-small {
+  font-size: 0.625rem;
+  color: #e0e0e0;
+  text-shadow: 2px 2px 0 #3f3f3f;
 }
+
+/* The picture sits in a grass block: grass on top, dirt round the sides. */
+.game-minecraft .game-frame {
+  padding: 0 8px 8px;
+  background: url("/game/minecraft/dirt.svg") 0 0 / 64px 64px;
+  border: 3px solid #000;
+}
+.game-minecraft .game-frame::before {
+  content: "";
+  display: block;
+  height: 16px;
+  margin: 0 -8px 8px;
+  background: url("/game/minecraft/grass.svg") 0 0 / 64px 16px repeat-x;
+}
+.game-minecraft .game-picture { background: #000; image-rendering: auto; }
 
 .game-minecraft .game-panel {
-  background: var(--mc-stone-light);
+  background: var(--mc-panel);
   color: var(--mc-ink);
   padding: var(--space-5);
-  border: 4px solid var(--mc-stone-dark);
+  border: 3px solid #000;
   box-shadow:
-    inset 4px 4px 0 #fff,
-    inset -4px -4px 0 #8b8b8b;
+    inset 3px 3px 0 var(--mc-panel-light),
+    inset -3px -3px 0 var(--mc-panel-dark);
 }
 
 .game-minecraft .game-title {
-  font-size: 0.875rem;
-  line-height: 1.7;
+  font-size: 0.8125rem;
+  line-height: 1.8;
+  color: #3f3f3f;
+}
+.game-minecraft .game-panel > .game-title:first-child {
+  font-size: 1rem;
+  color: var(--mc-yellow);
+  text-shadow: 3px 3px 0 #3f3f15;
+  -webkit-text-stroke: 0;
+  background: #3f3f3f;
+  margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 0;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 3px solid #000;
+}
+.game-minecraft .game-step { color: #fff; text-shadow: 2px 2px 0 #000; }
+.game-minecraft .game-panel .game-step {
+  display: inline-block;
+  background: #3f3f3f;
+  padding: 4px 8px;
 }
 
-.game-minecraft .game-label {
-  font-size: 0.625rem;
-  color: #555;
+.game-minecraft .game-text { font-size: 1.0625rem; line-height: 1.5; }
+.game-minecraft .game-hint { font-size: 0.875rem; color: #555; }
+.game-minecraft .game-error { font-size: 0.875rem; color: #a00; }
+.game-minecraft .game-tip {
+  font-size: 0.9375rem;
+  background: #8b8b8b;
+  color: #fff;
+  padding: var(--space-3);
+  border: 2px solid #373737;
 }
+.game-minecraft .game-tip .game-small { color: var(--mc-yellow); margin-right: 6px; }
 
-.game-minecraft .game-text {
-  font-size: 1.0625rem;
-}
-
-.game-minecraft .game-hint {
-  font-size: 0.875rem;
-  color: #444;
-}
-
+/* Like the game's chat box: black, translucent, white text. */
 .game-minecraft .game-input {
   background: #000;
   color: #fff;
   border: 3px solid #a0a0a0;
   border-radius: 0;
+  -webkit-appearance: none;
 }
-
-.game-minecraft .game-input:focus {
+.game-minecraft .game-input::placeholder { color: #7a7a7a; }
+.game-minecraft .game-input:focus,
+.game-minecraft .game-input:focus-visible {
   outline: none;
+  box-shadow: none;
   border-color: #fff;
 }
 
 .game-minecraft .game-button {
-  display: inline-block;
+  flex: 1;
   width: 100%;
-  padding: 0.9rem var(--space-4);
+  padding: 1rem var(--space-4);
   font-size: 0.75rem;
   text-align: center;
   color: #fff;
   text-shadow: 2px 2px 0 #3f3f3f;
-  background: var(--mc-stone);
+  background: var(--mc-button);
   border: 3px solid #000;
   box-shadow:
-    inset 3px 3px 0 #aaa,
-    inset -3px -3px 0 #555;
+    inset 3px 3px 0 #a9a9a9,
+    inset -3px -4px 0 #4a4a4a;
   transition: transform var(--dur-press) var(--ease-out);
 }
-
-.game-minecraft .game-button:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
+.game-minecraft .game-button-small { flex: 0 0 4rem; }
+.game-minecraft .game-button:active:not(:disabled) { transform: scale(0.97); }
+.game-minecraft .game-button:disabled { color: #a0a0a0; text-shadow: none; opacity: 1; }
 @media (hover: hover) and (pointer: fine) {
   .game-minecraft .game-button:hover:not(:disabled) {
-    background: #8f9cd1;
+    background: #7e88bf;
+    box-shadow:
+      inset 3px 3px 0 #bdc6ff,
+      inset -3px -4px 0 #59609c;
   }
 }
 
-.game-minecraft .game-back {
+/* "Achievement get!" - the game's own toast for finishing something. */
+.game-minecraft .game-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: #212121;
+  border: 3px solid #555;
+  box-shadow: 0 0 0 3px #000;
+  animation: game-toast-in 400ms var(--ease-out);
+}
+.game-minecraft .game-toast-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  background: url("/game/minecraft/grass.svg") 0 0 / 32px 8px repeat-x,
+    url("/game/minecraft/dirt.svg") 0 0 / 32px 32px;
+  border: 2px solid #000;
+}
+.game-minecraft .game-toast-title {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--mc-yellow);
+}
+.game-minecraft .game-toast-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.6875rem;
+  color: #fff;
+}
+@keyframes game-toast-in {
+  from { transform: translateY(-12px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-minecraft .game-toast { animation: none; }
+}
+
+.game-minecraft .game-level {
+  text-align: center;
   font-size: 0.875rem;
-  color: var(--muted);
+  color: var(--mc-xp);
+  text-shadow:
+    2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000;
 }
-
-.game-minecraft .game-bar {
-  position: relative;
-  height: 1.25rem;
-  background: #222;
-  border: 3px solid #000;
+.game-minecraft .game-xp {
+  height: 10px;
+  margin: 4px auto 6px;
+  max-width: 22rem;
+  background: #000;
+  border: 2px solid #000;
 }
-
-.game-minecraft .game-bar-fill {
+.game-minecraft .game-xp-fill {
   height: 100%;
   background: var(--mc-xp);
-  transition: width 300ms var(--ease-out);
+  box-shadow: inset 0 -2px 0 #3c8a00;
+  transition: width 400ms var(--ease-out);
 }
 
-.game-minecraft .game-bar-label {
-  position: absolute;
-  inset: 0;
+.game-minecraft .game-hotbar {
+  display: flex;
+  justify-content: center;
+  width: max-content;
+  margin: 0 auto;
+  background: #8b8b8b;
+  border: 3px solid #000;
+}
+.game-minecraft .game-slot {
   display: grid;
   place-items: center;
-  font-size: 0.5625rem;
+  width: 48px;
+  height: 48px;
+  font-size: 0.75rem;
   color: #fff;
-  text-shadow: 1px 1px 0 #000;
+  text-shadow: 2px 2px 0 #3f3f3f;
+  border: 3px solid #373737;
+  box-shadow: inset 2px 2px 0 #555, inset -2px -2px 0 #b5b5b5;
 }
+.game-minecraft .game-slot-done { background: #5b9b2c; }
+.game-minecraft .game-slot-on {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #000;
+  position: relative;
+  z-index: 1;
+}
+
+/* The doorway into a game from the child's page: a block of the game's world
+   rather than an app card, so it is obvious this one is different. */
+.game-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.game-entry:active { transform: scale(0.98); }
+.game-entry-kicker,
+.game-entry-title { display: block; font-family: var(--font-pixel), monospace; }
+
+.game-entry-minecraft {
+  color: #fff;
+  border: 3px solid #000;
+  padding-top: calc(var(--space-5) + 16px);
+  background:
+    url("/game/minecraft/grass.svg") 0 0 / 64px 16px repeat-x,
+    linear-gradient(rgb(0 0 0 / 0.35), rgb(0 0 0 / 0.35)),
+    url("/game/minecraft/dirt.svg") 0 0 / 64px 64px;
+  image-rendering: pixelated;
+}
+.game-entry-minecraft .game-entry-kicker {
+  font-size: 0.625rem;
+  color: #ffff55;
+  text-shadow: 2px 2px 0 #3f3f15;
+}
+.game-entry-minecraft .game-entry-title {
+  margin-top: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  text-shadow: 2px 2px 0 #3f3f3f;
+}
+

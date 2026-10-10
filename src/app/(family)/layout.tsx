@@ -1,19 +1,27 @@
+import { FamilyTabs } from "@/components/FamilyTabs";
 import { SignOut } from "@/components/SignOut";
+import { requireFamily } from "@/lib/auth";
+import { getStudent } from "@/lib/store";
 
 export const metadata = { title: "Tutor Signal" };
 
 /**
- * Children and parents who signed in. Same comfortable reading density as the
- * private links, plus the one thing a login needs: a way out.
+ * A family signed in: the child and the parent share the sign-in, so the top
+ * of every page offers both of their pages, plus a way out. Same comfortable
+ * reading density as the private links.
  */
-export default function FamilyLayout({
+export default async function FamilyLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await requireFamily();
+  const student = await getStudent(session.id);
+
   return (
     <>
-      <header className="page page-narrow flex justify-end pt-4">
+      <header className="page page-narrow flex items-center justify-between gap-3 pt-4">
+        <FamilyTabs studentName={student?.name ?? "Student"} />
         <SignOut name="" />
       </header>
       <main

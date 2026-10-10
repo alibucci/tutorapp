@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
 import { updateLesson } from "@/lib/store";
-import { labelSpeakers, studentWordShare } from "@/lib/diarize";
+import { labelSpeakers } from "@/lib/diarize";
 import { writeParentMessage } from "@/lib/parentMessage";
 import { summarizeLesson } from "@/lib/summarize";
 
@@ -25,9 +25,8 @@ export async function POST(_request: Request, { params }: Params) {
   try {
     // Speaker labels only mean something when the student is in the same room
     // as the microphone. Online, their voice comes out of a speaker and the
-    // browser's echo cancellation removes most of it, so the labels - and any
-    // share-of-talk number built on them - would be noise. Skipping it there
-    // also saves a whole model call.
+    // browser's echo cancellation removes most of it, so the labels would be
+    // noise. Skipping it there also saves a whole model call.
     const inRoom = lesson.capture === "both" && lesson.mode === "classroom";
     let working = lesson;
     if (inRoom && lesson.transcript.length) {
@@ -45,9 +44,6 @@ export async function POST(_request: Request, { params }: Params) {
         ? Promise.resolve(lesson.parentMessage)
         : writeParentMessage(working, student),
     ]);
-    summary.studentWordShare = inRoom
-      ? studentWordShare(working.transcript)
-      : undefined;
 
     return NextResponse.json(
       await updateLesson(id, {

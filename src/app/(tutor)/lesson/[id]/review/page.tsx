@@ -80,23 +80,6 @@ export default async function ReviewPage({
         ))}
       </nav>
 
-      {/* Only an in-room lesson puts the student near the microphone. Online,
-          their voice is mostly removed by echo cancellation, so the number
-          would describe the setup rather than the lesson. */}
-      {lesson.mode === "classroom" &&
-        typeof lesson.summary?.studentWordShare === "number" && (
-        <section className="card p-5">
-          <h2 className="t-subtitle">How much they spoke</h2>
-          <p className="mt-2 t-num t-display">
-            {Math.round(lesson.summary.studentWordShare * 100)}%
-          </p>
-          <p className="t-caption t-muted mt-1">
-            Share of the words in this lesson that were the student&rsquo;s. A
-            low number usually means the lesson was a lecture.
-          </p>
-        </section>
-      )}
-
       <div id="summary" className="scroll-mt-6">
         <SummaryPanel lesson={lesson} />
       </div>

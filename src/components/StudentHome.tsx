@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { pixelFont } from "@/lib/fonts";
 import { gameStyle } from "@/lib/gameStyles";
 import { listLessons } from "@/lib/store";
 import type { Skill, Student } from "@/lib/types";
@@ -53,13 +54,13 @@ export async function StudentHome({
             <Link
               key={lesson.id}
               href={questHref(lesson.id)}
-              className="card card-focus card-pad flex items-center justify-between gap-4"
+              className={`game-entry game-entry-${style.id} ${pixelFont.variable}`}
             >
               <span>
-                <span className="t-eyebrow block">{style.name} homework</span>
-                <span className="t-title mt-1 block">New quest from {lesson.title}</span>
+                <span className="game-entry-kicker">{style.name} homework</span>
+                <span className="game-entry-title">New quest from {lesson.title}</span>
               </span>
-              <span aria-hidden className="t-title">→</span>
+              <span aria-hidden className="game-entry-title">→</span>
             </Link>
           ))}
         </section>

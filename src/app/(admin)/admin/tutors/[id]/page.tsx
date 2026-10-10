@@ -55,7 +55,7 @@ export default async function TutorPage({
                         ? gameStyle(student.gameStyle).name
                         : "no game style"}
                       {" · "}
-                      {student.logins?.student ? "has sign-in" : "no sign-in"}
+                      {student.login ? "has sign-in" : "no sign-in"}
                       {student.recordingConsent ? " · consent on file" : ""}
                     </span>
                   </span>

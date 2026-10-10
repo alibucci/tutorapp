@@ -65,23 +65,3 @@ export async function labelSpeakers(
     speaker: byIndex.get(i) ?? "unknown",
   }));
 }
-
-/**
- * Share of spoken words that came from the student.
- *
- * Counted in words rather than seconds: segment durations are not recorded, and
- * word count is a steadier proxy for "who is doing the work" anyway.
- */
-export function studentWordShare(
-  segments: TranscriptSegment[],
-): number | undefined {
-  let tutor = 0;
-  let student = 0;
-  for (const seg of segments) {
-    const words = seg.text.trim().split(/\s+/).filter(Boolean).length;
-    if (seg.speaker === "tutor") tutor += words;
-    else if (seg.speaker === "student") student += words;
-  }
-  const total = tutor + student;
-  return total === 0 ? undefined : student / total;
-}

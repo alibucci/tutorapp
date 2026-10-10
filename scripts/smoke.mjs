@@ -184,7 +184,6 @@ const sum = summary.json?.summary;
 check("summary generated", Boolean(sum?.covered?.length), summary.json?.error);
 check("summary carries evidence", Boolean(sum?.struggles?.[0]?.evidence));
 check("speakers labelled", summary.json?.transcript?.some((s) => s.speaker === "student"));
-check("talk ratio computed", typeof sum?.studentWordShare === "number");
 const msg = summary.json?.parentMessage;
 check("a parent message is written alongside", Boolean(msg?.en?.length));
 check("the parent message has a Chinese version", /[\u4e00-\u9fff]/.test(msg?.zh ?? ""));
@@ -406,48 +405,49 @@ function picture(bytes) {
     (await a(`/api/lessons/${lessonA.id}/homework`, patch({ send: false }))).status === 409);
 }
 
-// --- child and parent sign-ins -----------------------------------------------
+// --- the family sign-in (one for the child and the parent) -------------------
 {
   check("tutor B cannot make a sign-in for tutor A's student",
-    (await b(`/api/students/${sA.id}/logins`, post({ who: "student" }))).status === 404);
+    (await b(`/api/students/${sA.id}/logins`, { method: "POST" })).status === 404);
 
-  const made = (await a(`/api/students/${sA.id}/logins`, post({ who: "student" }))).json;
-  check("the tutor creates a sign-in for the child", Boolean(made?.username && made?.password));
+  const made = (await a(`/api/students/${sA.id}/logins`, { method: "POST" })).json;
+  check("the tutor creates the family sign-in", Boolean(made?.username && made?.password));
 
-  const kid = actor();
+  const family = actor();
   // As a phone would send it: capitalised, with a trailing space.
-  const signIn = await kid("/api/auth", post({
+  const signIn = await family("/api/auth", post({
     email: `${made.username[0].toUpperCase()}${made.username.slice(1)} `,
     password: made.password,
   }));
-  check("the child signs in with a username", signIn.json?.next === "/me", signIn.text);
-  check("the child's home shows their quest record", (await kid("/me")).status === 200);
-  check("the child can open their homework picture",
-    (await kid(`/api/lessons/${lessonA.id}/homework/image`)).status === 200);
-  check("a child's session is not a tutor session",
-    (await kid("/api/students")).status === 403);
-  check("a child is sent away from the tutor screens",
-    (await kid("/")).status === 307);
-  check("a child cannot open the parent page", (await kid("/family")).status === 307);
+  check("the family signs in with a username", signIn.json?.next === "/me", signIn.text);
+  check("one sign-in opens the child's page", (await family("/me")).status === 200);
+  check("the same sign-in opens the parent's page",
+    !(await family("/family")).text.includes("No notes yet"));
+  check("the family can open the homework picture",
+    (await family(`/api/lessons/${lessonA.id}/homework/image`)).status === 200);
+  check("a family session is not a tutor session",
+    (await family("/api/students")).status === 403);
+  check("a family is sent away from the tutor screens",
+    (await family("/")).status === 307);
 
-  const parentMade = (await a(`/api/students/${sA.id}/logins`, post({ who: "parent" }))).json;
-  check("parent and child get different usernames", parentMade.username !== made.username);
-  const mum = actor();
-  const parentIn = await mum("/api/auth", post({ email: parentMade.username, password: parentMade.password }));
-  check("the parent signs in", parentIn.json?.next === "/family");
-  check("the parent sees the weekly note", !(await mum("/family")).text.includes("No notes yet"));
-  check("the parent cannot see the child's homework",
-    (await mum(`/api/lessons/${lessonA.id}/homework/image`)).status === 404);
+  const otherFamily = (await b(`/api/students/${sB.id}/logins`, { method: "POST" })).json;
+  check("two families never share a username", otherFamily.username !== made.username);
+  const other = actor();
+  await other("/api/auth", post({ email: otherFamily.username, password: otherFamily.password }));
+  check("another family cannot open this homework",
+    (await other(`/api/lessons/${lessonA.id}/homework/image`)).status === 404);
 
   // A reset has to sign out every device that used the old password.
-  const reset = (await a(`/api/students/${sA.id}/logins`, post({ who: "student" }))).json;
+  const reset = (await a(`/api/students/${sA.id}/logins`, { method: "POST" })).json;
   check("a reset keeps the username", reset.username === made.username);
-  check("a reset signs the child out everywhere", (await kid("/me")).status === 307);
-  check("the old child password stops working",
+  check("a reset signs the family out everywhere", (await family("/me")).status === 307);
+  check("the old password stops working",
     (await actor()("/api/auth", post({ email: made.username, password: made.password }))).status === 401);
 
-  await a(`/api/students/${sA.id}/logins?who=parent`, { method: "DELETE" });
-  check("removing a sign-in ends that session", (await mum("/family")).status === 307);
+  const again = actor();
+  await again("/api/auth", post({ email: reset.username, password: reset.password }));
+  await a(`/api/students/${sA.id}/logins`, { method: "DELETE" });
+  check("removing the sign-in ends its session", (await again("/me")).status === 307);
 }
 
 // --- leakage --------------------------------------------------------------

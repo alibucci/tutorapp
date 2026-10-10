@@ -12,7 +12,7 @@ Last updated: 2026-09-27
 The whole pipeline exists and runs end to end. **No real lesson has ever gone
 through it**, but as of 28 September every layer has been proven separately:
 
-- the server path, by an automated run with real model calls (97 checks, all
+- the server path, by an automated run with real model calls (94 checks, all
   passing — `npm run smoke`)
 - the capture path, by hand on macOS via `/check`: microphone, the gate running
   in the AudioWorklet, the Opus recorder, wake lock, and a live transcript in
@@ -105,13 +105,13 @@ The per-lesson gate is a few ticks; the weekly one is about thirty seconds.
   edited English message is translated again, and regenerating the summary
   does not overwrite the tutor's edit.
 - **Homework.** Only JPEGs are accepted (checked by bytes). The child sees
-  nothing until the tutor sends it; the picture needs the child's link or login
-  - a wrong key, the parent's link or the parent's login all get 404. Answers
+  nothing until the tutor sends it; the picture needs the child's link or the
+  family sign-in - a wrong key or the parent's link get 404. Answers
   need three adjectives and can be handed in once.
-- **Child and parent sign-ins.** Usernames work as a phone types them
-  (capitalised, trailing space). A child's session cannot reach any tutor page
-  or API, nor the parent page. A reset or a removal signs out every device at
-  once.
+- **Family sign-in.** One username for the child and the parent; it opens both
+  pages. It works as a phone types it (capitalised, trailing space). A family
+  session cannot reach any tutor page or API, nor another family's homework. A
+  reset or a removal signs out every device at once.
 - **What a tutor may write.** Consent cannot be forged, a lesson's capture mode
   cannot be set from outside, a lesson cannot be reassigned to another student
   and its summary cannot be planted. Consent is granted through its own action
@@ -239,7 +239,7 @@ isolation, consent, every model call, both approval gates, homework, family
 sign-ins, and what a family
 can and cannot see. It makes real DeepSeek requests, so it costs a few cents and
 takes about a minute — that is deliberate, a mocked run would prove nothing. It
-deletes the records it creates. **97 checks, all passing as of this writing.**
+deletes the records it creates. **94 checks, all passing as of this writing.**
 
 For the browser half, open **`/check`** on the device that will actually record.
 It reports secure context, microphone access, the AudioWorklet, the gate module,

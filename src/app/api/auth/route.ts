@@ -52,11 +52,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ role: admin.role, next: "/admin" });
   }
 
-  // No @ means a username, and usernames belong to children and parents.
+  // No @ means a username, and usernames belong to families.
   if (!email.includes("@")) {
-    const found = await getStudentByUsername(email);
-    const login = found?.student.logins?.[found.role];
-    if (!found || !login || !verifyPassword(password, login.passwordHash)) {
+    const student = await getStudentByUsername(email);
+    const login = student?.login;
+    if (!student || !login || !verifyPassword(password, login.passwordHash)) {
       throttleKeys.forEach(recordAttempt);
       return NextResponse.json(
         { error: "That username and password do not match." },
@@ -64,15 +64,8 @@ export async function POST(request: Request) {
       );
     }
     throttleKeys.forEach(clearAttempts);
-    await startFamilySession({
-      role: found.role,
-      id: found.student.id,
-      v: login.tokenVersion,
-    });
-    return NextResponse.json({
-      role: found.role,
-      next: found.role === "student" ? "/me" : "/family",
-    });
+    await startFamilySession({ id: student.id, v: login.tokenVersion });
+    return NextResponse.json({ role: "family", next: "/me" });
   }
 
   const tutor = await getTutorByEmail(email);

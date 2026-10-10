@@ -13,15 +13,15 @@ import { getStudent, getTutor } from "./store";
  * Sessions.
  *
  * Tutors and the superadmin ("staff") get a password and a signed cookie.
- * Children and parents can have a username and password too, created by the
- * tutor - or no account at all and just their private link.
+ * Each family (child and parent together) can have one username and password,
+ * created by the tutor - or no account at all and just the private links.
  *
  * Family sessions live in a separate cookie on purpose. Every tutor page and
  * API route reads only the staff cookie through getSession(), so a child's
  * login cannot reach a tutor screen even if a check somewhere is sloppy.
  *
  * Nobody signs themselves up. The superadmin comes from the environment and
- * creates tutors; tutors create their own students and their logins.
+ * creates tutors; tutors create their own students and the family sign-ins.
  */
 
 export type Role = "admin" | "tutor";
@@ -198,12 +198,10 @@ export function temporaryPassword(): string {
   return [0, 4, 8].map((i) => chars.slice(i, i + 4).join("")).join("-");
 }
 
-// --- family sessions (child and parent) ------------------------------------
+// --- family sessions (child and parent, one shared sign-in) -----------------
 
-export type FamilyRole = "student" | "parent";
 export type FamilySession = {
-  role: FamilyRole;
-  /** The student's id, for both roles. */
+  /** The student's id. */
   id: string;
   v: number;
 };
@@ -247,17 +245,16 @@ export async function getFamilySession(): Promise<FamilySession | null> {
     return null;
   }
   if (!claims || claims.kind !== "family" || claims.exp < Date.now()) return null;
-  if (claims.role !== "student" && claims.role !== "parent") return null;
 
   const student = await getStudent(claims.id);
-  const login = student?.logins?.[claims.role];
+  const login = student?.login;
   if (!login || login.tokenVersion !== claims.v) return null;
-  return { role: claims.role, id: claims.id, v: claims.v };
+  return { id: claims.id, v: claims.v };
 }
 
-export async function requireFamily(role: FamilyRole): Promise<FamilySession> {
+export async function requireFamily(): Promise<FamilySession> {
   const session = await getFamilySession();
-  if (!session || session.role !== role) redirect("/login");
+  if (!session) redirect("/login");
   return session;
 }
 
