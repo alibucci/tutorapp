@@ -6,6 +6,18 @@ import type { FamilyLogin, Student } from "@/lib/types";
 
 type Params = { params: Promise<{ id: string }> };
 
+/**
+ * A session version that has never been used for this student before.
+ *
+ * Counting up from the current login reused numbers after a removal: delete
+ * the login, create a new one, and it started again at 1 - so a phone the
+ * tutor had just signed out, still holding a v=1 cookie, was signed back in.
+ * The clock only goes forward, so a timestamp cannot repeat.
+ */
+function nextVersion(previous: number | undefined): number {
+  return Math.max(Date.now(), (previous ?? 0) + 1);
+}
+
 /** "Yeva Petrova" -> "yeva"; a number on the end if that is taken. */
 async function freeUsername(student: Student): Promise<string> {
   const base =
@@ -36,17 +48,22 @@ export async function POST(_request: Request, { params }: Params) {
   }
 
   const { student } = found;
-  const current = student.login;
   const password = temporaryPassword();
-  const login: FamilyLogin = {
-    username: current?.username ?? (await freeUsername(student)),
-    passwordHash: hashPassword(password),
-    tokenVersion: (current?.tokenVersion ?? 0) + 1,
-    createdAt: current?.createdAt ?? new Date().toISOString(),
-  };
+  const passwordHash = hashPassword(password);
+  const fresh = student.login ? null : await freeUsername(student);
 
-  await updateStudent(id, { login });
-  return NextResponse.json({ username: login.username, password });
+  // Decided under the student's lock, so a double tap cannot store one
+  // password while showing the tutor another.
+  const updated = await updateStudent(id, (current) => {
+    const login: FamilyLogin = {
+      username: current.login?.username ?? fresh ?? current.id,
+      passwordHash,
+      tokenVersion: nextVersion(current.login?.tokenVersion),
+      createdAt: current.login?.createdAt ?? new Date().toISOString(),
+    };
+    return { login };
+  });
+  return NextResponse.json({ username: updated?.login?.username, password });
 }
 
 /** Remove the sign-in. Its sessions stop working at once - the record is gone. */

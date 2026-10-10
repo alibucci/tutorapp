@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LevelMeter } from "@/components/LevelMeter";
 import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
 import { useTutorRecorder } from "@/hooks/useTutorRecorder";
@@ -11,9 +11,28 @@ import {
   DEBRIEF_TOTAL_SECONDS,
   type DebriefAnswer,
   type Lesson,
+  type TranscriptSegment,
 } from "@/lib/types";
 
 type Phase = "ready" | "running" | "review";
+
+/** How often a running debrief is copied to the server. */
+const AUTOSAVE_MS = 5_000;
+
+type Draft = { segments: TranscriptSegment[]; edits: Record<string, string> };
+
+function draftKey(id: string) {
+  return `tutor-signal:debrief:${id}`;
+}
+
+function readDraft(id: string): Draft | null {
+  try {
+    const raw = window.localStorage.getItem(draftKey(id));
+    return raw ? (JSON.parse(raw) as Draft) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const router = useRouter();
@@ -21,7 +40,10 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const speech = useSpeechTranscript(lesson.language);
   const wakeLock = useWakeLock();
 
-  const [phase, setPhase] = useState<Phase>("ready");
+  // A debrief that was under way when the page died comes back on the review
+  // screen with what had been said, rather than vanishing.
+  const unfinished = lesson.debrief.length === 0 && lesson.debriefTranscript.length > 0;
+  const [phase, setPhase] = useState<Phase>(unfinished ? "review" : "ready");
   const [index, setIndex] = useState(0);
   const [remaining, setRemaining] = useState<number>(DEBRIEF_PROMPTS[0].seconds);
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -37,17 +59,32 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
   useEffect(() => {
     void rec.arm();
+    const local = readDraft(lesson.id);
+    if (unfinished || local) {
+      const server = lesson.debriefTranscript;
+      speech.restore(
+        local && local.segments.length > server.length ? local.segments : server,
+      );
+      // Device storage only exists after hydration, so this cannot be read
+      // during render; restoring it here is a one-time sync from outside React.
+      /* eslint-disable react-hooks/set-state-in-effect */
+      if (local?.edits) setEdits(local.edits);
+      if (local && local.segments.length) setPhase("review");
+      /* eslint-enable react-hooks/set-state-in-effect */
+    }
+    // one-shot on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const finish = useCallback(() => {
+  function finish() {
     speech.stop();
     void wakeLock.release();
     setPhase("review");
     rec.stop();
-  }, [rec, speech, wakeLock]);
+    saveRef.current(false);
+  }
 
-  const advance = useCallback(() => {
+  function advance() {
     const next = indexRef.current + 1;
     if (next >= DEBRIEF_PROMPTS.length) {
       finish();
@@ -59,7 +96,32 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     deadlineRef.current = performance.now() + DEBRIEF_PROMPTS[next].seconds * 1000;
     setIndex(next);
     setRemaining(DEBRIEF_PROMPTS[next].seconds);
-  }, [finish, speech]);
+  }
+
+  /** Copy what has been said so far to the server, without marking it done. */
+  function saveProgress(keepalive: boolean) {
+    const debriefTranscript = speech.segmentsRef.current;
+    if (!debriefTranscript.length) return;
+    void fetch(`/api/lessons/${lesson.id}`, {
+      method: "PATCH",
+      keepalive,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ debriefTranscript }),
+    }).catch(() => {});
+  }
+
+  // The interval and the listeners below outlive any one render, so they call
+  // through refs. Depending on the functions themselves tore the timer down on
+  // every render - and the level meter re-renders ~24 times a second, so the
+  // 250 ms tick never fired and the prompts never advanced on their own.
+  const advanceRef = useRef(advance);
+  const finishRef = useRef(finish);
+  const saveRef = useRef(saveProgress);
+  useEffect(() => {
+    advanceRef.current = advance;
+    finishRef.current = finish;
+    saveRef.current = saveProgress;
+  });
 
   // Driven off a wall-clock deadline rather than counted ticks: a backgrounded
   // tab has its timers throttled to about one call a minute, and a decremented
@@ -70,18 +132,44 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     const id = window.setInterval(() => {
       let left = deadlineRef.current - performance.now();
       while (left <= 0 && indexRef.current < DEBRIEF_PROMPTS.length - 1) {
-        advance();
+        advanceRef.current();
         left = deadlineRef.current - performance.now();
       }
       if (left <= 0) {
-        finish();
+        finishRef.current();
         return;
       }
       setRemaining(Math.ceil(left / 1000));
     }, 250);
 
-    return () => window.clearInterval(id);
-  }, [phase, advance, finish]);
+    const autosave = window.setInterval(() => saveRef.current(false), AUTOSAVE_MS);
+    const onHide = () => {
+      if (document.visibilityState === "hidden") saveRef.current(true);
+    };
+    const onPageHide = () => saveRef.current(true);
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+
+    return () => {
+      window.clearInterval(id);
+      window.clearInterval(autosave);
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [phase]);
+
+  // The device keeps its own copy too, including what the tutor has typed.
+  useEffect(() => {
+    if (phase === "ready") return;
+    try {
+      window.localStorage.setItem(
+        draftKey(lesson.id),
+        JSON.stringify({ segments: speech.segments, edits }),
+      );
+    } catch {
+      // Private mode or full storage: the server copy still runs.
+    }
+  }, [phase, speech.segments, edits, lesson.id]);
 
   /**
    * What the tutor typed over the top, keyed by prompt. Everything else is
@@ -127,9 +215,16 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
         }),
       });
       if (!res.ok) throw new Error("Could not save the debrief.");
+      try {
+        window.localStorage.removeItem(draftKey(lesson.id));
+      } catch {
+        // nothing to clean
+      }
       router.push(`/lesson/${lesson.id}/review`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Saving failed.");
+    } catch {
+      setError(
+        "Could not save - probably the connection. Nothing is lost: it is kept on this phone. Try again when you have signal.",
+      );
       setSaving(false);
     }
   }
@@ -154,14 +249,24 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
             their own; you can skip ahead at any time.
           </p>
         </div>
-        {rec.error && <p className="note note-warn">{rec.error}</p>}
-        <button
-          onClick={() => void begin()}
-          disabled={rec.state === "idle"}
-          className="btn btn-primary btn-lg"
-        >
-          Start debrief ({DEBRIEF_TOTAL_SECONDS}s)
-        </button>
+        {rec.error && (
+          <p className="note note-warn">
+            The microphone is not available here ({rec.error}). Check the
+            browser&rsquo;s microphone permission, or type the debrief instead.
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => void begin()}
+            disabled={rec.state === "idle"}
+            className="btn btn-primary btn-lg"
+          >
+            Start debrief ({DEBRIEF_TOTAL_SECONDS}s)
+          </button>
+          <button onClick={() => setPhase("review")} className="btn btn-quiet btn-lg">
+            Type it instead
+          </button>
+        </div>
       </div>
     );
   }
@@ -190,13 +295,13 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
         <div className="flex justify-center gap-3">
           <button
-            onClick={advance}
+            onClick={() => advance()}
             className="btn btn-quiet"
           >
             Next prompt
           </button>
           <button
-            onClick={finish}
+            onClick={() => finish()}
             className="btn btn-quiet"
           >
             Finish early
@@ -209,8 +314,9 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   return (
     <div className="space-y-6">
       <p className="t-small t-muted">
-        Transcribed from what you said. Fix anything the recogniser got wrong -
-        it goes straight into the summary.
+        {unfinished && Object.keys(edits).length === 0
+          ? "This debrief was interrupted. Here is what was saved - check it, fill any gaps, then save."
+          : "Transcribed from what you said. Fix anything the recogniser got wrong - it goes straight into the summary."}
       </p>
 
       {DEBRIEF_PROMPTS.map((prompt, i) => (

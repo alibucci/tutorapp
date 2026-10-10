@@ -82,7 +82,19 @@ export function explainSpeechError(code: string): string {
 
 export function useSpeechTranscript(lang = "en-US") {
   const [listening, setListening] = useState(false);
-  const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const [segments, setSegmentsState] = useState<TranscriptSegment[]>([]);
+  /** The same list, readable from callbacks without waiting for a render. */
+  const segmentsRef = useRef<TranscriptSegment[]>([]);
+  const setSegments = useCallback(
+    (next: TranscriptSegment[] | ((prev: TranscriptSegment[]) => TranscriptSegment[])) => {
+      const value = typeof next === "function" ? next(segmentsRef.current) : next;
+      segmentsRef.current = value;
+      setSegmentsState(value);
+    },
+    [],
+  );
+  /** Resolves a pending stopAndFlush once the recogniser has really ended. */
+  const endedRef = useRef<(() => void) | null>(null);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -158,22 +170,29 @@ export function useSpeechTranscript(lang = "en-US") {
 
     rec.onerror = (e) => {
       // "no-speech" and "aborted" are routine during a quiet stretch.
-      if (e.error !== "no-speech" && e.error !== "aborted") {
-        setError(explainSpeechError(e.error));
-      }
+      if (e.error === "no-speech" || e.error === "aborted") return;
+      setError(explainSpeechError(e.error));
+      // These do not fix themselves. Restarting on them just fails again in a
+      // tight loop, so give up until the caller starts over.
+      if (FATAL.has(e.error)) wantRef.current = false;
     };
 
     // Chrome ends the session on its own every so often; restart while wanted.
     rec.onend = () => {
+      // A recogniser that has since been replaced (a quick pause and resume)
+      // must not restart itself, or two run at once and every line doubles.
+      if (recRef.current !== rec) return;
       if (wantRef.current) {
         try {
           rec.start();
+          return;
         } catch {
-          setListening(false);
+          // fall through to stopped
         }
-      } else {
-        setListening(false);
       }
+      setListening(false);
+      endedRef.current?.();
+      endedRef.current = null;
     };
 
     startedAtRef.current = performance.now();
@@ -191,7 +210,7 @@ export function useSpeechTranscript(lang = "en-US") {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start recognition.");
     }
-  }, [lang]);
+  }, [lang, setSegments]);
 
   /** Begin a new transcript, discarding anything already captured. */
   const start = useCallback(() => listen(true), [listen]);
@@ -208,6 +227,32 @@ export function useSpeechTranscript(lang = "en-US") {
     setListening(false);
     setInterim("");
   }, []);
+
+  /**
+   * Stop, and wait for the recogniser to hand over what it was still holding.
+   * Chrome delivers the last final result after stop(), so reading the
+   * segments straight away loses whatever was being said at that moment.
+   */
+  const stopAndFlush = useCallback(async (): Promise<TranscriptSegment[]> => {
+    const running = wantRef.current && recRef.current;
+    stop();
+    if (running) {
+      await new Promise<void>((resolve) => {
+        endedRef.current = resolve;
+        window.setTimeout(resolve, 1500);
+      });
+    }
+    return segmentsRef.current;
+  }, [stop]);
+
+  /** Put back a transcript saved earlier, so a resumed lesson carries on. */
+  const restore = useCallback(
+    (saved: TranscriptSegment[]) => {
+      setSegments(saved);
+      offsetRef.current = saved.length ? saved[saved.length - 1].t + 1000 : 0;
+    },
+    [setSegments],
+  );
 
   useEffect(() => () => {
     wantRef.current = false;
@@ -228,6 +273,20 @@ export function useSpeechTranscript(lang = "en-US") {
     start,
     resume,
     stop,
+    stopAndFlush,
+    restore,
     setTag,
+    /** Current segments without waiting for a render - for autosave. */
+    segmentsRef,
   };
 }
+
+/** Errors that will happen again if the recogniser is simply restarted. */
+const FATAL = new Set([
+  "not-allowed",
+  "service-not-allowed",
+  "audio-capture",
+  "network",
+  "language-not-supported",
+  "bad-grammar",
+]);

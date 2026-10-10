@@ -23,13 +23,89 @@ async function ensureDirs() {
   );
 }
 
-async function readJson<T>(file: string): Promise<T | null> {
+/**
+ * Ids become file names, so they must never carry a path. Route params arrive
+ * decoded - `..%2F..%2Fdata` is `../../data` by the time it gets here.
+ */
+const SAFE_ID = /^[A-Za-z0-9_-]{1,80}$/;
+
+function recordPath(dir: string, id: string): string | null {
+  return SAFE_ID.test(id) ? path.join(dir, `${id}.json`) : null;
+}
+
+async function readJson<T>(file: string | null): Promise<T | null> {
+  if (!file) return null;
+  let text: string;
   try {
-    return JSON.parse(await fs.readFile(file, "utf8")) as T;
+    text = await fs.readFile(file, "utf8");
   } catch {
+    return null; // not there
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // There but unreadable is not the same as missing: say so in the log,
+    // or a tutor whose record broke is simply locked out with no trace.
+    console.error(`[store] unreadable record: ${file}`);
     return null;
   }
 }
+
+/**
+ * Write a whole record so that a reader sees either the old file or the new
+ * one, never half of each: write beside it, then rename over it. A crash
+ * mid-write leaves a stray temp file, not a corrupted record.
+ */
+async function writeJson(file: string, value: unknown): Promise<void> {
+  const tmp = `${file}.${randomBytes(6).toString("hex")}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(value, null, 2));
+  await fs.rename(tmp, file);
+}
+
+/**
+ * One change at a time per record. Without this, two requests that each read
+ * a lesson, change their part and write it back would silently drop one
+ * another's change - a homework upload erasing the answers handed in during
+ * it. In-process, which is right for one server.
+ */
+const locks = new Map<string, Promise<unknown>>();
+
+function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const previous = locks.get(key) ?? Promise.resolve();
+  const run = previous.then(fn, fn);
+  const tail = run.catch(() => {});
+  locks.set(key, tail);
+  void tail.then(() => {
+    if (locks.get(key) === tail) locks.delete(key);
+  });
+  return run;
+}
+
+/**
+ * Change a record under its lock. `change` sees the current record, read
+ * inside the lock, and returns the fields to change - or null to leave it
+ * alone, for when it turns out the change no longer applies.
+ */
+async function updateRecord<T extends { id: string }>(
+  dir: string,
+  id: string,
+  change: Partial<T> | ((current: T) => Partial<T> | null),
+): Promise<T | null> {
+  const file = recordPath(dir, id);
+  if (!file) return null;
+  return withLock(file, async () => {
+    const current = await readJson<T>(file);
+    if (!current) return null;
+    const patch = typeof change === "function" ? change(current) : change;
+    if (!patch) return current;
+    const next = { ...current, ...patch, id: current.id };
+    await writeJson(file, next);
+    return next;
+  });
+}
+
+/** Fields to change, or a function from the current record to them. */
+export type Change<T> = Partial<T> | ((current: T) => Partial<T> | null);
 
 async function readAll<T>(dir: string): Promise<T[]> {
   await ensureDirs();
@@ -59,15 +135,12 @@ export async function createTutor(
     active: true,
     createdAt: new Date().toISOString(),
   };
-  await fs.writeFile(
-    path.join(TUTOR_DIR, `${tutor.id}.json`),
-    JSON.stringify(tutor, null, 2),
-  );
+  await writeJson(path.join(TUTOR_DIR, `${tutor.id}.json`), tutor);
   return tutor;
 }
 
 export async function getTutor(id: string): Promise<Tutor | null> {
-  return readJson<Tutor>(path.join(TUTOR_DIR, `${id}.json`));
+  return readJson<Tutor>(recordPath(TUTOR_DIR, id));
 }
 
 export async function getTutorByEmail(email: string): Promise<Tutor | null> {
@@ -78,16 +151,9 @@ export async function getTutorByEmail(email: string): Promise<Tutor | null> {
 
 export async function updateTutor(
   id: string,
-  patch: Partial<Tutor>,
+  change: Change<Tutor>,
 ): Promise<Tutor | null> {
-  const current = await getTutor(id);
-  if (!current) return null;
-  const next = { ...current, ...patch, id: current.id };
-  await fs.writeFile(
-    path.join(TUTOR_DIR, `${id}.json`),
-    JSON.stringify(next, null, 2),
-  );
-  return next;
+  return updateRecord<Tutor>(TUTOR_DIR, id, change);
 }
 
 export async function listTutors(): Promise<Tutor[]> {
@@ -116,29 +182,19 @@ export async function createStudent(
     parentKey: accessKey(),
     skills: [],
   };
-  await fs.writeFile(
-    path.join(STUDENT_DIR, `${student.id}.json`),
-    JSON.stringify(student, null, 2),
-  );
+  await writeJson(path.join(STUDENT_DIR, `${student.id}.json`), student);
   return student;
 }
 
 export async function getStudent(id: string): Promise<Student | null> {
-  return readJson<Student>(path.join(STUDENT_DIR, `${id}.json`));
+  return readJson<Student>(recordPath(STUDENT_DIR, id));
 }
 
 export async function updateStudent(
   id: string,
-  patch: Partial<Student>,
+  change: Change<Student>,
 ): Promise<Student | null> {
-  const current = await getStudent(id);
-  if (!current) return null;
-  const next = { ...current, ...patch, id: current.id };
-  await fs.writeFile(
-    path.join(STUDENT_DIR, `${id}.json`),
-    JSON.stringify(next, null, 2),
-  );
-  return next;
+  return updateRecord<Student>(STUDENT_DIR, id, change);
 }
 
 /** Omit `tutorId` only where the caller is the superadmin. */
@@ -188,29 +244,19 @@ export async function createLesson(
     debrief: [],
     debriefTranscript: [],
   };
-  await fs.writeFile(
-    path.join(LESSON_DIR, `${lesson.id}.json`),
-    JSON.stringify(lesson, null, 2),
-  );
+  await writeJson(path.join(LESSON_DIR, `${lesson.id}.json`), lesson);
   return lesson;
 }
 
 export async function getLesson(id: string): Promise<Lesson | null> {
-  return readJson<Lesson>(path.join(LESSON_DIR, `${id}.json`));
+  return readJson<Lesson>(recordPath(LESSON_DIR, id));
 }
 
 export async function updateLesson(
   id: string,
-  patch: Partial<Lesson>,
+  change: Change<Lesson>,
 ): Promise<Lesson | null> {
-  const current = await getLesson(id);
-  if (!current) return null;
-  const next = { ...current, ...patch, id: current.id };
-  await fs.writeFile(
-    path.join(LESSON_DIR, `${id}.json`),
-    JSON.stringify(next, null, 2),
-  );
-  return next;
+  return updateRecord<Lesson>(LESSON_DIR, id, change);
 }
 
 export async function listLessons(studentId?: string): Promise<Lesson[]> {
@@ -224,15 +270,12 @@ export async function listLessons(studentId?: string): Promise<Lesson[]> {
 
 export async function saveReport(report: ParentReport): Promise<ParentReport> {
   await ensureDirs();
-  await fs.writeFile(
-    path.join(REPORT_DIR, `${report.id}.json`),
-    JSON.stringify(report, null, 2),
-  );
+  await writeJson(path.join(REPORT_DIR, `${report.id}.json`), report);
   return report;
 }
 
 export async function getReport(id: string): Promise<ParentReport | null> {
-  return readJson<ParentReport>(path.join(REPORT_DIR, `${id}.json`));
+  return readJson<ParentReport>(recordPath(REPORT_DIR, id));
 }
 
 export async function listReports(studentId?: string): Promise<ParentReport[]> {
@@ -246,6 +289,7 @@ export async function listReports(studentId?: string): Promise<ParentReport[]> {
 
 /** A fresh name per upload, so a replaced picture is never served from cache. */
 export async function saveImage(lessonId: string, data: ArrayBuffer): Promise<string> {
+  if (!SAFE_ID.test(lessonId)) throw new Error("Bad lesson id.");
   await ensureDirs();
   const name = `${lessonId}-${randomBytes(6).toString("hex")}.jpg`;
   await fs.writeFile(path.join(IMAGE_DIR, name), Buffer.from(data));

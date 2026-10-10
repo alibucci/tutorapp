@@ -1,3 +1,4 @@
+import { LIMIT, readForm, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
 import { deleteImage, saveImage, updateLesson } from "@/lib/store";
@@ -26,7 +27,10 @@ export async function POST(request: Request, { params }: Params) {
     );
   }
 
-  const form = await request.formData();
+  // Read with a ceiling: the size check below only runs after parsing, which
+  // would otherwise buffer whatever was sent.
+  const form = await readForm(request, LIMIT.upload);
+  if (form instanceof Response) return form;
   const file = form.get("image");
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No picture in request." }, { status: 400 });
@@ -41,11 +45,30 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "That is not a JPEG." }, { status: 415 });
   }
 
-  const current =
-    found.lesson.homework ?? blankHomework(found.lesson.summary?.homeworkFocus);
   const imageFile = await saveImage(id, data);
-  await deleteImage(current.imageFile);
-  const lesson = await updateLesson(id, { homework: { ...current, imageFile } });
+
+  // Decided against the record as it is now, not as it was before the
+  // upload: the child may have handed in answers while it was arriving.
+  let replaced: string | undefined;
+  let refused = false;
+  const lesson = await updateLesson(id, (current) => {
+    if (current.homework?.answers) {
+      refused = true;
+      return null;
+    }
+    const homework = current.homework ?? blankHomework(current.summary?.homeworkFocus);
+    replaced = homework.imageFile;
+    return { homework: { ...homework, imageFile } };
+  });
+
+  if (refused) {
+    await deleteImage(imageFile);
+    return NextResponse.json(
+      { error: "The homework has already been answered." },
+      { status: 409 },
+    );
+  }
+  await deleteImage(replaced);
   return NextResponse.json(lesson?.homework);
 }
 
@@ -56,31 +79,36 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!found) {
     return NextResponse.json({ error: "No such lesson." }, { status: 404 });
   }
-  const body = (await request.json()) as { focus?: string; send?: boolean };
-  const current =
-    found.lesson.homework ?? blankHomework(found.lesson.summary?.homeworkFocus);
-  const next: Homework = { ...current };
+  const parsed = await readJson<{ focus?: string; send?: boolean }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const body = parsed;
 
-  if (typeof body.focus === "string") next.focus = body.focus.trim().slice(0, 300);
-  if (body.send === true) {
-    if (!next.imageFile) {
-      return NextResponse.json(
-        { error: "Add a picture before sending." },
-        { status: 400 },
-      );
+  let problem: { error: string; status: number } | null = null;
+  const lesson = await updateLesson(id, (current) => {
+    const next: Homework = {
+      ...(current.homework ?? blankHomework(current.summary?.homeworkFocus)),
+    };
+    if (typeof body.focus === "string") next.focus = body.focus.trim().slice(0, 300);
+    if (body.send === true) {
+      if (!next.imageFile) {
+        problem = { error: "Add a picture before sending.", status: 400 };
+        return null;
+      }
+      next.sentAt ??= new Date().toISOString();
     }
-    next.sentAt = new Date().toISOString();
-  }
-  if (body.send === false) {
-    if (next.answers) {
-      return NextResponse.json(
-        { error: "It has already been answered." },
-        { status: 409 },
-      );
+    if (body.send === false) {
+      if (next.answers) {
+        problem = { error: "It has already been answered.", status: 409 };
+        return null;
+      }
+      delete next.sentAt;
     }
-    delete next.sentAt;
-  }
+    return { homework: next };
+  });
 
-  const lesson = await updateLesson(id, { homework: next });
+  if (problem) {
+    const { error, status } = problem;
+    return NextResponse.json({ error }, { status });
+  }
   return NextResponse.json(lesson?.homework);
 }

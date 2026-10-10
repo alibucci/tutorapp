@@ -73,7 +73,7 @@ export default async function StudentPage({
               return (
                 <li key={lesson.id}>
                   <Link
-                    href={`/lesson/${lesson.id}/review`}
+                    href={next.href}
                     className="row row-link py-3.5"
                   >
                     <span className="min-w-0 flex-1">
@@ -126,10 +126,16 @@ export default async function StudentPage({
 const DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
 
 /** What this lesson is still waiting for, in the app's colours. */
-function nextStep(lesson: Lesson): { text: string; tone: string } {
-  if (lesson.homework?.answers) return { text: "Homework done", tone: "text-live" };
-  if (lesson.homework?.sentAt) return { text: "Homework sent", tone: "t-muted" };
-  if (lesson.summary) return { text: "Send homework", tone: "text-warn" };
-  if (lesson.debrief.length) return { text: "Review", tone: "text-warn" };
-  return { text: "Debrief", tone: "text-warn" };
+function nextStep(lesson: Lesson): { text: string; tone: string; href: string } {
+  const base = `/lesson/${lesson.id}`;
+  if (lesson.homework?.answers) return { text: "Homework done", tone: "text-live", href: `${base}/review` };
+  if (lesson.homework?.sentAt) return { text: "Homework sent", tone: "t-muted", href: `${base}/review` };
+  if (lesson.summary) return { text: "Send homework", tone: "text-warn", href: `${base}/review#homework` };
+  if (lesson.debrief.length) return { text: "Review", tone: "text-warn", href: `${base}/review` };
+  // Not recorded, or interrupted: back to the recorder. Ended without a
+  // debrief: straight to the debrief.
+  if (!lesson.endedAt) {
+    return { text: lesson.startedAt ? "Finish lesson" : "Not recorded", tone: "text-warn", href: base };
+  }
+  return { text: "Debrief", tone: "text-warn", href: `${base}/debrief` };
 }

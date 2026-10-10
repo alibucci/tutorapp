@@ -1,14 +1,31 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LevelMeter } from "@/components/LevelMeter";
 import { MicPicker } from "@/components/MicPicker";
 import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
 import { useTutorRecorder } from "@/hooks/useTutorRecorder";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import { INTERRUPTION_LABEL, type Lesson } from "@/lib/types";
+import { INTERRUPTION_LABEL, type Lesson, type TranscriptSegment } from "@/lib/types";
+
+/** How often a running lesson's transcript is copied to the server. */
+const AUTOSAVE_MS = 10_000;
+
+function draftKey(id: string) {
+  return `tutor-signal:lesson:${id}`;
+}
+
+/** The copy kept on the device, for when the network is what failed. */
+function readDraft(id: string): TranscriptSegment[] {
+  try {
+    const raw = window.localStorage.getItem(draftKey(id));
+    return raw ? (JSON.parse(raw) as TranscriptSegment[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   const router = useRouter();
@@ -22,6 +39,16 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  /** The end-of-lesson save failed; the transcript is still here to retry. */
+  const [unsaved, setUnsaved] = useState(false);
+  /**
+   * Started earlier and never ended: the tab closed, the phone died, or the
+   * browser threw it away in the background. Offer to carry on rather than
+   * start over.
+   */
+  const [interrupted, setInterrupted] = useState(
+    Boolean(lesson.startedAt && !lesson.endedAt),
+  );
 
   const gate = useMemo(
     () =>
@@ -36,10 +63,16 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   });
   const wakeLock = useWakeLock();
 
-  // Ask for the mic as soon as the page opens so the meter is live.
+  // Ask for the mic as soon as the page opens so the meter is live, and put
+  // back whatever an interrupted run already captured - the server's copy or
+  // the device's, whichever got further.
   useEffect(() => {
     void rec.arm();
-    // arm is stable enough for a one-shot on mount
+    if (interrupted) {
+      const local = readDraft(lesson.id);
+      speech.restore(local.length > lesson.transcript.length ? local : lesson.transcript);
+    }
+    // one-shot on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -52,45 +85,121 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   // would transcribe people who never agreed to be recorded.
   const transcribes = capturesStudent;
 
+  // --- keeping a running lesson safe ---------------------------------------
+
+  const savedCountRef = useRef(lesson.transcript.length);
+  const live_ = rec.state === "recording" || rec.state === "paused";
+
+  /** Copy progress to the server. `keepalive` lets it finish as the page dies. */
+  function saveProgress(keepalive = false) {
+      const transcript = speech.segmentsRef.current;
+      if (transcribes && transcript.length === savedCountRef.current) return;
+      savedCountRef.current = transcript.length;
+      void fetch(`/api/lessons/${lesson.id}`, {
+        method: "PATCH",
+        keepalive,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(transcribes && { transcript }),
+          interruptions: rec.interruptions,
+          recordedMs: Math.round(rec.openMs),
+        }),
+      }).catch(() => {
+        // Try again on the next tick rather than losing it.
+        savedCountRef.current = -1;
+      });
+  }
+  const saveRef = useRef(saveProgress);
+  useEffect(() => {
+    saveRef.current = saveProgress;
+  });
+
+  useEffect(() => {
+    if (!live_) return;
+    const timer = window.setInterval(() => saveRef.current(), AUTOSAVE_MS);
+    // The moment the app is hidden is the last moment we are sure to run.
+    const onHide = () => {
+      if (document.visibilityState === "hidden") saveRef.current(true);
+    };
+    const onPageHide = () => saveRef.current(true);
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [live_]);
+
+  // And a copy on the device, every time a line lands.
+  useEffect(() => {
+    if (!transcribes || speech.segments.length === 0) return;
+    try {
+      window.localStorage.setItem(draftKey(lesson.id), JSON.stringify(speech.segments));
+    } catch {
+      // Private mode or full storage: the server copy still runs.
+    }
+  }, [transcribes, speech.segments, lesson.id]);
+
   async function begin() {
     // Taken before recording so a lock cannot land in the gap.
     await wakeLock.acquire();
-    await fetch(`/api/lessons/${lesson.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startedAt: new Date().toISOString() }),
-    });
-    if (transcribes) speech.start();
+    if (!lesson.startedAt) {
+      await fetch(`/api/lessons/${lesson.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startedAt: new Date().toISOString() }),
+      }).catch(() => {});
+    }
+    // Carrying on after an interruption keeps the restored lines.
+    if (transcribes) {
+      if (interrupted) speech.resume();
+      else speech.start();
+    }
+    setInterrupted(false);
     await rec.start();
   }
 
-  async function end() {
-    setConfirmingEnd(false);
-    speech.stop();
+  /** Save the end of the lesson. Safe to call again if it failed. */
+  async function finishSave(transcript: TranscriptSegment[]) {
     setSaving(true);
     setSaveError(null);
-
-    // Audio is never kept, so only the transcript and the timings are saved.
-    rec.stop();
-
     try {
       const res = await fetch(`/api/lessons/${lesson.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          transcript: transcribes ? speech.segments : [],
+          ...(transcribes && { transcript }),
           interruptions: rec.interruptions,
           endedAt: new Date().toISOString(),
-          recordedMs: Math.round(rec.openMs),
+          ...(rec.openMs > 0 && { recordedMs: Math.round(rec.openMs) }),
         }),
       });
       if (!res.ok) throw new Error("Could not save the lesson.");
+      try {
+        window.localStorage.removeItem(draftKey(lesson.id));
+      } catch {
+        // nothing to clean
+      }
+      setUnsaved(false);
       void wakeLock.release();
       router.push(`/lesson/${lesson.id}/debrief`);
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Saving failed.");
+    } catch {
+      setUnsaved(true);
+      setSaveError(
+        "Could not save the end of the lesson - probably the connection. Nothing is lost: try again when you have signal.",
+      );
       setSaving(false);
     }
+  }
+
+  async function end() {
+    setConfirmingEnd(false);
+    // Waits for the recogniser to hand over the line it was still holding.
+    const transcript = await speech.stopAndFlush();
+    // Audio is never kept, so only the transcript and the timings are saved.
+    rec.stop();
+    await finishSave(transcript);
   }
 
   function pause() {
@@ -107,17 +216,40 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
 
   return (
     <div className="stack-lg">
-      <p
-        className={`rounded-md px-3 py-2 t-small ${
-          capturesStudent
-            ? "border border-accent bg-accent-soft"
-            : "bg-surface text-muted"
-        }`}
-      >
+      <p className={`note ${capturesStudent ? "note-accent" : "note-quiet"}`}>
         {capturesStudent
-          ? "Recording both voices - yours and the student's."
-          : "Recording your voice only. No transcript is taken, because the recogniser listens to the room rather than to the filtered signal."}
+          ? "Both voices, with a live transcript. The parent has consented."
+          : "Your voice only, and no live transcript - without the parent's consent the transcript could pick up the student. Your debrief straight after the lesson is what the summary is built from."}
       </p>
+
+      {interrupted && (
+        <section className="card card-pad space-y-3 border-warn">
+          <p className="t-subtitle">This lesson was interrupted</p>
+          <p className="t-small t-muted">
+            It started{" "}
+            {lesson.startedAt && new Date(lesson.startedAt).toLocaleTimeString()} and
+            was never ended - the page closed or the phone went off.
+            {transcribes &&
+              ` ${speech.segments.length} lines of transcript were saved and are kept.`}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => void begin()}
+              disabled={rec.state === "idle"}
+              className="btn btn-primary"
+            >
+              Continue recording
+            </button>
+            <button
+              onClick={() => void finishSave(speech.segmentsRef.current)}
+              disabled={saving}
+              className="btn btn-quiet"
+            >
+              End it and record the debrief
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="space-y-4 card p-5">
         <MicPicker
@@ -218,13 +350,21 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
       )}
 
       <section className="flex flex-wrap items-center gap-3">
-        {!live ? (
+        {unsaved ? (
+          <button
+            onClick={() => void finishSave(speech.segmentsRef.current)}
+            disabled={saving}
+            className="btn btn-primary btn-lg"
+          >
+            {saving ? "Saving…" : "Try saving again"}
+          </button>
+        ) : interrupted ? null : !live ? (
           <button
             onClick={() => void begin()}
             disabled={rec.state === "idle" || saving}
             className="btn btn-primary btn-lg"
           >
-            {saving ? "Saving..." : "Start lesson"}
+            {saving ? "Saving…" : "Start lesson"}
           </button>
         ) : (
           <>
@@ -271,6 +411,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
 
       {saveError && <p className="note note-warn">{saveError}</p>}
 
+      {transcribes && (
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="t-subtitle">
@@ -281,14 +422,13 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
               ? speech.listening
                 ? "listening"
                 : "idle"
-              : "not supported in this browser - audio still records"}
+              : "not supported in this browser - use Safari or Chrome"}
           </span>
         </div>
         <div className="max-h-80 space-y-2 overflow-y-auto card p-4 t-small">
           {speech.segments.length === 0 && !speech.interim && (
             <p className="text-muted">
-              Whatever you say during the lesson lands here. Students are not
-              recorded.
+              Both voices land here as you talk. It is saved as you go.
             </p>
           )}
           {speech.segments.map((s, i) => (
@@ -303,6 +443,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         </div>
         {speech.error && <p className="t-caption">{speech.error}</p>}
       </section>
+      )}
     </div>
   );
 }

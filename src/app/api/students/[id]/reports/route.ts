@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
 import { listLessons, listReports, saveReport } from "@/lib/store";
@@ -26,7 +27,9 @@ export async function POST(request: Request, { params }: Params) {
   }
   const { student } = found;
 
-  const body = (await request.json().catch(() => ({}))) as { week?: string };
+  const parsed = await readJson<{ week?: string }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const body = parsed;
   const { start, end } = weekBounds(body.week ? new Date(body.week) : new Date());
 
   const lessons = lessonsInWeek(await listLessons(id), start, end);

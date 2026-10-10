@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
-import { getLesson, updateLesson } from "@/lib/store";
+import { updateLesson } from "@/lib/store";
 import { labelSpeakers } from "@/lib/diarize";
 import { writeParentMessage } from "@/lib/parentMessage";
 import { summarizeLesson } from "@/lib/summarize";
@@ -68,16 +68,14 @@ async function generate(id: string, lesson: Lesson, student: Student): Promise<R
     ]);
 
     // The model took half a minute; the tutor may have edited the message
-    // meanwhile. Their edit wins over what was generated.
-    const latest = await getLesson(id);
-    const keep = latest?.parentMessage?.editedAt ? latest.parentMessage : parentMessage;
-
+    // meanwhile. Their edit wins over what was generated - decided against the
+    // record as it is now, under its lock.
     return NextResponse.json(
-      await updateLesson(id, {
+      await updateLesson(id, (current) => ({
         ...(working.transcript !== lesson.transcript && { transcript: working.transcript }),
         summary,
-        parentMessage: keep,
-      }),
+        parentMessage: current.parentMessage?.editedAt ? current.parentMessage : parentMessage,
+      })),
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Summary failed.";

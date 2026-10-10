@@ -10,11 +10,13 @@
 aloudli.com, www.aloudli.com {
 	encode zstd gzip
 
-	# Recording chunks arrive once a second; the default buffer would add
-	# latency for no benefit.
-	reverse_proxy 127.0.0.1:3000 {
-		flush_interval -1
+	# Nothing the app accepts is bigger than one homework picture (5 MB, already
+	# shrunk in the browser). Stop anything larger here, before it is buffered.
+	request_body {
+		max_size 6MB
 	}
+
+	reverse_proxy 127.0.0.1:3000
 
 	# The app sets no third-party requests of its own, so the policy can be
 	# strict. `unsafe-inline` on styles is what Next's streamed CSS needs.

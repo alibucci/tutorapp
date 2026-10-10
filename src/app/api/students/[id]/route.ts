@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
 import { isGameStyle } from "@/lib/gameStyles";
@@ -29,12 +30,14 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ error: "No such student." }, { status: 404 });
   }
 
-  const body = (await request.json()) as {
+  const parsed = await readJson<{
     name?: string;
     consentFrom?: string | null;
     rotateLinks?: boolean;
     gameStyle?: string;
-  };
+  }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const body = parsed;
 
   const patch: Parameters<typeof updateStudent>[1] = {};
 

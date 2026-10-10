@@ -31,11 +31,21 @@ type Todo = {
 /** The one thing each recent lesson is still waiting for, if anything. */
 function todoFor(lesson: Lesson, name: string): Todo | null {
   const base = `/lesson/${lesson.id}`;
+  if (lesson.startedAt && !lesson.endedAt) {
+    return {
+      href: base,
+      title: `Finish ${name}'s lesson`,
+      detail: `${lesson.title} · it was interrupted`,
+      kind: "warn",
+      icon: <MicIcon />,
+    };
+  }
   if (lesson.endedAt && lesson.debrief.length === 0) {
+    const begun = lesson.debriefTranscript.length > 0;
     return {
       href: `${base}/debrief`,
-      title: `Record the debrief for ${name}`,
-      detail: `${lesson.title} · sixty seconds`,
+      title: `${begun ? "Finish" : "Record"} the debrief for ${name}`,
+      detail: `${lesson.title} · ${begun ? "it was interrupted" : "sixty seconds"}`,
       kind: "warn",
       icon: <MicIcon />,
     };

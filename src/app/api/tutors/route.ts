@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { getSession, hashPassword, temporaryPassword } from "@/lib/auth";
 import { createTutor, getTutorByEmail, listTutors } from "@/lib/store";
@@ -30,10 +31,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not allowed." }, { status: 403 });
   }
 
-  const { email, name } = (await request.json()) as {
+  const parsed = await readJson<{
     email?: string;
     name?: string;
-  };
+  }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const { email, name } = parsed;
   if (!email?.trim() || !name?.trim()) {
     return NextResponse.json(
       { error: "Name and email are required." },

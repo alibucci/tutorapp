@@ -72,6 +72,20 @@ export default async function ReviewPage({
         ))}
       </nav>
 
+      {lesson.debrief.length === 0 && (
+        <section className="card card-pad flex flex-wrap items-center justify-between gap-3">
+          <span>
+            <span className="block font-semibold">No debrief yet</span>
+            <span className="block t-small t-muted">
+              Sixty seconds of what you think. The summary is written from it.
+            </span>
+          </span>
+          <Link href={`/lesson/${lesson.id}/debrief`} className="btn btn-primary">
+            Record the debrief
+          </Link>
+        </section>
+      )}
+
       {lesson.interruptions?.length > 0 && (
         <section className="note note-warn">
           <p className="font-semibold">The recording was interrupted</p>
@@ -170,14 +184,6 @@ export default async function ReviewPage({
         </details>
       )}
 
-      {lesson.debrief.length === 0 && (
-        <Link
-          href={`/lesson/${lesson.id}/debrief`}
-          className="inline-block btn btn-primary"
-        >
-          Record the debrief
-        </Link>
-      )}
     </div>
   );
 }

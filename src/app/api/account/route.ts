@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import {
   MIN_PASSWORD_LENGTH,
@@ -20,10 +21,12 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Not allowed." }, { status: 403 });
   }
 
-  const { currentPassword, newPassword } = (await request.json()) as {
+  const parsed = await readJson<{
     currentPassword?: string;
     newPassword?: string;
-  };
+  }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const { currentPassword, newPassword } = parsed;
 
   if (!currentPassword || !newPassword) {
     return NextResponse.json(

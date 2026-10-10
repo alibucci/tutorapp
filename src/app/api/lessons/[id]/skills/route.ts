@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
 import { updateLesson, updateStudent } from "@/lib/store";
@@ -40,7 +41,9 @@ export async function PUT(request: Request, { params }: Params) {
   }
   const { lesson, student } = found;
 
-  const { changes } = (await request.json()) as { changes: SkillChange[] };
+  const parsed = await readJson<{ changes: SkillChange[] }>(request, LIMIT.medium);
+  if (parsed instanceof Response) return parsed;
+  const { changes } = parsed;
   const skills = applySkillChanges(student.skills, changes ?? [], lesson.id);
 
   await updateStudent(student.id, { skills });

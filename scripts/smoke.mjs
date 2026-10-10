@@ -140,6 +140,12 @@ for (const [label, path, init] of [
 check("tutor B cannot open the admin API",
   (await b("/api/tutors", post({ name: "X", email: "x@y.z" }))).status === 403);
 
+// --- hardening ----------------------------------------------------------------
+check("a huge body is refused before it is read",
+  (await anon("/api/auth", { method: "POST", body: JSON.stringify({ email: "x".repeat(200_000), password: "y" }) })).status === 413);
+check("an id cannot walk out of its folder",
+  (await a(`/api/students/..%2F..%2Fdata%2Fstudents%2F${sA.id}`)).status === 404);
+
 // --- consent drives capture ----------------------------------------------
 const lessonA = (await a("/api/lessons", post({
   title: "Smoke lesson", mode: "classroom", language: "en-US", studentId: sA.id,
@@ -156,6 +162,11 @@ const forced = (await b("/api/lessons", post({
   title: "Forced", mode: "classroom", studentId: sB.id, capture: "both",
 }))).json;
 check("a client cannot forge capture without consent", forced?.capture === "tutor");
+check("listing lessons shows only your own",
+  !(await b("/api/lessons")).json.some((l) => l.studentId === sA.id)
+  && (await a("/api/lessons")).json.some((l) => l.id === lessonA.id));
+check("a wrongly shaped lesson save is refused",
+  (await a(`/api/lessons/${lessonA.id}`, patch({ debrief: "not a list" }))).status === 400);
 
 // --- the model path -------------------------------------------------------
 await a(`/api/lessons/${lessonA.id}`, patch({
@@ -430,6 +441,18 @@ function picture(bytes) {
   check("a family is sent away from the tutor screens",
     (await family("/")).status === 307);
 
+  {
+    // The family cookie, pasted in as a staff cookie, must not be a session.
+    const jarFamily = await fetch(`${BASE}/api/auth`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: made.username, password: made.password }),
+    });
+    const famValue = jarFamily.headers.getSetCookie()
+      .map((c) => c.split(";")[0]).find((c) => c.startsWith("family_session="))?.split("=")[1];
+    const swapped = await fetch(`${BASE}/api/lessons`, { headers: { cookie: `tutor_session=${famValue}` } });
+    check("a family cookie cannot pose as a tutor's", Boolean(famValue) && swapped.status === 403);
+  }
+
   const otherFamily = (await b(`/api/students/${sB.id}/logins`, { method: "POST" })).json;
   check("two families never share a username", otherFamily.username !== made.username);
   const other = actor();
@@ -448,6 +471,10 @@ function picture(bytes) {
   await again("/api/auth", post({ email: reset.username, password: reset.password }));
   await a(`/api/students/${sA.id}/logins`, { method: "DELETE" });
   check("removing the sign-in ends its session", (await again("/me")).status === 307);
+
+  // A new sign-in after a removal must not bring the removed one back.
+  await a(`/api/students/${sA.id}/logins`, { method: "POST" });
+  check("a new sign-in does not revive a removed one", (await again("/me")).status === 307);
 }
 
 // --- leakage --------------------------------------------------------------

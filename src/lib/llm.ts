@@ -52,6 +52,9 @@ async function chat(
 ): Promise<string> {
   const res = await fetch(`${BASE_URL}/chat/completions`, {
     method: "POST",
+    // A hung connection would otherwise leave the tutor watching a spinner
+    // forever. A full summary takes well under a minute.
+    signal: AbortSignal.timeout(120_000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey()}`,
@@ -108,6 +111,13 @@ function unfence(text: string): string {
   return (fenced ? fenced[1] : text).trim();
 }
 
+/**
+ * The most text one call may carry. A two-hour lesson transcribed in full is
+ * around 120k characters; anything past this is a bug or abuse, and every
+ * character is paid for.
+ */
+const MAX_INPUT_CHARS = 150_000;
+
 export async function complete<T>(opts: {
   system: string;
   user: string;
@@ -136,7 +146,13 @@ export async function complete<T>(opts: {
       role: "system",
       content: `${system}\n\n${schemaBlock(schema, schemaName)}${language}`,
     },
-    { role: "user", content: user },
+    {
+      role: "user",
+      content:
+        user.length > MAX_INPUT_CHARS
+          ? `${user.slice(0, MAX_INPUT_CHARS)}\n\n[cut here: input too long]`
+          : user,
+    },
   ];
 
   let lastError = "";

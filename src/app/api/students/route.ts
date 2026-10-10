@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { isGameStyle } from "@/lib/gameStyles";
@@ -23,11 +24,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json()) as {
+  const parsed = await readJson<{
     name?: string;
     consentFrom?: string;
     gameStyle?: string;
-  };
+  }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const body = parsed;
   if (!body.name?.trim()) {
     return NextResponse.json({ error: "A name is required." }, { status: 400 });
   }

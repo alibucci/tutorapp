@@ -38,10 +38,12 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
   }, [busy]);
 
   // Nobody should have to press a button to get the obvious next thing. Once
-  // per page load, so a failure does not turn into a retry loop.
+  // per page load, so a failure does not turn into a retry loop - and only
+  // once the debrief is in: a summary written without the tutor's own view
+  // is the weaker one, and generating it early spends the call for nothing.
   const started = useRef(false);
   useEffect(() => {
-    if (started.current || summary || !canGenerate) return;
+    if (started.current || summary || lesson.debrief.length === 0) return;
     started.current = true;
     void generate();
     // generate is recreated every render; this is a one-shot on mount
@@ -67,6 +69,8 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
         <p className="empty">
           {!canGenerate
             ? "Record a lesson or a debrief first."
+            : lesson.debrief.length === 0 && !busy
+              ? "Written once your debrief is in - it carries what the transcript cannot."
             : busy
               ? "Reading the lesson and writing the summary and the parent message. This usually takes 15–30 seconds."
               : "Nothing generated yet."}

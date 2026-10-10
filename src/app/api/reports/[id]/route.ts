@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
 import { getReport, saveReport } from "@/lib/store";
@@ -13,10 +14,12 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ error: "No such report." }, { status: 404 });
   }
 
-  const patch = (await request.json()) as {
+  const parsed = await readJson<{
     body?: ParentReportBody;
     approved?: boolean;
-  };
+  }>(request, LIMIT.medium);
+  if (parsed instanceof Response) return parsed;
+  const patch = parsed;
 
   const next = { ...report };
   if (patch.body) {

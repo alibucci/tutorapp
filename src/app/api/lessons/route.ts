@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
 import { getSession } from "@/lib/auth";
@@ -29,12 +30,14 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as {
+  const parsed = await readJson<{
     title?: string;
     mode?: LessonMode;
     studentId?: string;
     language?: string;
-  };
+  }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const body = parsed;
 
   if (!body.title?.trim()) {
     return NextResponse.json({ error: "A title is required." }, { status: 400 });

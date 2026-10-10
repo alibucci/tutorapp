@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { homeworkFor } from "@/lib/access";
 import { updateLesson } from "@/lib/store";
@@ -13,12 +14,14 @@ function clean(value: unknown, max = MAX): string {
 /** The child hands the homework in. Once - after that it is the tutor's. */
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
-  const body = (await request.json()) as {
+  const parsed = await readJson<{
     key?: string;
     describe?: unknown;
     next?: unknown;
     adjectives?: unknown;
-  };
+  }>(request, LIMIT.medium);
+  if (parsed instanceof Response) return parsed;
+  const body = parsed;
 
   const found = await homeworkFor(id, body.key ?? null);
   if (!found || found.tutor || !found.lesson.homework) {
@@ -40,16 +43,26 @@ export async function POST(request: Request, { params }: Params) {
     );
   }
 
-  await updateLesson(id, {
-    homework: {
-      ...found.lesson.homework,
-      answers: {
-        describe,
-        next,
-        adjectives: [adjectives[0], adjectives[1], adjectives[2]],
-        submittedAt: new Date().toISOString(),
+  // Checked again under the lock: two taps on "Craft it" must not both land,
+  // and the tutor may have taken the homework back meanwhile.
+  let accepted = false;
+  await updateLesson(id, (current) => {
+    if (!current.homework?.sentAt || current.homework.answers) return null;
+    accepted = true;
+    return {
+      homework: {
+        ...current.homework,
+        answers: {
+          describe,
+          next,
+          adjectives: [adjectives[0], adjectives[1], adjectives[2]],
+          submittedAt: new Date().toISOString(),
+        },
       },
-    },
+    };
   });
+  if (!accepted) {
+    return NextResponse.json({ error: "Already handed in." }, { status: 409 });
+  }
   return NextResponse.json({ ok: true });
 }

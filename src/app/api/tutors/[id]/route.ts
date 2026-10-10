@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { getSession, hashPassword, temporaryPassword } from "@/lib/auth";
 import { getTutor, updateTutor } from "@/lib/store";
@@ -11,10 +12,12 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const { id } = await params;
-  const body = (await request.json()) as {
+  const parsed = await readJson<{
     active?: boolean;
     resetPassword?: boolean;
-  };
+  }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const body = parsed;
 
   const current = await getTutor(id);
   if (!current) {

@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import {
   checkAdmin,
@@ -21,10 +22,12 @@ function keys(request: Request, email: string): string[] {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as {
+  const parsed = await readJson<{
     email?: string;
     password?: string;
-  };
+  }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const body = parsed;
   // Phones add a trailing space after autocomplete, and capitalise the first
   // letter of a username. Neither should cost anyone a sign-in.
   const email = body.email?.trim() ?? "";

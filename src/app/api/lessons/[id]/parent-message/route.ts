@@ -1,3 +1,4 @@
+import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
 import { MODEL } from "@/lib/llm";
@@ -14,9 +15,11 @@ export async function PATCH(_request: Request, { params }: Params) {
   if (!found || !message) {
     return NextResponse.json({ error: "No such message." }, { status: 404 });
   }
-  await updateLesson(id, {
-    parentMessage: { ...message, copiedAt: new Date().toISOString() },
-  });
+  await updateLesson(id, (current) =>
+    current.parentMessage
+      ? { parentMessage: { ...current.parentMessage, copiedAt: new Date().toISOString() } }
+      : null,
+  );
   return NextResponse.json({ ok: true });
 }
 
@@ -28,7 +31,9 @@ export async function PUT(request: Request, { params }: Params) {
     return NextResponse.json({ error: "No such lesson." }, { status: 404 });
   }
 
-  const { en } = (await request.json()) as { en?: string };
+  const parsed = await readJson<{ en?: string }>(request, LIMIT.small);
+  if (parsed instanceof Response) return parsed;
+  const { en } = parsed;
   const text = en?.trim();
   if (!text) {
     return NextResponse.json({ error: "The message is empty." }, { status: 400 });
