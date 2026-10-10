@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { HomeworkPanel } from "@/components/HomeworkPanel";
+import { ParentMessagePanel } from "@/components/ParentMessagePanel";
 import { SkillReview } from "@/components/SkillReview";
 import { SummaryPanel } from "@/components/SummaryPanel";
 import { lessonFor } from "@/lib/access";
@@ -17,10 +19,21 @@ export default async function ReviewPage({
   if (!found) notFound();
   const { lesson, student } = found;
 
+  const steps = [
+    { href: "#summary", label: "Summary", done: Boolean(lesson.summary) },
+    { href: "#homework", label: "Homework", done: Boolean(lesson.homework?.sentAt) },
+    { href: "#parent", label: "Message to parent", done: Boolean(lesson.parentMessage) },
+  ];
+
   return (
     <div className="stack-lg">
       <header>
-        <h1 className="t-display">{lesson.title}</h1>
+        {student && (
+          <Link href={`/student/${student.id}`} className="t-small t-muted">
+            ← {student.name}
+          </Link>
+        )}
+        <h1 className="t-display mt-2">{lesson.title}</h1>
         <p className="t-body t-muted mt-2">
           {student ? (
           <Link href={`/student/${student.id}`} className="underline">
@@ -49,13 +62,29 @@ export default async function ReviewPage({
             ))}
           </ul>
           <p className="mt-2 t-caption">
-            Audio from these points on may be missing, or recorded without the
-            classroom gate. Listen before trusting the summary.
+            The transcript from these points on may be missing. Check it before
+            trusting the summary.
           </p>
         </section>
       )}
 
-      {typeof lesson.summary?.studentWordShare === "number" && (
+      {/* After a lesson: summary, then homework, then the note home. */}
+      <nav aria-label="Steps" className="flex flex-wrap items-center gap-2 t-small">
+        {steps.map((step, i) => (
+          <span key={step.href} className="flex items-center gap-2">
+            {i > 0 && <span aria-hidden className="t-muted">→</span>}
+            <a href={step.href} className={`pill ${step.done ? "pill-done" : ""}`}>
+              {i + 1}. {step.label}
+            </a>
+          </span>
+        ))}
+      </nav>
+
+      {/* Only an in-room lesson puts the student near the microphone. Online,
+          their voice is mostly removed by echo cancellation, so the number
+          would describe the setup rather than the lesson. */}
+      {lesson.mode === "classroom" &&
+        typeof lesson.summary?.studentWordShare === "number" && (
         <section className="card p-5">
           <h2 className="t-subtitle">How much they spoke</h2>
           <p className="mt-2 t-num t-display">
@@ -68,9 +97,19 @@ export default async function ReviewPage({
         </section>
       )}
 
-      <SummaryPanel lesson={lesson} />
+      <div id="summary" className="scroll-mt-6">
+        <SummaryPanel lesson={lesson} />
+      </div>
 
       <SkillReview lesson={lesson} />
+
+      {lesson.summary && (
+        <HomeworkPanel lesson={lesson} studentName={student?.name ?? "the student"} />
+      )}
+
+      <div id="parent" className="scroll-mt-6">
+        <ParentMessagePanel lesson={lesson} />
+      </div>
 
       {lesson.debrief.length > 0 && (
         <section className="space-y-3">
@@ -86,14 +125,6 @@ export default async function ReviewPage({
               </div>
             ))}
           </dl>
-          {lesson.debriefAudioFile && (
-            <audio
-              controls
-              preload="none"
-              src={`/api/lessons/${lesson.id}/audio?kind=debrief`}
-              className="w-full"
-            />
-          )}
         </section>
       )}
 
@@ -105,14 +136,6 @@ export default async function ReviewPage({
               ({lesson.transcript.length} segments)
             </span>
           </h2>
-          {lesson.audioFile && (
-            <audio
-              controls
-              preload="none"
-              src={`/api/lessons/${lesson.id}/audio`}
-              className="w-full"
-            />
-          )}
           <div className="max-h-96 space-y-2 overflow-y-auto card p-4 t-small">
             {lesson.transcript.map((s, i) => (
               <p key={i} className={s.speaker === "student" ? "pl-6" : ""}>

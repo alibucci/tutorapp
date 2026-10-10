@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
+import { isGameStyle } from "@/lib/gameStyles";
 import { accessKey, updateStudent } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -32,6 +33,7 @@ export async function PATCH(request: Request, { params }: Params) {
     name?: string;
     consentFrom?: string | null;
     rotateLinks?: boolean;
+    gameStyle?: string;
   };
 
   const patch: Parameters<typeof updateStudent>[1] = {};
@@ -49,6 +51,13 @@ export async function PATCH(request: Request, { params }: Params) {
     patch.recordingConsent = body.consentFrom?.trim()
       ? { grantedAt: new Date().toISOString(), grantedBy: body.consentFrom.trim() }
       : undefined;
+  }
+
+  if (body.gameStyle !== undefined) {
+    if (!isGameStyle(body.gameStyle)) {
+      return NextResponse.json({ error: "Unknown game style." }, { status: 400 });
+    }
+    patch.gameStyle = body.gameStyle;
   }
 
   // A shared link cannot be taken back once it is out; a new one can replace it.

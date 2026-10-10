@@ -37,10 +37,18 @@ type ChatResponse = {
   error?: { message?: string };
 };
 
+/**
+ * How hard the model thinks before answering. Both models default to "high",
+ * which is most of the wait on a summary; "low" cuts the reasoning roughly in
+ * half and is plenty for reading a short lesson.
+ */
+export type Effort = "low" | "high" | "max";
+
 async function chat(
   messages: Message[],
   model: string,
   maxTokens: number,
+  effort: Effort | undefined,
 ): Promise<string> {
   const res = await fetch(`${BASE_URL}/chat/completions`, {
     method: "POST",
@@ -55,6 +63,7 @@ async function chat(
       // Reasoning tokens come out of this budget, so keep it generous - a tight
       // cap returns an empty string rather than an error.
       max_tokens: maxTokens,
+      ...(effort ? { reasoning_effort: effort } : {}),
     }),
   });
 
@@ -69,11 +78,13 @@ async function chat(
   const choice = body.choices?.[0];
   const content = choice?.message?.content ?? "";
   if (!content.trim()) {
-    throw new Error(
-      choice?.finish_reason === "length"
-        ? "Model hit the token limit before answering. Raise maxTokens."
-        : "Model returned an empty response.",
-    );
+    if (choice?.finish_reason === "length") {
+      throw new Error(
+        `${model} hit the token limit before answering. Raise maxTokens.`,
+      );
+    }
+    // Happens now and then for no reason the API reports. Worth one more go.
+    return "";
   }
   return content;
 }
@@ -104,6 +115,7 @@ export async function complete<T>(opts: {
   schemaName: string;
   maxTokens?: number;
   model?: string;
+  effort?: Effort;
   /**
    * Language for every human-readable string in the output. Without this the
    * model answers in whatever language the prompt happens to be written in,
@@ -129,7 +141,11 @@ export async function complete<T>(opts: {
 
   let lastError = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await chat(messages, model, maxTokens);
+    const raw = await chat(messages, model, maxTokens, opts.effort);
+    if (!raw) {
+      lastError = `${model} returned an empty response.`;
+      continue;
+    }
 
     let parsed: unknown;
     try {

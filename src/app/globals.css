@@ -327,6 +327,15 @@ body {
 .choice-on { border-color: var(--accent); background: var(--accent-soft); }
 .choice:active { transform: scale(0.99); }
 
+/* A whole card that is a link. Same press feedback as a button, smaller -
+   a big surface shrinking 3% reads as a lurch. */
+.card-press {
+  transition:
+    border-color var(--dur-hover) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+.card-press:active { transform: scale(0.98); }
+
 /* Touch devices fire hover on tap, so a tapped row would stay highlighted.
    Gate every hover state behind a real pointer. */
 @media (hover: hover) and (pointer: fine) {
@@ -335,6 +344,7 @@ body {
   .btn-quiet:hover:not(:disabled) { background: var(--sunken); }
   .btn-ghost:hover:not(:disabled) { background: var(--sunken); color: var(--foreground); }
   .choice:hover { border-color: var(--border-strong); }
+  .card-press:hover { border-color: var(--border-strong); }
 }
 
 .pill {
@@ -423,4 +433,159 @@ body {
 @keyframes rise {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------------------------------------------------------------------
+   Homework games. `.game` is the frame every style shares; `.game-<id>` is one
+   look from src/lib/gameStyles.ts. A new style is a new block below.
+   --------------------------------------------------------------------------- */
+
+.game {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.game-picture {
+  width: 100%;
+  max-height: 42vh;
+  object-fit: contain;
+}
+
+.game-input {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 1rem;
+  padding: var(--space-3);
+}
+
+.game-button:disabled {
+  opacity: 0.5;
+}
+
+.game-back {
+  align-self: flex-start;
+}
+
+/* Minecraft: stone panels, a grass-and-dirt picture frame, a green XP bar and
+   the blocky font for anything short. Long text stays in the system font -
+   the pixel font is unreadable past a few words. */
+.game-minecraft {
+  --mc-stone: #7d7d7d;
+  --mc-stone-dark: #3a3a3a;
+  --mc-stone-light: #c6c6c6;
+  --mc-grass: #5b9b2c;
+  --mc-dirt: #866043;
+  --mc-xp: #80ff20;
+  --mc-ink: #1d1d1d;
+}
+
+.game-minecraft .game-title,
+.game-minecraft .game-label,
+.game-minecraft .game-button,
+.game-minecraft .game-bar-label {
+  font-family: var(--font-pixel), monospace;
+}
+
+.game-minecraft .game-picture {
+  border: 6px solid var(--mc-dirt);
+  border-top-color: var(--mc-grass);
+  background: #000;
+  image-rendering: auto;
+}
+
+.game-minecraft .game-panel {
+  background: var(--mc-stone-light);
+  color: var(--mc-ink);
+  padding: var(--space-5);
+  border: 4px solid var(--mc-stone-dark);
+  box-shadow:
+    inset 4px 4px 0 #fff,
+    inset -4px -4px 0 #8b8b8b;
+}
+
+.game-minecraft .game-title {
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.game-minecraft .game-label {
+  font-size: 0.625rem;
+  color: #555;
+}
+
+.game-minecraft .game-text {
+  font-size: 1.0625rem;
+}
+
+.game-minecraft .game-hint {
+  font-size: 0.875rem;
+  color: #444;
+}
+
+.game-minecraft .game-input {
+  background: #000;
+  color: #fff;
+  border: 3px solid #a0a0a0;
+  border-radius: 0;
+}
+
+.game-minecraft .game-input:focus {
+  outline: none;
+  border-color: #fff;
+}
+
+.game-minecraft .game-button {
+  display: inline-block;
+  width: 100%;
+  padding: 0.9rem var(--space-4);
+  font-size: 0.75rem;
+  text-align: center;
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f;
+  background: var(--mc-stone);
+  border: 3px solid #000;
+  box-shadow:
+    inset 3px 3px 0 #aaa,
+    inset -3px -3px 0 #555;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.game-minecraft .game-button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .game-minecraft .game-button:hover:not(:disabled) {
+    background: #8f9cd1;
+  }
+}
+
+.game-minecraft .game-back {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.game-minecraft .game-bar {
+  position: relative;
+  height: 1.25rem;
+  background: #222;
+  border: 3px solid #000;
+}
+
+.game-minecraft .game-bar-fill {
+  height: 100%;
+  background: var(--mc-xp);
+  transition: width 300ms var(--ease-out);
+}
+
+.game-minecraft .game-bar-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.5625rem;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
 }

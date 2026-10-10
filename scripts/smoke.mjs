@@ -2,7 +2,7 @@
  * End-to-end check of the server path, against a running dev server.
  *
  * Covers everything that does not need a browser: sign-in, tenant isolation,
- * consent driving capture, the four model calls, the tutor's two approval
+ * consent driving capture, the model calls, the tutor's two approval
  * gates, and what a family can and cannot see. Costs a few cents in DeepSeek
  * usage because the model calls are real - that is the point of it.
  *
@@ -26,34 +26,43 @@ const env = Object.fromEntries(
 let pass = 0;
 let fail = 0;
 
-/** Tutor A's live password - the account section replaces it mid-run. */
-let passwordA;
 
 function check(label, ok, detail = "") {
   if (ok) { pass++; console.log(`  ok    ${label}`); }
   else { fail++; console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ""}`); }
 }
 
-/** Keeps one session's cookies, so each actor is a separate client. */
+/**
+ * Keeps one session's cookies, so each actor is a separate client. A real jar:
+ * signing in sets one cookie and clears the other, in the same response.
+ */
 function actor() {
-  let cookie = "";
-  return async (path, init = {}) => {
+  const jar = new Map();
+  const cookie = () => [...jar].map(([k, v]) => `${k}=${v}`).join("; ");
+  const call = async (path, init = {}) => {
     const res = await fetch(`${BASE}${path}`, {
       ...init,
       redirect: "manual",
       headers: {
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
-        ...(cookie ? { cookie } : {}),
+        ...(typeof init.body === "string" ? { "Content-Type": "application/json" } : {}),
+        ...(jar.size ? { cookie: cookie() } : {}),
         ...init.headers,
       },
     });
-    const set = res.headers.get("set-cookie");
-    if (set) cookie = set.split(";")[0];
+    for (const line of res.headers.getSetCookie()) {
+      const [pair] = line.split(";");
+      const i = pair.indexOf("=");
+      const name = pair.slice(0, i);
+      const value = pair.slice(i + 1);
+      if (!value || /max-age=0|expires=thu, 01 jan 1970/i.test(line)) jar.delete(name);
+      else jar.set(name, value);
+    }
     const text = await res.text();
     let json = null;
     try { json = JSON.parse(text); } catch { /* html */ }
-    return { status: res.status, json, text };
+    return { status: res.status, json, text, location: res.headers.get("location") };
   };
+  return call;
 }
 
 const post = (body) => ({ method: "POST", body: JSON.stringify(body) });
@@ -98,7 +107,9 @@ const mk = async (name) =>
 const t1 = await mk("Smokeone");
 const t2 = await mk("Smoketwo");
 check("superadmin creates tutors", Boolean(t1?.password && t2?.password));
-passwordA = t1.password;
+check("temporary passwords are easy to type on a phone",
+  /^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/.test(t1.password) && !/[01ilo]/.test(t1.password),
+  t1.password);
 check("password hashes never leave the server",
   !JSON.stringify((await admin("/api/tutors")).json).includes("passwordHash"));
 
@@ -166,12 +177,27 @@ await a(`/api/lessons/${lessonA.id}`, patch({
 
 console.log("\n  (model calls — these cost a few cents and take a minute)\n");
 
+const summaryStarted = Date.now();
 const summary = await a(`/api/lessons/${lessonA.id}/summary`, { method: "POST" });
+console.log(`  (summary + parent message took ${((Date.now() - summaryStarted) / 1000).toFixed(1)}s)`);
 const sum = summary.json?.summary;
 check("summary generated", Boolean(sum?.covered?.length), summary.json?.error);
 check("summary carries evidence", Boolean(sum?.struggles?.[0]?.evidence));
 check("speakers labelled", summary.json?.transcript?.some((s) => s.speaker === "student"));
 check("talk ratio computed", typeof sum?.studentWordShare === "number");
+const msg = summary.json?.parentMessage;
+check("a parent message is written alongside", Boolean(msg?.en?.length));
+check("the parent message has a Chinese version", /[\u4e00-\u9fff]/.test(msg?.zh ?? ""));
+check("the summary suggests a homework focus", typeof sum?.homeworkFocus === "string");
+
+const edited = await a(`/api/lessons/${lessonA.id}/parent-message`, put({
+  en: "Today Smoke worked on adding fractions. Please ask them to explain a half using a pizza.",
+}));
+check("an edited message is translated again",
+  /[\u4e00-\u9fff]/.test(edited.json?.zh ?? "") && edited.json?.editedAt, edited.json?.error);
+const regenerated = await a(`/api/lessons/${lessonA.id}/summary`, { method: "POST" });
+check("regenerating the summary keeps the tutor's edit",
+  regenerated.json?.parentMessage?.en?.includes("pizza"));
 
 const proposed = await a(`/api/lessons/${lessonA.id}/skills`, { method: "POST" });
 check("topic changes proposed", proposed.json?.changes?.length > 0, proposed.json?.error);
@@ -288,8 +314,7 @@ check("parent sees the note after approval", !parentAfter.includes("No notes yet
   const newLogin = actor();
   const ok = await newLogin("/api/auth", post({ email: t1.email, password: NEW }));
   check("the new password works", ok.json?.role === "tutor");
-  check("the change clears the must-change flag", ok.json?.mustChangePassword === false);
-  passwordA = NEW;
+  check("the change clears the must-change flag", ok.json?.next === "/");
 
   // The tab that made the change keeps working on purpose; every other one
   // must not. `other` signed in before the change, so it is the real test.
@@ -314,97 +339,116 @@ check("parent sees the note after approval", !parentAfter.includes("No notes yet
   await admin(`/api/tutors/${t2id}`, patch({ active: true }));
 }
 
-// --- audio round trip -----------------------------------------------------
-// The one server path nothing else touches. A bug here loses a whole lesson's
-// recording silently, so it is worth a real upload and a real read-back.
-const fakeAudio = Buffer.from([
-  0x1a, 0x45, 0xdf, 0xa3, // EBML header, enough to look like webm
-  ...Array.from({ length: 2048 }, (_, i) => i % 256),
-]);
+// --- pages render ------------------------------------------------------------
+{
+  const home = await a("/");
+  check("the students page shows cards and an add button",
+    home.status === 200 && home.text.includes("Add student") && home.text.includes("Smoke Student A"));
+  check("the add-student page renders", (await a("/student/new")).status === 200);
+  const review = await a(`/lesson/${lessonA.id}/review`);
+  check("the review page shows the steps and the parent message",
+    review.status === 200 && review.text.includes("Message to the parent") && review.text.includes("Homework"));
+  const t1id = (await admin("/api/tutors")).json.find((t) => t.email === t1.email).id;
+  const tutorPage = await admin(`/admin/tutors/${t1id}`);
+  check("the admin can open a tutor", tutorPage.status === 200 && tutorPage.text.includes("Smoke Student A"));
+}
 
-async function upload(client, lessonId, kind, seq = 0, body = fakeAudio) {
+// --- recordings are not kept ----------------------------------------------
+check("there is no audio upload any more",
+  (await a(`/api/lessons/${lessonA.id}/audio`, { method: "POST" })).status === 404);
+
+// --- homework ---------------------------------------------------------------
+// The smallest thing that starts like a JPEG; the server checks the bytes.
+const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, ...Array.from({ length: 64 }, (_, i) => i)]);
+function picture(bytes) {
   const form = new FormData();
-  form.append("kind", kind);
-  form.append("seq", String(seq));
-  form.append("audio", new Blob([body], { type: "audio/webm" }), `${kind}.webm`);
-  const res = await fetch(`${BASE}/api/lessons/${lessonId}/audio`, {
-    method: "POST",
-    body: form,
-    headers: { cookie: client.cookie },
-    redirect: "manual",
-  });
-  return res.status;
+  form.append("image", new Blob([bytes], { type: "image/jpeg" }), "p.jpg");
+  return { method: "POST", body: form };
+}
+{
+  const childKey = keys.studentKey;
+  const img = (key) => anon(`/api/lessons/${lessonA.id}/homework/image?key=${key}`);
+
+  check("a non-JPEG picture is refused",
+    (await a(`/api/lessons/${lessonA.id}/homework`, picture(Buffer.from("GIF89a-not-a-jpeg")))).status === 415);
+  check("tutor B cannot add homework to tutor A's lesson",
+    (await b(`/api/lessons/${lessonA.id}/homework`, picture(jpeg))).status === 404);
+  const up = await a(`/api/lessons/${lessonA.id}/homework`, picture(jpeg));
+  check("the tutor uploads a picture", Boolean(up.json?.imageFile), up.text.slice(0, 120));
+  check("the focus is prefilled from the summary", typeof up.json?.focus === "string");
+
+  check("the child cannot see homework before it is sent", (await img(childKey)).status === 404);
+  check("the child's page shows no quest before it is sent",
+    !(await anon(`/s/${childKey}`)).text.includes("New quest"));
+
+  await a(`/api/lessons/${lessonA.id}/homework`, patch({ focus: "Use the past tense.", send: true }));
+  check("once sent, the child's page shows the quest",
+    (await anon(`/s/${childKey}`)).text.includes("New quest"));
+  check("the child can load the picture by link", (await img(childKey)).status === 200);
+  check("a wrong key cannot load the picture", (await img("wrong-key")).status === 404);
+  check("the parent link cannot load the picture", (await img(keys.parentKey)).status === 404);
+  check("the quest page opens", (await anon(`/s/${childKey}/quest/${lessonA.id}`)).status === 200);
+
+  const answer = (body) => anon(`/api/lessons/${lessonA.id}/homework/answers`, post({ key: childKey, ...body }));
+  check("two adjectives are not enough",
+    (await answer({ describe: "A cat.", next: "It jumps.", adjectives: ["big", "red"] })).status === 400);
+  check("answers need the right key",
+    (await anon(`/api/lessons/${lessonA.id}/homework/answers`, post({
+      key: "wrong", describe: "x", next: "y", adjectives: ["a", "b", "c"],
+    }))).status === 404);
+  check("the child hands the homework in",
+    (await answer({ describe: "A cat sat on a mat.", next: "It will sleep.", adjectives: ["calm", "warm", "sleepy"] })).status === 200);
+  check("it can only be handed in once",
+    (await answer({ describe: "again", next: "again", adjectives: ["a", "b", "c"] })).status === 409);
+  const hw = (await a(`/api/lessons/${lessonA.id}`)).json.homework;
+  check("the tutor sees the answers", hw?.answers?.adjectives?.join() === "calm,warm,sleepy");
+  check("answered homework cannot be taken back",
+    (await a(`/api/lessons/${lessonA.id}/homework`, patch({ send: false }))).status === 409);
 }
 
-// The actor helper hides its cookie, so grab one the plain way for FormData -
-// setting Content-Type by hand would break the multipart boundary.
-function cookieFrom(res, who) {
-  const set = res.headers.get("set-cookie");
-  if (!set) {
-    console.log(`  FAIL  could not sign ${who} in for the audio checks`);
-    fail++;
-    return "";
-  }
-  return set.split(";")[0];
+// --- child and parent sign-ins -----------------------------------------------
+{
+  check("tutor B cannot make a sign-in for tutor A's student",
+    (await b(`/api/students/${sA.id}/logins`, post({ who: "student" }))).status === 404);
+
+  const made = (await a(`/api/students/${sA.id}/logins`, post({ who: "student" }))).json;
+  check("the tutor creates a sign-in for the child", Boolean(made?.username && made?.password));
+
+  const kid = actor();
+  // As a phone would send it: capitalised, with a trailing space.
+  const signIn = await kid("/api/auth", post({
+    email: `${made.username[0].toUpperCase()}${made.username.slice(1)} `,
+    password: made.password,
+  }));
+  check("the child signs in with a username", signIn.json?.next === "/me", signIn.text);
+  check("the child's home shows their quest record", (await kid("/me")).status === 200);
+  check("the child can open their homework picture",
+    (await kid(`/api/lessons/${lessonA.id}/homework/image`)).status === 200);
+  check("a child's session is not a tutor session",
+    (await kid("/api/students")).status === 403);
+  check("a child is sent away from the tutor screens",
+    (await kid("/")).status === 307);
+  check("a child cannot open the parent page", (await kid("/family")).status === 307);
+
+  const parentMade = (await a(`/api/students/${sA.id}/logins`, post({ who: "parent" }))).json;
+  check("parent and child get different usernames", parentMade.username !== made.username);
+  const mum = actor();
+  const parentIn = await mum("/api/auth", post({ email: parentMade.username, password: parentMade.password }));
+  check("the parent signs in", parentIn.json?.next === "/family");
+  check("the parent sees the weekly note", !(await mum("/family")).text.includes("No notes yet"));
+  check("the parent cannot see the child's homework",
+    (await mum(`/api/lessons/${lessonA.id}/homework/image`)).status === 404);
+
+  // A reset has to sign out every device that used the old password.
+  const reset = (await a(`/api/students/${sA.id}/logins`, post({ who: "student" }))).json;
+  check("a reset keeps the username", reset.username === made.username);
+  check("a reset signs the child out everywhere", (await kid("/me")).status === 307);
+  check("the old child password stops working",
+    (await actor()("/api/auth", post({ email: made.username, password: made.password }))).status === 401);
+
+  await a(`/api/students/${sA.id}/logins?who=parent`, { method: "DELETE" });
+  check("removing a sign-in ends that session", (await mum("/family")).status === 307);
 }
-
-const aCookie = (await fetch(`${BASE}/api/auth`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email: t1.email, password: passwordA }),
-})).headers.get("set-cookie").split(";")[0];
-
-const bCookie = (await fetch(`${BASE}/api/auth`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email: t2.email, password: t2.password }),
-})).headers.get("set-cookie").split(";")[0];
-
-check("lesson audio uploads",
-  (await upload({ cookie: aCookie }, lessonA.id, "lesson", 0)) === 200);
-check("debrief audio uploads",
-  (await upload({ cookie: aCookie }, lessonA.id, "debrief", 0)) === 200);
-
-// Streaming: chunks arrive one at a time and are appended in order.
-const chunks = [
-  Buffer.from([0x1a, 0x45, 0xdf, 0xa3, ...Array.from({ length: 300 }, (_, i) => i % 256)]),
-  Buffer.from(Array.from({ length: 400 }, (_, i) => (i * 7) % 256)),
-  Buffer.from(Array.from({ length: 500 }, (_, i) => (i * 13) % 256)),
-];
-for (let i = 0; i < chunks.length; i++) {
-  await upload({ cookie: aCookie }, lessonA.id, "lesson", i, chunks[i]);
-}
-const streamed = Buffer.from(await (await fetch(
-  `${BASE}/api/lessons/${lessonA.id}/audio`, { headers: { cookie: aCookie } },
-)).arrayBuffer());
-check("streamed chunks land in order and concatenate",
-  streamed.equals(Buffer.concat(chunks)),
-  `${streamed.length} bytes vs ${Buffer.concat(chunks).length}`);
-
-// Sequence 0 must start the file over, not append to the previous take.
-await upload({ cookie: aCookie }, lessonA.id, "lesson", 0, fakeAudio);
-const read = await fetch(`${BASE}/api/lessons/${lessonA.id}/audio`, {
-  headers: { cookie: aCookie },
-});
-const readBack = Buffer.from(await read.arrayBuffer());
-check("re-recording replaces rather than appends", readBack.equals(fakeAudio),
-  `${readBack.length} bytes vs ${fakeAudio.length}`);
-check("a negative chunk number is refused",
-  (await upload({ cookie: aCookie }, lessonA.id, "lesson", -1)) === 400);
-check("audio is served as webm",
-  (read.headers.get("content-type") ?? "").includes("webm"));
-
-const debriefRead = await fetch(`${BASE}/api/lessons/${lessonA.id}/audio?kind=debrief`, {
-  headers: { cookie: aCookie },
-});
-check("debrief audio is a separate file", debriefRead.status === 200);
-
-check("another tutor cannot download the audio",
-  (await fetch(`${BASE}/api/lessons/${lessonA.id}/audio`, {
-    headers: { cookie: bCookie }, redirect: "manual",
-  })).status === 404);
-check("anonymous cannot download the audio",
-  (await fetch(`${BASE}/api/lessons/${lessonA.id}/audio`, { redirect: "manual" })).status === 404);
 
 // --- leakage --------------------------------------------------------------
 const reason = proposed.json.changes[0]?.reason ?? "";
@@ -450,10 +494,10 @@ for (const [dir, matches] of [
   }
 }
 try {
-  for (const f of readdirSync("data/audio")) {
-    if (f.startsWith(lessonA.id)) { rmSync(join("data/audio", f)); removed++; }
+  for (const f of readdirSync("data/images")) {
+    if (f.startsWith(lessonA.id)) { rmSync(join("data/images", f)); removed++; }
   }
-} catch { /* no audio dir yet */ }
+} catch { /* no images dir yet */ }
 
 console.log(`\n  cleaned up ${removed} records it created`);
 

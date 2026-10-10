@@ -12,7 +12,7 @@ Last updated: 2026-09-27
 The whole pipeline exists and runs end to end. **No real lesson has ever gone
 through it**, but as of 28 September every layer has been proven separately:
 
-- the server path, by an automated run with real model calls (62 checks, all
+- the server path, by an automated run with real model calls (97 checks, all
   passing — `npm run smoke`)
 - the capture path, by hand on macOS via `/check`: microphone, the gate running
   in the AudioWorklet, the Opus recorder, wake lock, and a live transcript in
@@ -82,14 +82,14 @@ The per-lesson gate is a few ticks; the weekly one is about thirty seconds.
 
 - **Access control.** Two tutors were created, each with a student. Tutor B was
   then pointed at every one of tutor A's URLs by direct id: student record,
-  student page, reports, lesson, review page, and the audio file. All returned
+  student page, reports, lesson, review page, homework and sign-ins. All returned
   404. Anonymous users are redirected from every page and get 403 from every
   API. A suspended tutor cannot sign in; a password reset invalidates the old
   one.
 - **Consent drives capture, and cannot be forged.** A request that explicitly
   asked for `capture: "both"` on a student with no consent on file still got
   `tutor`. The server derives it from the stored record and ignores the client.
-- **The four model calls.** Run for real against DeepSeek on a realistic
+- **The model calls.** Run for real against DeepSeek on a realistic
   fractions lesson. Output was good: the summary separated the surface mistake
   ("adds the denominators") from the root cause ("doesn't picture a fraction as
   part of a whole"), and picked up a topic that appeared only in the transcript
@@ -99,9 +99,19 @@ The per-lesson gate is a few ticks; the weekly one is about thirty seconds.
   the tutor.
 - **No leakage to families.** Checked the rendered student page for the tutor's
   internal reasoning field, raw status values, and diagnostic language. Clean.
-- **Audio round trip.** A file is uploaded, read back byte for byte, served as
-  webm, and kept separate from the debrief recording. Another tutor and an
-  anonymous visitor both get 404.
+- **No recordings kept.** There is no audio upload route any more; the recorder
+  drops every chunk on the device.
+- **Parent message.** Written in English and Chinese alongside the summary; an
+  edited English message is translated again, and regenerating the summary
+  does not overwrite the tutor's edit.
+- **Homework.** Only JPEGs are accepted (checked by bytes). The child sees
+  nothing until the tutor sends it; the picture needs the child's link or login
+  - a wrong key, the parent's link or the parent's login all get 404. Answers
+  need three adjectives and can be handed in once.
+- **Child and parent sign-ins.** Usernames work as a phone types them
+  (capitalised, trailing space). A child's session cannot reach any tutor page
+  or API, nor the parent page. A reset or a removal signs out every device at
+  once.
 - **What a tutor may write.** Consent cannot be forged, a lesson's capture mode
   cannot be set from outside, a lesson cannot be reassigned to another student
   and its summary cannot be planted. Consent is granted through its own action
@@ -225,10 +235,11 @@ npm run smoke        # another
 ```
 
 `smoke` drives the whole server path against the running app: sign-in, tenant
-isolation, consent, all four model calls, both approval gates, and what a family
+isolation, consent, every model call, both approval gates, homework, family
+sign-ins, and what a family
 can and cannot see. It makes real DeepSeek requests, so it costs a few cents and
 takes about a minute — that is deliberate, a mocked run would prove nothing. It
-deletes the records it creates. **60 checks, all passing as of this writing.**
+deletes the records it creates. **97 checks, all passing as of this writing.**
 
 For the browser half, open **`/check`** on the device that will actually record.
 It reports secure context, microphone access, the AudioWorklet, the gate module,

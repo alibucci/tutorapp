@@ -7,6 +7,7 @@ export function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +19,7 @@ export function LoginForm() {
     const res = await fetch("/api/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: email.trim(), password }),
     });
 
     if (!res.ok) {
@@ -28,8 +29,8 @@ export function LoginForm() {
       return;
     }
 
-    const { role } = (await res.json()) as { role: string };
-    router.push(role === "admin" ? "/admin" : "/");
+    const { next } = (await res.json()) as { next: string };
+    router.push(next);
     router.refresh();
   }
 
@@ -38,18 +39,24 @@ export function LoginForm() {
       <div>
         <h1 className="t-display">Tutor Signal</h1>
         <p className="t-body t-muted mt-2">
-          Accounts are created for you — there is no sign-up.
+          Your tutor or school gives you your sign-in. There is no sign-up.
         </p>
       </div>
 
       <div className="field-group">
         <label className="block">
-          <span className="label">Email</span>
+          <span className="label">Email or username</span>
+          {/* Plain text, not type=email: children and parents sign in with a
+              username. Phones must not capitalise or "correct" it. */}
           <input
-            type="email"
+            type="text"
+            inputMode="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
             className="field"
           />
@@ -57,20 +64,33 @@ export function LoginForm() {
 
         <label className="block">
           <span className="label">Password</span>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-            className="field"
-          />
+          <span className="relative block">
+            <input
+              type={show ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              required
+              className="field pr-16"
+            />
+            <button
+              type="button"
+              onClick={() => setShow((v) => !v)}
+              className="absolute inset-y-0 right-0 px-3 t-small t-muted"
+            >
+              {show ? "Hide" : "Show"}
+            </button>
+          </span>
         </label>
       </div>
 
       {error && (
         <p role="alert" className="note note-warn">
-          {error}
+          {error} If your phone filled the password in for you, check it is the
+          right one - tap Show.
         </p>
       )}
 

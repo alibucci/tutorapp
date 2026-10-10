@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { isGameStyle } from "@/lib/gameStyles";
 import { createStudent, listStudents, updateStudent } from "@/lib/store";
 
 export async function GET() {
@@ -25,20 +26,25 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     name?: string;
     consentFrom?: string;
+    gameStyle?: string;
   };
   if (!body.name?.trim()) {
     return NextResponse.json({ error: "A name is required." }, { status: 400 });
   }
 
   const student = await createStudent(body.name.trim(), session.id);
+  const extra: Parameters<typeof updateStudent>[1] = {};
   if (body.consentFrom?.trim()) {
-    const withConsent = await updateStudent(student.id, {
-      recordingConsent: {
-        grantedAt: new Date().toISOString(),
-        grantedBy: body.consentFrom.trim(),
-      },
+    extra.recordingConsent = {
+      grantedAt: new Date().toISOString(),
+      grantedBy: body.consentFrom.trim(),
+    };
+  }
+  if (isGameStyle(body.gameStyle)) extra.gameStyle = body.gameStyle;
+  if (Object.keys(extra).length) {
+    return NextResponse.json(await updateStudent(student.id, extra), {
+      status: 201,
     });
-    return NextResponse.json(withConsent, { status: 201 });
   }
 
   return NextResponse.json(student, { status: 201 });

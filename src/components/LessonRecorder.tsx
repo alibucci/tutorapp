@@ -33,7 +33,6 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   const rec = useTutorRecorder({
     gate,
     onAutoPause: () => speech.stop(),
-    upload: { lessonId: lesson.id, kind: "lesson" },
   });
   const wakeLock = useWakeLock();
 
@@ -71,10 +70,8 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     setSaving(true);
     setSaveError(null);
 
-    // The audio is already on the server; only the transcript and the timings
-    // are still here. Waiting for the tail of the queue takes a moment, not
-    // the minute a whole-file upload used to.
-    const complete = await rec.stop();
+    // Audio is never kept, so only the transcript and the timings are saved.
+    rec.stop();
 
     try {
       const res = await fetch(`/api/lessons/${lesson.id}`, {
@@ -89,13 +86,6 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
       });
       if (!res.ok) throw new Error("Could not save the lesson.");
       void wakeLock.release();
-      if (!complete) {
-        setSaveError(
-          "Some audio did not reach the server. The recording has gaps - check it before relying on it.",
-        );
-        setSaving(false);
-        return;
-      }
       router.push(`/lesson/${lesson.id}/debrief`);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Saving failed.");
@@ -209,14 +199,6 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         </div>
       )}
 
-      {live && (rec.pending > 2 || rec.uploadFailed) && (
-        <p className={`note ${rec.uploadFailed ? "note-warn" : "note-quiet"}`}>
-          {rec.uploadFailed
-            ? "Some audio did not reach the server. The recording will have gaps."
-            : `${rec.pending} seconds of audio waiting to upload — the connection is slow.`}
-        </p>
-      )}
-
       {rec.interruptions.length > 0 && (
         <div className="enter card card-accent card-pad t-small">
           <p className="font-medium">This recording was interrupted.</p>
@@ -229,8 +211,8 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
             ))}
           </ul>
           <p className="mt-2 t-caption">
-            Audio after this point may be missing or ungated. Check the
-            recording before relying on it.
+            The transcript after this point may be missing. Check it before
+            relying on the summary.
           </p>
         </div>
       )}

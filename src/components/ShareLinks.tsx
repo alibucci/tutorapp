@@ -5,8 +5,8 @@ import { useState } from "react";
 import type { Student } from "@/lib/types";
 
 /**
- * A link is the credential for now - no accounts. Good enough to validate
- * whether these views are wanted at all; real auth comes after that.
+ * The other way in: a private link, no password. Handy for a parent who will
+ * never keep a password; sign-ins above are for everyone else.
  */
 export function ShareLinks({ student }: { student: Student }) {
   const router = useRouter();
@@ -46,7 +46,7 @@ export function ShareLinks({ student }: { student: Student }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="t-subtitle">Links</h2>
+      <h2 className="t-subtitle">Private links</h2>
       <ul className="divide-y divide-line card">
         {links.map((link) => (
           <li

@@ -2,8 +2,12 @@
 
 A lesson gets recorded, the tutor spends sixty seconds saying what happened, and
 three audiences get three different things out of it: a diagnostic write-up for
-the tutor, a short list of what to work on for the student, and one honest note
-a week for the parent.
+the tutor, homework and a short list of what to work on for the student, and a
+short message for the parent (Chinese and English, ready to paste into WeChat)
+plus one honest note a week.
+
+Recordings are never stored. The audio is used live and dropped; only text is
+kept.
 
 Nothing reaches a student or a parent without the tutor approving it first.
 
@@ -15,13 +19,14 @@ Nothing reaches a student or a parent without the tutor approving it first.
 
 ## Who can see what
 
-Three audiences, three route groups, and no self-registration anywhere.
+Four audiences, and no self-registration anywhere.
 
 | | Gets in by | Sees |
 |---|---|---|
-| **Superadmin** `(admin)` | credentials in `.env.local` | tutor accounts; creates, suspends and resets them |
-| **Tutor** `(tutor)` | email + password issued by the superadmin | only their own students, lessons, audio and drafts |
-| **Student / parent** `(guest)` | an unguessable link | one page of approved content, nothing else |
+| **Superadmin** `(admin)` | credentials in `.env.local` | tutor accounts and each tutor's students; creates, suspends and resets tutors |
+| **Tutor** `(tutor)` | email + password issued by the superadmin | only their own students, lessons and drafts |
+| **Student** `(family)` `/me`, or `(guest)` `/s/[key]` | username + password from the tutor, or a private link | their topics and homework the tutor has sent |
+| **Parent** `(family)` `/family`, or `(guest)` `/p/[key]` | username + password from the tutor, or a private link | weekly notes the tutor has approved |
 
 A tutor changes their issued password at `/account`; doing so signs out every
 other session of theirs, which is the point of replacing a password somebody
@@ -29,15 +34,21 @@ else once read out. Suspending a tutor or resetting their password has the same
 effect, because a session carries the account's token version and it is
 re-checked on every request rather than trusted for a fortnight.
 
-Tutors get passwords because they handle the raw material daily. Families get
-links instead: a nine-year-old with a password is a support queue, and a parent
-will not keep an account either. A family link only ever shows content a tutor
-has approved, so a leaked one is worth one weekly note — and it can be rotated.
+Children and parents sign in with a **username**, not an email - a child has
+none. The tutor creates the sign-in on the student's page, sees the password
+once, and copies it as a ready-made message. A reset keeps the username and
+signs out every device. Passwords are generated readable (`k7mp-q2xr-h9td`: no
+capitals, no 0/o/1/l/i) because they get typed on phones.
+
+Family sessions use **their own cookie**. Every tutor page and API reads only the
+staff cookie, so a child's login cannot reach a tutor screen even through a
+forgotten check. The private links still work for anyone who will never keep a
+password; they only show approved content and can be rotated.
 
 Authorisation lives in `src/lib/access.ts`, called from each route next to the
 data rather than in `proxy.ts`. Next's own guidance is that proxy-level checks
 are optimistic only, so every route that touches one student's material
-re-checks ownership: guessing an id returns 404, not someone else's audio.
+re-checks ownership: guessing an id returns 404, not someone else's lesson.
 
 ## Who gets recorded
 
@@ -148,25 +159,33 @@ the tab — which is what the interruption log is for.
 
 ## What the model is asked to do
 
-Four calls, all through `src/lib/llm.ts`. Swapping providers means rewriting that
-one file.
+All model calls go through `src/lib/llm.ts`. Swapping providers means rewriting
+that one file.
 
 | Call | Reads | Produces |
 |---|---|---|
-| `diarize.ts` | raw transcript | who said each line |
-| `summarize.ts` | transcript + debrief | the tutor's diagnostic write-up |
+| `diarize.ts` | raw transcript, in-room lessons only | who said each line |
+| `summarize.ts` | transcript + debrief | the tutor's diagnostic write-up, plus a homework focus line |
+| `parentMessage.ts` | transcript + debrief | a 3-4 sentence WeChat message, English + Chinese |
 | `skills.ts` | student's topics + this lesson | proposed changes to the student model |
 | `parentReport.ts` | a week of lessons + topics | a draft note for the parent |
 
 DeepSeek has no strict `json_schema` mode and its models reject a forced
 `tool_choice`, so structured output is done the honest way: `json_object` for
 guaranteed-valid JSON, the shape described in the prompt, Zod validation on the
-way out, and one retry with the validation error fed back.
+way out, and one retry with the validation error fed back (or after an empty
+reply, which DeepSeek returns now and then).
+
+Speed: every call runs at `reasoning_effort: "low"`, and the summary and the
+parent message run in parallel. Speaker labelling is skipped for online lessons,
+where the student's voice is mostly removed by echo cancellation anyway. A
+classroom lesson takes about 11-18 seconds from button to result.
 
 Two gates keep the model away from people:
 
 1. **Per lesson** — the tutor reviews proposed topic changes and ticks off the
-   ones that are wrong before anything reaches the student.
+   ones that are wrong before anything reaches the student, and sends the
+   homework only when it is ready.
 2. **Per week** — the tutor edits the parent note and approves it. Until then the
    parent's page shows nothing.
 
@@ -196,11 +215,10 @@ either and fail with a misleading `network` error. Firefox has no support at
 all. Where Google is unreachable, Safari is the one that still works. Audio still records everywhere — only the transcript
 is missing.
 
-Audio streams to the server a second at a time while the lesson runs, so a
-crashed tab costs the last second rather than the whole lesson, and there is no
-upload to sit through at the end. See `deploy/` for hosting, TLS and backups.
+No audio leaves the device. The recorder still runs the gate and the timers, but
+every encoded chunk is dropped. See `deploy/` for hosting, TLS and backups.
 
-Everything is written to `data/` as JSON plus audio blobs. That directory is
+Everything is written to `data/` as JSON plus homework pictures. That directory is
 gitignored and is the only persistence layer; swap `src/lib/store.ts` for a real
 database without touching a single caller.
 
@@ -213,11 +231,22 @@ database without touching a single caller.
    transcript on screen; pause and resume at will.
 3. **`/lesson/[id]/debrief`** — five prompts, sixty seconds, auto-advancing.
    Transcribed answers are editable before saving.
-4. **`/lesson/[id]/review`** — generate the summary, then review the topic
-   changes it proposes and apply the ones you agree with.
-5. **`/student/[id]`** — the student's topics over time, the weekly note to
-   draft and approve, and the two family links to copy.
-6. **`/s/[key]`** and **`/p/[key]`** — what the child and the parent actually see.
+4. **`/lesson/[id]/review`** — three steps. The summary and the parent message
+   start writing on their own when the page opens. Then the homework: add a
+   picture, adjust the focus line, send it. Then copy the Chinese message into
+   WeChat (edit the English and the Chinese is translated again).
+5. **`/student/[id]`** — topics over time, game style, sign-ins for the child
+   and the parent, the weekly note, and the private links.
+6. **`/me`**, **`/family`** (signed in) or **`/s/[key]`**, **`/p/[key]`** (by
+   link) — what the child and the parent see. Homework opens as a game in the
+   student's style.
+
+Homework is the same every time: describe the picture, say what happens next,
+give three adjectives. The child types the answers and hands in once; the tutor
+reads them on the lesson page. Game styles are a list in
+`src/lib/gameStyles.ts` plus a `.game-<id>` block in `globals.css`; Minecraft is
+the first. Its pixel font is bundled at build time, so nothing is fetched from
+Google - which matters in China.
 
 Outside that loop: **`/account`** for a tutor to replace the one-time password
 they were issued, and **`/check`** to test a device before recording on it.
@@ -234,7 +263,8 @@ src/lib/diarize.ts               Who said each line, and the talk ratio
 src/lib/summarize.ts             The tutor's write-up
 src/lib/skills.ts                The student model and its proposed changes
 src/lib/parentReport.ts          The weekly note
-src/lib/client.ts                Streams recorder chunks, in order, with retry
+src/lib/parentMessage.ts         The per-lesson WeChat message, EN + ZH
+src/lib/gameStyles.ts            Homework looks (Minecraft first)
 
 public/tutor-gate-worklet.js     The gate, on the audio thread
 src/hooks/useTutorRecorder.ts    Mic capture, worklet wiring, interruption log
@@ -244,7 +274,8 @@ src/hooks/useWakeLock.ts         Keeps the screen awake for a lesson
 src/app/globals.css              Design tokens and the component layer
 src/app/(admin)/                 Superadmin
 src/app/(tutor)/                 The tutor's workspace
-src/app/(guest)/                 Student and parent pages
+src/app/(family)/                Child and parent, signed in
+src/app/(guest)/                 Child and parent, by private link
 src/app/api/                     REST for all of the above
 src/app/check/                   Device diagnostics, no login needed
 
@@ -276,12 +307,12 @@ movement. Nothing triggered many times an hour animates at all.
 
 ## Known limits
 
-- **No delivery.** Reports do not reach anyone; a parent has to open a link.
-- **Links are the family credential.** Rotatable, but not an account.
+- **No automatic delivery.** The tutor copies the parent message into WeChat by
+  hand; the weekly note waits for the parent to open it.
 - **Single machine.** Files on disk, no migrations, no second instance.
   `deploy/backup.sh` covers backups once someone installs the cron entry and
   points `BACKUP_REMOTE` off the box — until then there is still only one copy.
 - **Foreign services in the path.** The transcript goes through Google's
-  recogniser and the four model calls go to DeepSeek. For a deployment where
+  recogniser and the model calls go to DeepSeek. For a deployment where
   data must stay in one jurisdiction, both need replacing — the capture layer
   does not care, but `llm.ts` and `useSpeechTranscript.ts` do.

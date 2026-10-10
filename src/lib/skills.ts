@@ -89,6 +89,7 @@ export async function proposeSkillChanges(
     schema: ChangesSchema,
     schemaName: "SkillChanges",
     maxTokens: 8000,
+    effort: "low",
     outputLanguage: "English",
   });
 

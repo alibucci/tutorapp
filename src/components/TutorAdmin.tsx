@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -22,6 +23,7 @@ export function TutorAdmin({ tutors }: { tutors: Row[] }) {
   const [issued, setIssued] = useState<{ email: string; password: string } | null>(
     null,
   );
+  const [copiedIssued, setCopiedIssued] = useState(false);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -73,14 +75,31 @@ export function TutorAdmin({ tutors }: { tutors: Row[] }) {
           <p className="mt-2 font-mono t-title select-all">{issued.password}</p>
           <p className="hint">
             This is the only time it is shown. Send it to the tutor; they will be
-            asked to change it.
+            asked to change it when they first sign in.
           </p>
-          <button
-            onClick={() => setIssued(null)}
-            className="btn btn-quiet mt-3"
-          >
-            I&rsquo;ve copied it
-          </button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={() =>
+                void navigator.clipboard
+                  .writeText(
+                    `Sign in at ${window.location.origin}/login\nEmail: ${issued.email}\nPassword: ${issued.password}`,
+                  )
+                  .then(() => setCopiedIssued(true))
+              }
+              className="btn btn-primary"
+            >
+              {copiedIssued ? "Copied" : "Copy sign-in message"}
+            </button>
+            <button
+              onClick={() => {
+                setIssued(null);
+                setCopiedIssued(false);
+              }}
+              className="btn btn-quiet"
+            >
+              Done
+            </button>
+          </div>
         </div>
       )}
 
@@ -124,8 +143,8 @@ export function TutorAdmin({ tutors }: { tutors: Row[] }) {
               key={tutor.id}
               className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5"
             >
-              <span className="min-w-0">
-                <span className="block truncate t-small font-medium">
+              <Link href={`/admin/tutors/${tutor.id}`} className="min-w-0 flex-1">
+                <span className="block truncate t-small font-medium underline-offset-2 hover:underline">
                   {tutor.name}
                   {!tutor.active && (
                     <span className="ml-2 t-caption t-muted">
@@ -138,7 +157,7 @@ export function TutorAdmin({ tutors }: { tutors: Row[] }) {
                   {tutor.students === 1 ? "student" : "students"}
                   {tutor.mustChangePassword && " · password not changed yet"}
                 </span>
-              </span>
+              </Link>
               <span className="flex shrink-0 gap-2">
                 <button
                   onClick={() => void patch(tutor.id, { resetPassword: true })}

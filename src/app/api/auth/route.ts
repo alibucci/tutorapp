@@ -4,11 +4,12 @@ import {
   clearAttempts,
   endSession,
   recordAttempt,
+  startFamilySession,
   startSession,
   tooManyAttempts,
   verifyPassword,
 } from "@/lib/auth";
-import { getTutorByEmail } from "@/lib/store";
+import { getStudentByUsername, getTutorByEmail } from "@/lib/store";
 
 /** Throttle per account and per source, so one does not mask the other. */
 function keys(request: Request, email: string): string[] {
@@ -20,14 +21,18 @@ function keys(request: Request, email: string): string[] {
 }
 
 export async function POST(request: Request) {
-  const { email, password } = (await request.json()) as {
+  const body = (await request.json()) as {
     email?: string;
     password?: string;
   };
+  // Phones add a trailing space after autocomplete, and capitalise the first
+  // letter of a username. Neither should cost anyone a sign-in.
+  const email = body.email?.trim() ?? "";
+  const password = body.password ?? "";
 
   if (!email || !password) {
     return NextResponse.json(
-      { error: "Email and password are required." },
+      { error: "Email or username, and password, are required." },
       { status: 400 },
     );
   }
@@ -44,7 +49,30 @@ export async function POST(request: Request) {
   if (admin) {
     throttleKeys.forEach(clearAttempts);
     await startSession(admin);
-    return NextResponse.json({ role: admin.role });
+    return NextResponse.json({ role: admin.role, next: "/admin" });
+  }
+
+  // No @ means a username, and usernames belong to children and parents.
+  if (!email.includes("@")) {
+    const found = await getStudentByUsername(email);
+    const login = found?.student.logins?.[found.role];
+    if (!found || !login || !verifyPassword(password, login.passwordHash)) {
+      throttleKeys.forEach(recordAttempt);
+      return NextResponse.json(
+        { error: "That username and password do not match." },
+        { status: 401 },
+      );
+    }
+    throttleKeys.forEach(clearAttempts);
+    await startFamilySession({
+      role: found.role,
+      id: found.student.id,
+      v: login.tokenVersion,
+    });
+    return NextResponse.json({
+      role: found.role,
+      next: found.role === "student" ? "/me" : "/family",
+    });
   }
 
   const tutor = await getTutorByEmail(email);
@@ -52,7 +80,7 @@ export async function POST(request: Request) {
   if (!tutor || !tutor.active || !verifyPassword(password, tutor.passwordHash)) {
     throttleKeys.forEach(recordAttempt);
     return NextResponse.json(
-      { error: "Those details do not match an account." },
+      { error: "That email and password do not match." },
       { status: 401 },
     );
   }
@@ -66,7 +94,8 @@ export async function POST(request: Request) {
   });
   return NextResponse.json({
     role: "tutor",
-    mustChangePassword: tutor.mustChangePassword,
+    // A tutor still on the password the admin sent goes straight to change it.
+    next: tutor.mustChangePassword ? "/account" : "/",
   });
 }
 

@@ -4,7 +4,8 @@ import { randomBytes, randomUUID } from "crypto";
 import type { Lesson, ParentReport, Student, Tutor } from "./types";
 
 /**
- * File-backed store. One JSON file per record plus audio blobs.
+ * File-backed store. One JSON file per record, plus homework pictures.
+ * Recordings are never stored.
  * Deliberately boring: swap this module for a real DB without touching callers.
  */
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -12,11 +13,11 @@ const LESSON_DIR = path.join(DATA_DIR, "lessons");
 const STUDENT_DIR = path.join(DATA_DIR, "students");
 const TUTOR_DIR = path.join(DATA_DIR, "tutors");
 const REPORT_DIR = path.join(DATA_DIR, "reports");
-const AUDIO_DIR = path.join(DATA_DIR, "audio");
+const IMAGE_DIR = path.join(DATA_DIR, "images");
 
 async function ensureDirs() {
   await Promise.all(
-    [LESSON_DIR, STUDENT_DIR, TUTOR_DIR, REPORT_DIR, AUDIO_DIR].map((d) =>
+    [LESSON_DIR, STUDENT_DIR, TUTOR_DIR, REPORT_DIR, IMAGE_DIR].map((d) =>
       fs.mkdir(d, { recursive: true }),
     ),
   );
@@ -148,6 +149,23 @@ export async function listStudents(tutorId?: string): Promise<Student[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Find whose child or parent login a username belongs to. */
+export async function getStudentByUsername(
+  username: string,
+): Promise<{ student: Student; role: "student" | "parent" } | null> {
+  const wanted = username.trim().toLowerCase();
+  if (!wanted) return null;
+  for (const student of await readAll<Student>(STUDENT_DIR)) {
+    if (student.logins?.student?.username === wanted) {
+      return { student, role: "student" };
+    }
+    if (student.logins?.parent?.username === wanted) {
+      return { student, role: "parent" };
+    }
+  }
+  return null;
+}
+
 /** Resolve one of the shareable links back to its student. */
 export async function getStudentByKey(
   kind: "studentKey" | "parentKey",
@@ -231,38 +249,27 @@ export async function listReports(studentId?: string): Promise<ParentReport[]> {
     .sort((a, b) => b.weekStart.localeCompare(a.weekStart));
 }
 
-// --- audio -----------------------------------------------------------------
+// --- homework pictures -----------------------------------------------------
 
-/**
- * Append one chunk of a recording.
- *
- * The recorder emits a chunk a second and they are written as they arrive, so a
- * crashed tab costs the last second rather than the whole lesson. Sequence 0
- * starts the file - re-recording a lesson replaces it rather than appending to
- * what was there.
- *
- * MediaRecorder's first chunk carries the container header and the rest are
- * continuation clusters, so concatenating them in order is exactly what the
- * browser would have produced in one blob.
- */
-export async function appendAudio(
-  lessonId: string,
-  kind: "lesson" | "debrief",
-  data: ArrayBuffer,
-  ext: string,
-  seq: number,
-): Promise<string> {
+/** A fresh name per upload, so a replaced picture is never served from cache. */
+export async function saveImage(lessonId: string, data: ArrayBuffer): Promise<string> {
   await ensureDirs();
-  const name = `${lessonId}-${kind}.${ext}`;
-  const full = path.join(AUDIO_DIR, name);
-  const buffer = Buffer.from(data);
-
-  if (seq === 0) await fs.writeFile(full, buffer);
-  else await fs.appendFile(full, buffer);
-
+  const name = `${lessonId}-${randomBytes(6).toString("hex")}.jpg`;
+  await fs.writeFile(path.join(IMAGE_DIR, name), Buffer.from(data));
   return name;
 }
 
-export function audioPath(name: string) {
-  return path.join(AUDIO_DIR, name);
+export async function readImage(name: string): Promise<Buffer | null> {
+  // Names are generated here; anything else is not ours to read.
+  if (!/^[\w-]+\.jpg$/.test(name)) return null;
+  try {
+    return await fs.readFile(path.join(IMAGE_DIR, name));
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteImage(name: string | undefined): Promise<void> {
+  if (!name || !/^[\w-]+\.jpg$/.test(name)) return;
+  await fs.rm(path.join(IMAGE_DIR, name), { force: true });
 }

@@ -56,7 +56,8 @@ they still know it.
 2. Pick the right **language** when you create the lesson. The wrong one means a
    useless transcript and there is no recovering it afterwards.
 3. Check the **live transcript** produces words in the first minute. If it is
-   blank, stop and fix it — audio alone is not enough.
+   blank, stop and fix it. The recording itself is never kept, so the
+   transcript is all there is.
 4. **Keep the screen on.** If it goes dark the recording pauses and tells you.
 
 If you want to check a new laptop or phone before a real lesson, open **/check**
@@ -64,14 +65,9 @@ on it. It tests the microphone and the transcript in about thirty seconds.
 
 ## If something goes wrong mid-lesson
 
-Audio uploads as you go rather than all at once at the end, so a crashed tab
-costs a second or two, not the lesson.
-
-- **"N seconds of audio waiting to upload"** — the connection is slow. It is
-  catching up; carry on teaching.
-- **"Some audio did not reach the server"** — the recording will have gaps.
-  Finish the lesson, then be more thorough than usual in the debrief, because
-  it is now the better record of what happened.
+- **"This recording was interrupted"** — the screen went off or another app
+  took the microphone. Tap continue. Then be more thorough than usual in the
+  debrief, because it is now the better record of what happened.
 
 ## The debrief
 
@@ -87,11 +83,20 @@ debrief.
 
 ## Afterwards
 
-Two things need you, and neither takes long:
+The review page opens straight after the debrief and starts writing on its own
+(about 15 seconds). Then three steps, top to bottom:
 
-- **After a lesson**, the review page proposes changes to the student's topics.
-  Untick anything wrong and apply the rest. Until you do, the student's page
-  does not change.
+1. **Summary** — read it. Below it, the proposed changes to the student's
+   topics: untick anything wrong and apply the rest. Until you do, the
+   student's page does not change.
+2. **Homework** — add a picture (a scene with something going on), check the
+   focus line, and tap **Send**. The student describes the picture, says what
+   happens next, and gives three adjectives, as a game in their style. Their
+   answers appear in the same place.
+3. **Message to the parent** — tap **Copy Chinese** and paste it into WeChat. To
+   change it, edit the English; the Chinese is translated again from it.
+
+And:
 - **Once a week**, draft the parent note, edit it, and approve it. Until you
   approve, the parent sees nothing.
 
@@ -102,6 +107,6 @@ You were in the room; the model was not.
 
 | | Sees |
 |---|---|
-| **You** | everything — audio, transcript, summary, all of it |
-| **Student** | a few topics to work on and what they have already got, **after you apply** |
+| **You** | everything — transcript, summary, all of it. No audio is kept. |
+| **Student** | homework **after you send it**, and topics to work on **after you apply** |
 | **Parent** | one weekly note, **after you approve** |

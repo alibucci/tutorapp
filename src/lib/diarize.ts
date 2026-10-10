@@ -52,6 +52,7 @@ export async function labelSpeakers(
     schema: LabelsSchema,
     schemaName: "SpeakerLabels",
     model: MODEL_FAST,
+    effort: "low",
   });
 
   // Merge by index: a short, long or reordered reply cannot corrupt the

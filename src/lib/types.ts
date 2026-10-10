@@ -69,10 +69,24 @@ export type LessonSummary = {
   teachingSignals: { correction: string; concept: string }[];
   whatMatters: string;
   nextLesson: string[];
+  /** Suggested focus line for the homework, addressed to the child. */
+  homeworkFocus?: string;
   /** Share of spoken words that came from the student, 0..1. Only meaningful
    *  when both voices were recorded. */
   studentWordShare?: number;
   generatedAt: string;
+  model: string;
+};
+
+/**
+ * The tutor edits the English; the Chinese is always a translation of it, so
+ * the two can never say different things.
+ */
+export type ParentMessage = {
+  en: string;
+  zh: string;
+  generatedAt: string;
+  editedAt?: string;
   model: string;
 };
 
@@ -92,14 +106,15 @@ export type Lesson = {
   endedAt?: string;
   /** ms of audio actually written (gate-open time in classroom mode) */
   recordedMs?: number;
-  audioFile?: string;
   /** Empty means the recording ran start to finish uninterrupted. */
   interruptions: CaptureInterruption[];
   transcript: TranscriptSegment[];
   debrief: DebriefAnswer[];
-  debriefAudioFile?: string;
   debriefTranscript: TranscriptSegment[];
   summary?: LessonSummary;
+  /** Short note for the parent, sent by the tutor over WeChat. */
+  parentMessage?: ParentMessage;
+  homework?: Homework;
   /** Set once the tutor has accepted this lesson's changes to the student
    *  model. Nothing reaches the student before that. */
   skillsAppliedAt?: string;
@@ -174,10 +189,63 @@ export type Student = {
   name: string;
   createdAt: string;
   recordingConsent?: RecordingConsent;
-  /** Opaque URL keys - no accounts yet, a link is the credential. */
+  /** Opaque URL keys - a link is one way in, an account the other. */
   studentKey: string;
   parentKey: string;
+  /** Sign-ins the tutor has made for the child and the parent. */
+  logins?: { student?: FamilyLogin; parent?: FamilyLogin };
+  /** Id from GAME_STYLES - what the child's homework looks like. */
+  gameStyle?: string;
   skills: Skill[];
+};
+
+/**
+ * A username and password the tutor creates and hands over. Children have no
+ * email, so it is a username; the tutor resets it when it is forgotten.
+ */
+export type FamilyLogin = {
+  username: string;
+  passwordHash: string;
+  /** Bumped on reset or removal, which signs out every device. */
+  tokenVersion: number;
+  createdAt: string;
+};
+
+// ---------------------------------------------------------------------------
+// Homework: a picture the tutor picks, and the same tasks every time.
+// ---------------------------------------------------------------------------
+
+export const HOMEWORK_TASKS = [
+  {
+    id: "describe",
+    prompt: "Describe the picture. What do you see here?",
+    hint: "Write at least three sentences.",
+  },
+  {
+    id: "next",
+    prompt: "What do you think will happen next?",
+    hint: "Tell the story forward.",
+  },
+] as const;
+
+export const ADJECTIVES_TASK =
+  "Give me 3 adjectives that describe this situation the best.";
+
+export type HomeworkAnswers = {
+  describe: string;
+  next: string;
+  adjectives: [string, string, string];
+  submittedAt: string;
+};
+
+export type Homework = {
+  /** Stored picture, uploaded by the tutor. */
+  imageFile?: string;
+  /** One line for the child on what to practise while answering. */
+  focus: string;
+  /** The child sees nothing until the tutor sends it. */
+  sentAt?: string;
+  answers?: HomeworkAnswers;
 };
 
 // ---------------------------------------------------------------------------

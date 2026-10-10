@@ -1,18 +1,21 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Lesson } from "@/lib/types";
 
 export function SummaryPanel({ lesson }: { lesson: Lesson }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [seconds, setSeconds] = useState(0);
   const summary = lesson.summary;
+  const canGenerate = lesson.transcript.length > 0 || lesson.debrief.length > 0;
 
   async function generate() {
     setBusy(true);
     setError(null);
+    setSeconds(0);
     const res = await fetch(`/api/lessons/${lesson.id}/summary`, {
       method: "POST",
     });
@@ -26,7 +29,24 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
     setBusy(false);
   }
 
-  const canGenerate = lesson.transcript.length > 0 || lesson.debrief.length > 0;
+  // A tick while the model works, so a wait of half a minute reads as progress
+  // rather than as a frozen page.
+  useEffect(() => {
+    if (!busy) return;
+    const timer = window.setInterval(() => setSeconds((n) => n + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [busy]);
+
+  // Nobody should have to press a button to get the obvious next thing. Once
+  // per page load, so a failure does not turn into a retry loop.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || summary || !canGenerate) return;
+    started.current = true;
+    void generate();
+    // generate is recreated every render; this is a one-shot on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <section className="space-y-4">
@@ -37,7 +57,7 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
           disabled={busy || !canGenerate}
           className="btn btn-quiet btn-sm"
         >
-          {busy ? "Thinking..." : summary ? "Regenerate" : "Generate"}
+          {busy ? `Writing… ${seconds}s` : summary ? "Regenerate" : "Generate"}
         </button>
       </div>
 
@@ -45,9 +65,11 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
 
       {!summary ? (
         <p className="empty p-6 t-small t-muted">
-          {canGenerate
-            ? "Nothing generated yet."
-            : "Record a lesson or a debrief first."}
+          {!canGenerate
+            ? "Record a lesson or a debrief first."
+            : busy
+              ? "Reading the lesson and writing the summary and the parent message. This usually takes 15–30 seconds."
+              : "Nothing generated yet."}
         </p>
       ) : (
         <div className="space-y-5 card p-5">

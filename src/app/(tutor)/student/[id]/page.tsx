@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FamilyLogins } from "@/components/FamilyLogins";
+import { GameStylePicker } from "@/components/GameStylePicker";
 import { ReportsPanel } from "@/components/ReportsPanel";
 import { ShareLinks } from "@/components/ShareLinks";
 import { SkillList } from "@/components/SkillList";
@@ -26,7 +28,10 @@ export default async function StudentPage({
   return (
     <div className="stack-lg">
       <header>
-        <h1 className="t-display">
+        <Link href="/" className="t-small t-muted">
+          ← Students
+        </Link>
+        <h1 className="t-display mt-2">
           {student.name}
         </h1>
         <p className="t-body t-muted mt-2">
@@ -35,12 +40,30 @@ export default async function StudentPage({
         </p>
       </header>
 
+      <GameStylePicker studentId={student.id} value={student.gameStyle} />
+
       <section className="space-y-3">
         <h2 className="t-subtitle">Topics</h2>
         <SkillList skills={student.skills} />
       </section>
 
       <ReportsPanel student={student} reports={reports} />
+
+      <FamilyLogins
+        studentId={student.id}
+        rows={[
+          {
+            who: "student",
+            label: student.name,
+            username: student.logins?.student?.username,
+          },
+          {
+            who: "parent",
+            label: `${student.name}'s parent`,
+            username: student.logins?.parent?.username,
+          },
+        ]}
+      />
 
       <ShareLinks student={student} />
 
@@ -63,11 +86,13 @@ export default async function StudentPage({
                     </span>
                   </span>
                   <span className="shrink-0 t-caption t-muted">
-                    {lesson.skillsAppliedAt
-                      ? "applied"
-                      : lesson.summary
-                        ? "needs review"
-                        : "no summary"}
+                    {lesson.homework?.answers
+                      ? "homework handed in"
+                      : lesson.homework?.sentAt
+                        ? "homework sent"
+                        : lesson.summary
+                          ? "needs homework"
+                          : "no summary"}
                   </span>
                 </Link>
               </li>

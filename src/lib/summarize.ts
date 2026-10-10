@@ -30,6 +30,11 @@ const SummarySchema = z.object({
     .string()
     .describe("The tutor's own judgement about what matters, in 1-2 sentences"),
   nextLesson: z.array(z.string()).describe("Concrete next steps"),
+  homeworkFocus: z
+    .string()
+    .describe(
+      "One short sentence to the child, in simple English, saying what to practise while describing a picture for homework - taken from what they struggled with. E.g. 'Use the past tense: ate, swam, stabbed.' Empty string if nothing fits.",
+    ),
 });
 
 const COMMON = `The debrief is the tutor's own 60-second reflection recorded
@@ -123,6 +128,7 @@ export async function summarizeLesson(
     user: renderLesson(lesson, student),
     schema: SummarySchema,
     schemaName: "LessonSummary",
+    effort: "low",
     outputLanguage: "English",
   });
 

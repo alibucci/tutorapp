@@ -7,19 +7,21 @@ import {
 } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getTutor } from "./store";
+import { getStudent, getTutor } from "./store";
 
 /**
- * Sessions for the two roles that log in.
+ * Sessions.
  *
- * Tutors and the superadmin get a password and a signed cookie. Students and
- * parents do not: a nine-year-old with a password is a support queue, and a
- * parent will not keep an account either. They get an unguessable link that
- * only ever shows content a tutor has already approved, and that a tutor can
- * rotate. The blast radius of a leaked family link is one weekly note.
+ * Tutors and the superadmin ("staff") get a password and a signed cookie.
+ * Children and parents can have a username and password too, created by the
+ * tutor - or no account at all and just their private link.
+ *
+ * Family sessions live in a separate cookie on purpose. Every tutor page and
+ * API route reads only the staff cookie through getSession(), so a child's
+ * login cannot reach a tutor screen even if a check somewhere is sloppy.
  *
  * Nobody signs themselves up. The superadmin comes from the environment and
- * creates tutors; tutors create their own students.
+ * creates tutors; tutors create their own students and their logins.
  */
 
 export type Role = "admin" | "tutor";
@@ -102,6 +104,7 @@ function decode(token: string | undefined): Session | null {
 
 export async function startSession(session: Session): Promise<void> {
   const jar = await cookies();
+  jar.delete(FAMILY_COOKIE);
   jar.set(COOKIE, encode(session), {
     httpOnly: true,
     sameSite: "lax",
@@ -112,7 +115,9 @@ export async function startSession(session: Session): Promise<void> {
 }
 
 export async function endSession(): Promise<void> {
-  (await cookies()).delete(COOKIE);
+  const jar = await cookies();
+  jar.delete(COOKIE);
+  jar.delete(FAMILY_COOKIE);
 }
 
 /**
@@ -178,9 +183,82 @@ export function checkAdmin(email: string, password: string): Session | null {
     : null;
 }
 
-/** A one-time password for a tutor the superadmin has just created. */
+/**
+ * A password someone has to read off one screen and type on a phone.
+ *
+ * No capitals and none of the characters people confuse (0/o, 1/l/i), in
+ * groups of four - "k7mp-q2xr-h9td". Twelve characters from 31 is about 59
+ * bits, far more than an online guesser behind the login throttle can try.
+ */
+const READABLE = "abcdefghjkmnpqrstuvwxyz23456789";
+
 export function temporaryPassword(): string {
-  return randomBytes(6).toString("base64url");
+  const bytes = randomBytes(12);
+  const chars = Array.from(bytes, (b) => READABLE[b % READABLE.length]);
+  return [0, 4, 8].map((i) => chars.slice(i, i + 4).join("")).join("-");
+}
+
+// --- family sessions (child and parent) ------------------------------------
+
+export type FamilyRole = "student" | "parent";
+export type FamilySession = {
+  role: FamilyRole;
+  /** The student's id, for both roles. */
+  id: string;
+  v: number;
+};
+
+const FAMILY_COOKIE = "family_session";
+
+function encodeFamily(session: FamilySession): string {
+  const body = Buffer.from(
+    JSON.stringify({ ...session, kind: "family", exp: Date.now() + MAX_AGE_SECONDS * 1000 }),
+  ).toString("base64url");
+  return `${body}.${sign(body)}`;
+}
+
+export async function startFamilySession(session: FamilySession): Promise<void> {
+  const jar = await cookies();
+  jar.delete(COOKIE);
+  jar.set(FAMILY_COOKIE, encodeFamily(session), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: MAX_AGE_SECONDS,
+  });
+}
+
+/** Re-checked against the student record, like a tutor session. */
+export async function getFamilySession(): Promise<FamilySession | null> {
+  let claims: (FamilySession & { kind?: string; exp: number }) | null = null;
+  try {
+    const token = (await cookies()).get(FAMILY_COOKIE)?.value;
+    if (!token) return null;
+    const [body, mac] = token.split(".");
+    if (!body || !mac) return null;
+    const expected = Buffer.from(sign(body));
+    const actual = Buffer.from(mac);
+    if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
+      return null;
+    }
+    claims = JSON.parse(Buffer.from(body, "base64url").toString());
+  } catch {
+    return null;
+  }
+  if (!claims || claims.kind !== "family" || claims.exp < Date.now()) return null;
+  if (claims.role !== "student" && claims.role !== "parent") return null;
+
+  const student = await getStudent(claims.id);
+  const login = student?.logins?.[claims.role];
+  if (!login || login.tokenVersion !== claims.v) return null;
+  return { role: claims.role, id: claims.id, v: claims.v };
+}
+
+export async function requireFamily(role: FamilyRole): Promise<FamilySession> {
+  const session = await getFamilySession();
+  if (!session || session.role !== role) redirect("/login");
+  return session;
 }
 
 export { MIN_PASSWORD_LENGTH } from "./auth-constants";
