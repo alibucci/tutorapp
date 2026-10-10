@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
 import { getSession } from "@/lib/auth";
-import { createLesson, listLessons } from "@/lib/store";
+import { createLesson, listLessons, listStudents } from "@/lib/store";
 import {
   DEFAULT_LANGUAGE,
   LESSON_LANGUAGES,
@@ -14,10 +14,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Not allowed." }, { status: 403 });
   }
   const studentId = new URL(request.url).searchParams.get("studentId");
-  if (studentId && !(await studentFor(studentId))) {
-    return NextResponse.json({ error: "No such student." }, { status: 404 });
+  if (studentId) {
+    if (!(await studentFor(studentId))) {
+      return NextResponse.json({ error: "No such student." }, { status: 404 });
+    }
+    return NextResponse.json(await listLessons(studentId));
   }
-  return NextResponse.json(await listLessons(studentId ?? undefined));
+  // No student named: only the caller's own students' lessons. This used to
+  // fall through to every lesson in the system.
+  const lessons = await listLessons();
+  if (session.role === "admin") return NextResponse.json(lessons);
+  const mine = new Set((await listStudents(session.id)).map((s) => s.id));
+  return NextResponse.json(lessons.filter((l) => mine.has(l.studentId)));
 }
 
 export async function POST(request: Request) {

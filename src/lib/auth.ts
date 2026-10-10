@@ -70,7 +70,11 @@ function sign(payload: string): string {
 
 function encode(session: Session): string {
   const body = Buffer.from(
-    JSON.stringify({ ...session, exp: Date.now() + MAX_AGE_SECONDS * 1000 }),
+    JSON.stringify({
+      ...session,
+      kind: "staff",
+      exp: Date.now() + MAX_AGE_SECONDS * 1000,
+    }),
   ).toString("base64url");
   return `${body}.${sign(body)}`;
 }
@@ -88,9 +92,14 @@ function decode(token: string | undefined): Session | null {
 
   try {
     const claims = JSON.parse(Buffer.from(body, "base64url").toString()) as
-      | (Session & { exp: number })
+      | (Session & { kind?: string; exp: number })
       | null;
     if (!claims || claims.exp < Date.now()) return null;
+    // Both cookie kinds are signed with the same secret, so a valid signature
+    // alone does not say which kind this is. Without these two checks a
+    // family's own cookie, pasted into this one, read as a staff session.
+    if (claims.kind !== "staff") return null;
+    if (claims.role !== "admin" && claims.role !== "tutor") return null;
     return {
       role: claims.role,
       id: claims.id,
