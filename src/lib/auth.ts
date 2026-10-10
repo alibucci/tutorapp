@@ -272,18 +272,21 @@ export { MIN_PASSWORD_LENGTH } from "./auth-constants";
 // --- login throttling ------------------------------------------------------
 
 /**
- * In-process, per identifier. Enough for a pilot of five people on one server:
- * it stops a script, and it resets when the process does. A second server or a
+ * In-process, per identifier. Enough for a pilot on one server: it stops a
+ * script, and it resets when the process does. A second server or a
  * determined attacker needs this moved into the store.
  *
- * The two limits are deliberately far apart. Guessing one account's password is
- * the attack worth stopping hard, so the per-email limit is strict. The per-IP
- * limit only exists to slow enumeration across many accounts, and it has to
- * stay loose: a whole school behind one NAT shares an address, and a strict
- * limit there would lock out the people who typed their password correctly.
+ * Three limits, each for a different attack:
+ * - `pair` (one account from one address) is strict. It is what a person
+ *   mistyping hits, and it locks only them, only from there.
+ * - `email` (one account from anywhere) caps guessing that account's password.
+ *   It is looser, because it is also what a stranger could use to lock someone
+ *   out - a strict per-account limit let anyone do that with ten bad tries.
+ * - `ip` slows trying many accounts from one place, and stays loose because a
+ *   whole school behind one NAT shares an address.
  */
 const WINDOW_MS = 15 * 60 * 1000;
-const LIMITS: Record<string, number> = { email: 10, ip: 60 };
+const LIMITS: Record<string, number> = { pair: 10, email: 50, ip: 60 };
 const attempts = new Map<string, number[]>();
 
 function limitFor(key: string): number {
@@ -297,8 +300,25 @@ export function tooManyAttempts(key: string): boolean {
   return recent.length >= limitFor(key);
 }
 
+/**
+ * Run the password check on a made-up account. Without it a login for a name
+ * that does not exist answers in a few milliseconds and a real one in fifty,
+ * which tells anyone which usernames are real.
+ */
+const DUMMY_HASH = hashPassword(randomBytes(12).toString("hex"));
+export function burnPasswordCheck(password: string): void {
+  verifyPassword(password, DUMMY_HASH);
+}
+
 export function recordAttempt(key: string): void {
   const now = Date.now();
+  // Every new address or name adds an entry; drop the stale ones now and then
+  // so the map cannot grow without end.
+  if (attempts.size > 10_000) {
+    for (const [k, times] of attempts) {
+      if (times.every((t) => now - t >= WINDOW_MS)) attempts.delete(k);
+    }
+  }
   attempts.set(key, [...(attempts.get(key) ?? []).filter((t) => now - t < WINDOW_MS), now]);
 }
 

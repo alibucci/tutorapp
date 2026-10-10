@@ -176,9 +176,7 @@ export function useTutorRecorder(options: Options = {}) {
 
         setState("ready");
       } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "Could not open the microphone.",
-        );
+        setError(explainMicError(e));
         setState("idle");
       }
     },
@@ -309,4 +307,31 @@ function pickMimeType(): string {
     }
   }
   return "";
+}
+
+/**
+ * What went wrong with the microphone, in words a tutor can act on. The
+ * browser's own messages ("Not supported", "Permission denied") say what
+ * failed but not what to do about it.
+ */
+export function explainMicError(e: unknown): string {
+  const name = e instanceof DOMException || e instanceof Error ? e.name : "";
+  if (typeof navigator !== "undefined" && !navigator.mediaDevices) {
+    return "This page cannot use a microphone here. Open it at https://aloudli.com in Safari or Chrome - not inside WeChat or another app's browser.";
+  }
+  switch (name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return "Microphone access was refused. Allow the microphone for this site in the browser's settings, then reload the page.";
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return "No microphone was found. Plug one in or pick another, then reload.";
+    case "NotReadableError":
+    case "AbortError":
+      return "The microphone is busy - another app (a call, a video meeting) is using it. Close that, then reload.";
+    case "NotSupportedError":
+      return "This browser cannot record here. Use Safari on iPhone, or Chrome on Android or a computer.";
+    default:
+      return "Could not open the microphone. Reload the page; if it keeps happening, open /check to see what is wrong.";
+  }
 }

@@ -251,8 +251,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
         </div>
         {rec.error && (
           <p className="note note-warn">
-            The microphone is not available here ({rec.error}). Check the
-            browser&rsquo;s microphone permission, or type the debrief instead.
+            {rec.error} Or type the debrief instead.
           </p>
         )}
         <div className="flex flex-wrap gap-2">

@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api";
 import Link from "next/link";
 import { useState } from "react";
 import { pixelFont } from "@/lib/fonts";
@@ -53,20 +54,18 @@ export function HomeworkGame({
   async function submit() {
     setBusy(true);
     setError(null);
-    const res = await fetch(`/api/lessons/${lessonId}/homework/answers`, {
+    const result = await api(`/api/lessons/${lessonId}/homework/answers`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      json: {
         key: linkKey,
         describe: texts.describe,
         next: texts.next,
         adjectives,
-      }),
+      },
     });
     setBusy(false);
-    if (!res.ok) {
-      const body = (await res.json()) as { error?: string };
-      setError(body.error ?? "Something went wrong. Try again.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     setStep(TASKS.length + 1);

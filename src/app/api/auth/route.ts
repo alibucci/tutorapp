@@ -1,6 +1,7 @@
 import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import {
+  burnPasswordCheck,
   checkAdmin,
   clearAttempts,
   endSession,
@@ -18,7 +19,8 @@ function keys(request: Request, email: string): string[] {
     request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
     request.headers.get("x-real-ip") ??
     "unknown";
-  return [`email:${email.trim().toLowerCase()}`, `ip:${ip}`];
+  const account = email.trim().toLowerCase();
+  return [`pair:${account}|${ip}`, `email:${account}`, `ip:${ip}`];
 }
 
 export async function POST(request: Request) {
@@ -59,6 +61,7 @@ export async function POST(request: Request) {
   if (!email.includes("@")) {
     const student = await getStudentByUsername(email);
     const login = student?.login;
+    if (!student || !login) burnPasswordCheck(password);
     if (!student || !login || !verifyPassword(password, login.passwordHash)) {
       throttleKeys.forEach(recordAttempt);
       return NextResponse.json(
@@ -72,6 +75,7 @@ export async function POST(request: Request) {
   }
 
   const tutor = await getTutorByEmail(email);
+  if (!tutor || !tutor.active) burnPasswordCheck(password);
   // Same message either way: do not reveal which accounts exist.
   if (!tutor || !tutor.active || !verifyPassword(password, tutor.passwordHash)) {
     throttleKeys.forEach(recordAttempt);

@@ -105,7 +105,8 @@ export function LoginForm() {
       </button>
 
       <p className="t-small t-muted text-center">
-        Forgot it? Ask your tutor to reset it — it takes them one tap.
+        Forgot it? Families: ask your tutor. Tutors: ask your administrator.
+        Either can reset it in one tap.
       </p>
     </form>
   );

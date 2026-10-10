@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CopyIcon } from "@/components/ui";
@@ -43,15 +44,14 @@ export function ParentMessagePanel({ lesson }: { lesson: Lesson }) {
   async function save() {
     setBusy(true);
     setError(null);
-    const res = await fetch(`/api/lessons/${lesson.id}/parent-message`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ en: draft }),
-    });
+    const result = await api(
+      `/api/lessons/${lesson.id}/parent-message`,
+      { method: "PUT", json: { en: draft } },
+      "Could not save the message.",
+    );
     setBusy(false);
-    if (!res.ok) {
-      const body = (await res.json()) as { error?: string };
-      setError(body.error ?? "Could not save the message.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     setEditing(false);

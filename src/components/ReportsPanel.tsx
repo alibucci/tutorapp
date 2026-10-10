@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ParentReport, ParentReportBody, Student } from "@/lib/types";
@@ -8,6 +9,9 @@ import type { ParentReport, ParentReportBody, Student } from "@/lib/types";
  * The tutor gate. A draft is written by the model; nothing reaches a parent
  * until someone who was in the room has read it.
  */
+/** Week dates are calendar days; read at noon UTC so no timezone shifts them. */
+const WEEK = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+
 export function ReportsPanel({
   student,
   reports,
@@ -22,19 +26,17 @@ export function ReportsPanel({
   async function draft() {
     setBusy(true);
     setError(null);
-    const res = await fetch(`/api/students/${student.id}/reports`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    if (!res.ok) {
-      const body = (await res.json()) as { error?: string };
-      setError(body.error ?? "Could not draft the report.");
-      setBusy(false);
+    const result = await api(
+      `/api/students/${student.id}/reports`,
+      { method: "POST", json: {} },
+      "Could not draft the note.",
+    );
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     router.refresh();
-    setBusy(false);
   }
 
   return (
@@ -72,24 +74,31 @@ function ReportCard({ report }: { report: ParentReport }) {
   const router = useRouter();
   const [body, setBody] = useState<ParentReportBody>(report.body);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const approved = Boolean(report.approvedAt);
 
   async function save(approve: boolean) {
     setBusy(true);
-    await fetch(`/api/reports/${report.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body, approved: approve }),
-    });
-    router.refresh();
+    setError(null);
+    const result = await api(
+      `/api/reports/${report.id}`,
+      { method: "PATCH", json: { body, approved: approve } },
+      "Could not save the note.",
+    );
     setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
   }
 
   return (
     <div className="space-y-4 card p-5">
       <div className="flex items-baseline justify-between gap-3">
         <span className="t-subtitle">
-          {report.weekStart} &ndash; {report.weekEnd}
+          {WEEK.format(new Date(`${report.weekStart}T12:00:00Z`))} &ndash;{" "}
+          {WEEK.format(new Date(`${report.weekEnd}T12:00:00Z`))}
         </span>
         <span className="t-caption t-muted">
           {approved ? "visible to parent" : "draft - not sent"}
@@ -142,10 +151,10 @@ function ReportCard({ report }: { report: ParentReport }) {
           </button>
         )}
         <span className="self-center t-caption t-muted">
-          {report.model}
-          {report.editedByTutor && " · edited"}
+          {report.editedByTutor ? "Edited by you" : "Written from the week's lessons"}
         </span>
       </div>
+      {error && <p className="note note-warn">{error}</p>}
     </div>
   );
 }

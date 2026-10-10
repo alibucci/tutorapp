@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Lesson } from "@/lib/types";
@@ -16,17 +17,17 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
     setBusy(true);
     setError(null);
     setSeconds(0);
-    const res = await fetch(`/api/lessons/${lesson.id}/summary`, {
-      method: "POST",
-    });
-    if (!res.ok) {
-      const body = (await res.json()) as { error?: string };
-      setError(body.error ?? "Could not generate the summary.");
-      setBusy(false);
+    const result = await api(
+      `/api/lessons/${lesson.id}/summary`,
+      { method: "POST" },
+      "Could not write the summary. Try again.",
+    );
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     router.refresh();
-    setBusy(false);
   }
 
   // A tick while the model works, so a wait of half a minute reads as progress

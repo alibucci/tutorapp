@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { ImageIcon } from "@/components/ui";
@@ -16,7 +17,15 @@ const MAX_SIDE = 1600;
  * that picked the file can decode it, and what comes out is a JPEG anyone can.
  */
 async function toJpeg(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // Typically an iPhone HEIC photo in a browser that cannot decode it.
+    throw new Error(
+      "This browser cannot open that photo format. Take a screenshot of it, or pick a JPEG or PNG.",
+    );
+  }
   const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
@@ -77,15 +86,14 @@ export function HomeworkPanel({
   async function patch(payload: { focus?: string; send?: boolean }, label: string) {
     setBusy(label);
     setError(null);
-    const res = await fetch(`/api/lessons/${lesson.id}/homework`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const result = await api(
+      `/api/lessons/${lesson.id}/homework`,
+      { method: "PATCH", json: payload },
+      "Could not save.",
+    );
     setBusy(null);
-    if (!res.ok) {
-      const body = (await res.json()) as { error?: string };
-      setError(body.error ?? "Could not save.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     router.refresh();
@@ -164,7 +172,9 @@ export function HomeworkPanel({
             placeholder="e.g. Use the past tense: ate, swam, went."
             className="field"
           />
-          <span className="hint">Suggested from this lesson. Change it freely.</span>
+          {!answers && (
+            <span className="hint">Suggested from this lesson. Change it freely.</span>
+          )}
         </label>
 
         {!answers &&
@@ -179,7 +189,9 @@ export function HomeworkPanel({
           ) : (
             <button
               onClick={() => void patch({ focus, send: true }, "send")}
-              disabled={busy !== null || !homework?.imageFile}
+              // Saving the tip on blur must not swallow this tap: the send
+              // carries the tip anyway.
+              disabled={busy === "upload" || busy === "send" || !homework?.imageFile}
               className="btn btn-primary btn-lg btn-block"
             >
               {busy === "send" ? "Sending…" : `Send to ${studentName}`}

@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -24,38 +25,36 @@ export function SkillReview({ lesson }: { lesson: Lesson }) {
   async function propose() {
     setBusy(true);
     setError(null);
-    const res = await fetch(`/api/lessons/${lesson.id}/skills`, {
-      method: "POST",
-    });
-    if (!res.ok) {
-      const body = (await res.json()) as { error?: string };
-      setError(body.error ?? "Could not read the lesson.");
-      setBusy(false);
+    const result = await api<{ changes: SkillChange[] }>(
+      `/api/lessons/${lesson.id}/skills`,
+      { method: "POST" },
+      "Could not read the lesson.",
+    );
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    const body = (await res.json()) as { changes: SkillChange[] };
-    setChanges(body.changes);
-    setKeep(Object.fromEntries(body.changes.map((c) => [c.topic, true])));
-    setBusy(false);
+    setChanges(result.data.changes);
+    setKeep(Object.fromEntries(result.data.changes.map((c) => [c.topic, true])));
   }
 
   async function apply() {
     if (!changes) return;
     setBusy(true);
     setError(null);
-    const res = await fetch(`/api/lessons/${lesson.id}/skills`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ changes: changes.filter((c) => keep[c.topic]) }),
-    });
-    if (!res.ok) {
-      setError("Could not save the changes.");
-      setBusy(false);
+    const result = await api(
+      `/api/lessons/${lesson.id}/skills`,
+      { method: "PUT", json: { changes: changes.filter((c) => keep[c.topic]) } },
+      "Could not save the changes.",
+    );
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     setChanges(null);
     router.refresh();
-    setBusy(false);
   }
 
   if (!lesson.summary) return null;
