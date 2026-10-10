@@ -6,6 +6,20 @@ import { updateLesson } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
 
+/** The tutor copied it to send. Clears it from their to-do list. */
+export async function PATCH(_request: Request, { params }: Params) {
+  const { id } = await params;
+  const found = await lessonFor(id);
+  const message = found?.lesson.parentMessage;
+  if (!found || !message) {
+    return NextResponse.json({ error: "No such message." }, { status: 404 });
+  }
+  await updateLesson(id, {
+    parentMessage: { ...message, copiedAt: new Date().toISOString() },
+  });
+  return NextResponse.json({ ok: true });
+}
+
 /** Save the tutor's edited English and translate it again. */
 export async function PUT(request: Request, { params }: Params) {
   const { id } = await params;

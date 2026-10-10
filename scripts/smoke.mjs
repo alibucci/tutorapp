@@ -378,11 +378,11 @@ function picture(bytes) {
 
   check("the child cannot see homework before it is sent", (await img(childKey)).status === 404);
   check("the child's page shows no quest before it is sent",
-    !(await anon(`/s/${childKey}`)).text.includes("New quest"));
+    !(await anon(`/s/${childKey}`)).text.includes("Describe the picture"));
 
   await a(`/api/lessons/${lessonA.id}/homework`, patch({ focus: "Use the past tense.", send: true }));
   check("once sent, the child's page shows the quest",
-    (await anon(`/s/${childKey}`)).text.includes("New quest"));
+    (await anon(`/s/${childKey}`)).text.includes("Describe the picture"));
   check("the child can load the picture by link", (await img(childKey)).status === 200);
   check("a wrong key cannot load the picture", (await img("wrong-key")).status === 404);
   check("the parent link cannot load the picture", (await img(keys.parentKey)).status === 404);

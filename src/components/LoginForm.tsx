@@ -37,9 +37,15 @@ export function LoginForm() {
   return (
     <form onSubmit={submit} className="stack">
       <div>
-        <h1 className="t-display">Tutor Signal</h1>
+        <span
+          aria-hidden
+          className="grid h-12 w-12 place-items-center rounded-[var(--radius-lg)] bg-accent text-2xl font-bold text-white"
+        >
+          T
+        </span>
+        <h1 className="t-display mt-4">Tutor Signal</h1>
         <p className="t-body t-muted mt-2">
-          Your tutor or school gives you your sign-in. There is no sign-up.
+          Use the sign-in your tutor or school sent you.
         </p>
       </div>
 
@@ -79,7 +85,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setShow((v) => !v)}
-              className="absolute inset-y-0 right-0 px-3 t-small t-muted"
+              className="absolute inset-y-0 right-0 px-4 t-small font-semibold text-accent"
             >
               {show ? "Hide" : "Show"}
             </button>
@@ -94,9 +100,13 @@ export function LoginForm() {
         </p>
       )}
 
-      <button type="submit" disabled={busy} className="btn btn-primary btn-lg w-full">
+      <button type="submit" disabled={busy} className="btn btn-primary btn-lg btn-block">
         {busy ? "Signing in…" : "Sign in"}
       </button>
+
+      <p className="t-small t-muted text-center">
+        Forgot it? Ask your tutor to reset it — it takes them one tap.
+      </p>
     </form>
   );
 }

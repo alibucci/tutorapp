@@ -49,13 +49,13 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
   }, []);
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className="t-subtitle">Summary</h2>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="t-title">Summary</h2>
         <button
           onClick={() => void generate()}
           disabled={busy || !canGenerate}
-          className="btn btn-quiet btn-sm"
+          className="btn btn-ghost btn-sm"
         >
           {busy ? `Writing… ${seconds}s` : summary ? "Regenerate" : "Generate"}
         </button>
@@ -64,7 +64,7 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
       {error && <p className="note note-warn">{error}</p>}
 
       {!summary ? (
-        <p className="empty p-6 t-small t-muted">
+        <p className="empty">
           {!canGenerate
             ? "Record a lesson or a debrief first."
             : busy
@@ -72,60 +72,79 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
               : "Nothing generated yet."}
         </p>
       ) : (
-        <div className="space-y-5 card p-5">
-          <Block title="What matters">
-            <p className="t-body">{summary.whatMatters}</p>
-          </Block>
+        <div className="card space-y-5 p-5">
+          <p className="text-[1.125rem] font-medium leading-snug">{summary.whatMatters}</p>
 
-          <Block title="Covered">
-            <List items={summary.covered} />
-          </Block>
-
-          <Block title="Struggled">
-            <Notes notes={summary.struggles} />
-          </Block>
-
-          <Block title="Improved">
-            <Notes notes={summary.improvements} />
-          </Block>
-
-          <Block title="Teaching signals">
-            {summary.teachingSignals.length === 0 ? (
-              <Empty />
-            ) : (
-              <ul className="space-y-2 t-small">
-                {summary.teachingSignals.map((s, i) => (
-                  <li key={i}>
-                    <span className="font-medium">{s.concept}</span>
-                    <span className="block text-muted">
-                      &ldquo;{s.correction}&rdquo;
-                    </span>
+          {summary.covered.length > 0 && (
+            <Block title="Covered">
+              <ul className="flex flex-wrap gap-1.5">
+                {summary.covered.map((item, i) => (
+                  <li key={i} className="rounded-lg bg-sunken px-2.5 py-1 t-small font-medium">
+                    {item}
                   </li>
                 ))}
               </ul>
-            )}
-          </Block>
+            </Block>
+          )}
 
-          <Block title="Next lesson">
-            <List items={summary.nextLesson} />
-          </Block>
+          {summary.struggles.length > 0 && (
+            <Block title="Struggled" tone="text-warn">
+              <Notes notes={summary.struggles} />
+            </Block>
+          )}
 
-          <p className="t-caption t-muted mt-5 border-t border-line pt-3">
-            {summary.model} &middot;{" "}
-            {new Date(summary.generatedAt).toLocaleString()}
-          </p>
+          {summary.nextLesson.length > 0 && (
+            <Block title="Next lesson">
+              <List items={summary.nextLesson} />
+            </Block>
+          )}
+
+          <details className="group border-t border-line pt-4">
+            <summary className="cursor-pointer font-semibold text-accent">
+              <span className="group-open:hidden">Full summary</span>
+              <span className="hidden group-open:inline">Less</span>
+            </summary>
+            <div className="mt-4 space-y-5">
+              <Block title="Improved">
+                <Notes notes={summary.improvements} />
+              </Block>
+              <Block title="Teaching signals">
+                {summary.teachingSignals.length === 0 ? (
+                  <Empty />
+                ) : (
+                  <ul className="space-y-3">
+                    {summary.teachingSignals.map((s, i) => (
+                      <li key={i}>
+                        <span className="block font-semibold">{s.concept}</span>
+                        <span className="block t-small t-muted">&ldquo;{s.correction}&rdquo;</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Block>
+              <p className="t-caption t-muted">
+                {summary.model} &middot; {new Date(summary.generatedAt).toLocaleString()}
+              </p>
+            </div>
+          </details>
         </div>
       )}
     </section>
   );
 }
 
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+function Block({
+  title,
+  tone = "",
+  children,
+}: {
+  title: string;
+  tone?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <h3 className="mb-1.5 t-eyebrow">
-        {title}
-      </h3>
+      <h3 className={`t-eyebrow mb-2 ${tone}`}>{title}</h3>
       {children}
     </div>
   );
@@ -134,7 +153,7 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 function List({ items }: { items: string[] }) {
   if (items.length === 0) return <Empty />;
   return (
-    <ul className="list-disc space-y-1 pl-5 t-small">
+    <ul className="list-disc space-y-1 pl-5">
       {items.map((item, i) => (
         <li key={i}>{item}</li>
       ))}
@@ -145,11 +164,11 @@ function List({ items }: { items: string[] }) {
 function Notes({ notes }: { notes: { what: string; evidence: string }[] }) {
   if (notes.length === 0) return <Empty />;
   return (
-    <ul className="space-y-2 t-small">
+    <ul className="space-y-3">
       {notes.map((n, i) => (
         <li key={i}>
-          {n.what}
-          <span className="block text-muted">&ldquo;{n.evidence}&rdquo;</span>
+          <span className="block font-semibold">{n.what}</span>
+          <span className="block t-small t-muted">&ldquo;{n.evidence}&rdquo;</span>
         </li>
       ))}
     </ul>

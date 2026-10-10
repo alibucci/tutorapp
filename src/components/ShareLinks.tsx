@@ -46,7 +46,6 @@ export function ShareLinks({ student }: { student: Student }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="t-subtitle">Private links</h2>
       <ul className="divide-y divide-line card">
         {links.map((link) => (
           <li

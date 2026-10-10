@@ -63,9 +63,7 @@ export function SkillReview({ lesson }: { lesson: Lesson }) {
   return (
     <section className="space-y-4">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="t-subtitle">
-          What this lesson changes for the student
-        </h2>
+        <h2 className="t-title">Topics</h2>
         {!changes && (
           <button
             onClick={() => void propose()}
@@ -86,7 +84,7 @@ export function SkillReview({ lesson }: { lesson: Lesson }) {
       )}
 
       {changes && changes.length === 0 && (
-        <p className="empty p-5 t-small t-muted">
+        <p className="empty">
           Nothing to change - this lesson did not move any topic on its own.
         </p>
       )}

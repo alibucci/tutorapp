@@ -84,6 +84,8 @@ export type ParentMessage = {
   zh: string;
   generatedAt: string;
   editedAt?: string;
+  /** When the tutor last copied it - the closest we get to "sent". */
+  copiedAt?: string;
   model: string;
 };
 
@@ -124,9 +126,9 @@ export type Lesson = {
 export type SkillStatus = "struggling" | "improving" | "solid";
 
 export const SKILL_STATUS_LABEL: Record<SkillStatus, string> = {
-  struggling: "needs work",
-  improving: "coming along",
-  solid: "solid",
+  struggling: "Needs work",
+  improving: "Coming along",
+  solid: "Solid",
 };
 
 export type Skill = {

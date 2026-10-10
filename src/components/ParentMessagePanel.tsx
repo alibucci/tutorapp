@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CopyIcon } from "@/components/ui";
 import type { Lesson } from "@/lib/types";
 
 /**
@@ -19,6 +20,7 @@ export function ParentMessagePanel({ lesson }: { lesson: Lesson }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [tab, setTab] = useState<"zh" | "en">("zh");
 
   if (!message) return null;
 
@@ -27,6 +29,12 @@ export function ParentMessagePanel({ lesson }: { lesson: Lesson }) {
       await navigator.clipboard.writeText(text);
       setCopied(id);
       window.setTimeout(() => setCopied(null), 2000);
+      // Copying is the closest thing to "sent"; it clears the home to-do.
+      if (!message?.copiedAt) {
+        void fetch(`/api/lessons/${lesson.id}/parent-message`, { method: "PATCH" }).then(
+          () => router.refresh(),
+        );
+      }
     } catch {
       setError("Could not copy. Select the text and copy it by hand.");
     }
@@ -50,78 +58,105 @@ export function ParentMessagePanel({ lesson }: { lesson: Lesson }) {
     router.refresh();
   }
 
+  const text = tab === "zh" ? message.zh : message.en;
+
   return (
     <section className="space-y-3">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className="t-subtitle">Message to the parent</h2>
-        <button
-          onClick={() => void copy("zh", message.zh)}
-          className="btn btn-primary btn-sm"
-        >
-          {copied === "zh" ? "Copied" : "Copy Chinese"}
-        </button>
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="t-title">Message to the parent</h2>
+        {message.copiedAt && <span className="tag tag-done">Copied</span>}
       </div>
 
-      <div className="card card-focus p-5">
-        <p className="t-eyebrow">中文 · for WeChat</p>
-        <p className="t-body mt-2 whitespace-pre-wrap">{message.zh}</p>
-      </div>
-
-      <div className="card p-5">
-        <div className="flex items-baseline justify-between gap-4">
-          <p className="t-eyebrow">English · the source</p>
-          {!editing && (
-            <span className="flex gap-2">
-              <button
-                onClick={() => void copy("en", message.en)}
-                className="btn btn-quiet btn-sm"
-              >
-                {copied === "en" ? "Copied" : "Copy"}
-              </button>
-              <button
-                onClick={() => {
-                  setDraft(message.en);
-                  setEditing(true);
-                }}
-                className="btn btn-quiet btn-sm"
-              >
-                Edit
-              </button>
-            </span>
-          )}
+      <div className="card overflow-hidden">
+        <div role="tablist" aria-label="Language" className="grid grid-cols-2 border-b border-line">
+          {(
+            [
+              ["zh", "中文 · WeChat"],
+              ["en", "English · edit"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => {
+                setTab(id);
+                setEditing(false);
+              }}
+              className={`min-h-12 font-semibold ${
+                tab === id
+                  ? "bg-surface shadow-[inset_0_-3px_0_var(--accent)]"
+                  : "bg-[#fafbfc] t-muted"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        {editing ? (
-          <>
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              rows={5}
-              className="field mt-2"
-            />
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => void save()}
-                disabled={busy || !draft.trim()}
-                className="btn btn-primary btn-sm"
+        <div className="space-y-4 p-5">
+          {editing ? (
+            <>
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={6}
+                className="field"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void save()}
+                  disabled={busy || !draft.trim()}
+                  className="btn btn-primary flex-1"
+                >
+                  {busy ? "Translating…" : "Save and translate"}
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  disabled={busy}
+                  className="btn btn-quiet"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p
+                lang={tab === "zh" ? "zh" : "en"}
+                className={`whitespace-pre-wrap ${tab === "zh" ? "text-[1.0625rem] leading-[1.75]" : ""}`}
               >
-                {busy ? "Translating…" : "Save and translate"}
-              </button>
-              <button
-                onClick={() => setEditing(false)}
-                disabled={busy}
-                className="btn btn-quiet btn-sm"
-              >
-                Cancel
-              </button>
-            </div>
-            <p className="hint">The Chinese above is rewritten from this.</p>
-          </>
-        ) : (
-          <p className="t-small mt-2 whitespace-pre-wrap">{message.en}</p>
-        )}
+                {text}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void copy(tab, text)}
+                  className="btn btn-primary btn-lg flex-1"
+                >
+                  <CopyIcon />
+                  {copied === tab ? "Copied" : tab === "zh" ? "Copy for WeChat" : "Copy English"}
+                </button>
+                {tab === "en" && (
+                  <button
+                    onClick={() => {
+                      setDraft(message.en);
+                      setEditing(true);
+                    }}
+                    className="btn btn-quiet btn-lg"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
+      <p className="t-small t-muted">
+        To change it, edit the English. The Chinese is translated again from it.
+      </p>
       {error && <p className="note note-warn">{error}</p>}
     </section>
   );

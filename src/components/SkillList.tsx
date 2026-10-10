@@ -1,10 +1,10 @@
 import { SKILL_STATUS_LABEL, type Skill, type SkillStatus } from "@/lib/types";
 
-/** Status reads as a quiet label, not a colour-coded verdict. */
-const DOT: Record<SkillStatus, string> = {
-  struggling: "var(--accent)",
-  improving: "var(--border-strong)",
-  solid: "var(--live)",
+/** Amber needs work, blue is on its way, green is done - the app-wide code. */
+const TAG: Record<SkillStatus, string> = {
+  struggling: "tag-warn",
+  improving: "tag-info",
+  solid: "tag-done",
 };
 
 export function SkillList({ skills }: { skills: Skill[] }) {
@@ -20,22 +20,15 @@ export function SkillList({ skills }: { skills: Skill[] }) {
     <ul className="card rows">
       {skills.map((skill) => (
         <li key={skill.topic} className="px-4 py-3.5">
-          <div className="flex items-baseline gap-2.5">
-            <span
-              aria-hidden
-              className="h-2 w-2 shrink-0 rounded-full"
-              style={{ background: DOT[skill.status] }}
-            />
-            <span className="t-body min-w-0 flex-1 font-medium">
-              {skill.topic}
-            </span>
-            <span className="t-caption t-muted shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <span className="min-w-0 font-semibold">{skill.topic}</span>
+            <span className={`tag ${TAG[skill.status]}`}>
               {SKILL_STATUS_LABEL[skill.status]}
             </span>
           </div>
-          <p className="t-small t-muted mt-1 pl-4.5">{skill.note}</p>
+          <p className="t-small t-muted mt-1">{skill.note}</p>
           {skill.practice && (
-            <p className="t-small mt-1.5 pl-4.5">
+            <p className="t-small mt-1.5">
               <span className="t-muted">Practice: </span>
               {skill.practice}
             </p>

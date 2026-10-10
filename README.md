@@ -287,7 +287,15 @@ deploy/                          Caddyfile, backup script, hosting notes
 ## Design
 
 Tokens and components live in `src/app/globals.css`; screens compose from them
-rather than inventing values. Type is chosen by role (`.t-hero`, `.t-display`,
+rather than inventing values. Colour carries one meaning each: green is done or
+go, amber is "this needs you", blue is in progress. The font is Figtree,
+bundled at build time like the game font. The design was drawn first as phone
+screens in Claude Design; on a wide screen the lesson and student pages split
+into two columns - what to read on the left, what to do on the right.
+
+The tutor's home is built around "Needs you": every recent lesson that is still
+waiting for a debrief, a review, its homework or its parent message shows up
+there until it is done. Type is chosen by role (`.t-hero`, `.t-display`,
 `.t-title`, `.t-body`, `.t-small`, `.t-caption`, `.t-eyebrow`), not by size.
 
 `[data-density="comfortable"]` raises the base size for the family pages and the

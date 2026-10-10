@@ -11,13 +11,12 @@ export function FamilyTabs({ studentName }: { studentName: string }) {
     { href: "/family", label: "For parents", on: path.startsWith("/family") },
   ];
   return (
-    <nav aria-label="Pages" className="flex gap-2">
+    <nav aria-label="Pages" className="segmented">
       {tabs.map((tab) => (
         <Link
           key={tab.href}
           href={tab.href}
           aria-current={tab.on ? "page" : undefined}
-          className={`pill ${tab.on ? "choice-on" : ""}`}
         >
           {tab.label}
         </Link>

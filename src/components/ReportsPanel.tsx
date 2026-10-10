@@ -39,12 +39,12 @@ export function ReportsPanel({
 
   return (
     <section className="space-y-4">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className="t-subtitle">Weekly note to parent</h2>
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="t-title">Weekly note</h2>
         <button
           onClick={() => void draft()}
           disabled={busy}
-          className="btn btn-quiet btn-sm"
+          className="btn btn-soft btn-sm"
         >
           {busy ? "Drafting..." : "Draft this week"}
         </button>
@@ -53,7 +53,7 @@ export function ReportsPanel({
       {error && <p className="note note-warn">{error}</p>}
 
       {reports.length === 0 ? (
-        <p className="empty p-6 t-small t-muted">
+        <p className="empty">
           No notes yet. A draft is written from the week&rsquo;s lessons; you
           read and edit it before the parent sees anything.
         </p>

@@ -27,18 +27,18 @@ export function GameStylePicker({
   }
 
   return (
-    <label className="block max-w-xs">
-      <span className="label">Game style for homework</span>
+    <label className="inline-flex">
+      <span className="sr-only">Game style for homework</span>
       <select
         value={value ?? ""}
         onChange={(e) => void change(e.target.value)}
         disabled={saving}
-        className="field"
+        className="min-h-9 cursor-pointer rounded-[var(--radius)] border border-line-strong bg-surface px-3 t-small font-semibold"
       >
-        {!value && <option value="">Pick one…</option>}
+        {!value && <option value="">Pick a game style…</option>}
         {GAME_STYLES.map((style) => (
           <option key={style.id} value={style.id}>
-            {style.name}
+            Homework: {style.name}
           </option>
         ))}
       </select>

@@ -41,7 +41,9 @@ export async function StudentHome({
         <p className="t-eyebrow">Hi, {student.name}</p>
         <h1 className="t-display mt-2">
           {open.length
-            ? "You have homework waiting."
+            ? open.length === 1
+              ? "A new quest is waiting."
+              : `${open.length} quests are waiting.`
             : first
               ? "Here's what to work on."
               : "Nothing outstanding right now."}
@@ -58,7 +60,10 @@ export async function StudentHome({
             >
               <span>
                 <span className="game-entry-kicker">{style.name} homework</span>
-                <span className="game-entry-title">New quest from {lesson.title}</span>
+                <span className="game-entry-title">Describe the picture</span>
+                <span className="game-entry-meta">
+                  From {lesson.title} · 3 tasks · 30 XP
+                </span>
               </span>
               <span aria-hidden className="game-entry-title">→</span>
             </Link>

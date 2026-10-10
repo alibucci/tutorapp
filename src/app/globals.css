@@ -9,27 +9,33 @@
 
 :root {
   /* Surfaces, from furthest back to closest. */
-  --background: #f6f7f9;
+  --background: #f5f6f8;
   --surface: #ffffff;
-  --sunken: #f1f3f6;
-  --border: #e3e6ec;
-  --border-strong: #cfd4de;
+  --sunken: #f0f2f5;
+  --border: #e4e7ec;
+  --border-strong: #d5dae2;
 
   /* Ink. */
-  --foreground: #15171c;
-  --muted: #5f6673;
+  --foreground: #12151b;
+  --muted: #5b6270;
 
-  /* One accent, one success. Nothing else carries meaning. */
-  --accent: #4a55c7;
-  --accent-hover: #3f49b4;
-  --accent-soft: #eef0fc;
-  --live: #0f7a56;
-  --live-soft: #e9f5f0;
+  /* Green means "done" and "go"; amber means "this needs you"; blue is a
+     neutral "in progress". Nothing else carries meaning, so a screen can be
+     read by colour at a glance. */
+  --accent: #0f7b63;
+  --accent-hover: #0a5c4a;
+  --accent-soft: #e7f4ef;
+  --live: #0f7b63;
+  --live-soft: #e7f4ef;
+  --warn: #9a4a06;
+  --warn-soft: #fdf1e3;
+  --info: #2f4fa8;
+  --info-soft: #e8eefb;
 
   /* Type scale. A single ratio, named by role rather than by size, so a
      screen never has to invent one. */
   --text-hero: 2.5rem;
-  --text-display: 1.75rem;
+  --text-display: 1.875rem;
   --text-title: 1.25rem;
   --text-subtitle: 1.0625rem;
   --text-body: 0.9375rem;
@@ -53,8 +59,8 @@
   --space-14: 3.5rem;
 
   --radius-sm: 0.375rem;
-  --radius: 0.625rem;
-  --radius-lg: 1rem;
+  --radius: 0.75rem;
+  --radius-lg: 0.875rem;
   --radius-pill: 999px;
 
   --shadow-sm: 0 1px 2px rgb(21 23 28 / 0.05);
@@ -77,7 +83,7 @@
 [data-density="comfortable"] {
   --text-body: 1rem;
   --text-subtitle: 1.1875rem;
-  --text-display: 1.875rem;
+  --text-display: 2rem;
   --text-hero: 2.75rem;
   --leading-normal: 1.65;
 }
@@ -94,7 +100,11 @@
   --color-accent-soft: var(--accent-soft);
   --color-live: var(--live);
   --color-live-soft: var(--live-soft);
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: var(--font-figtree), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -144,30 +154,30 @@ body {
 }
 .t-display {
   font-size: var(--text-display);
-  line-height: var(--leading-tight);
-  letter-spacing: -0.021em;
-  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 700;
 }
 .t-title {
   font-size: var(--text-title);
   line-height: var(--leading-tight);
-  letter-spacing: -0.014em;
-  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-weight: 700;
 }
 .t-subtitle {
   font-size: var(--text-subtitle);
   line-height: var(--leading-snug);
-  letter-spacing: -0.008em;
-  font-weight: 550;
+  letter-spacing: -0.005em;
+  font-weight: 600;
 }
 .t-body { font-size: var(--text-body); line-height: var(--leading-normal); }
 .t-small { font-size: var(--text-small); line-height: var(--leading-snug); }
 .t-caption { font-size: var(--text-caption); line-height: var(--leading-snug); }
 .t-eyebrow {
-  font-size: var(--text-eyebrow);
+  font-size: var(--text-caption);
   line-height: 1;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -188,7 +198,7 @@ body {
 
 .page { width: 100%; margin-inline: auto; padding-inline: var(--space-4); }
 .page-narrow { max-width: 34rem; }
-.page-wide { max-width: 56rem; }
+.page-wide { max-width: 68rem; }
 
 /* Vertical rhythm between top-level blocks of a screen. */
 .stack > * + * { margin-top: var(--space-6); }
@@ -205,7 +215,6 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
 }
 .card-pad { padding: var(--space-5); }
 .card-quiet { background: transparent; border-style: dashed; box-shadow: none; }
@@ -270,9 +279,10 @@ body {
   justify-content: center;
   gap: var(--space-2);
   border-radius: var(--radius);
-  padding: 0.5625rem var(--space-4);
-  font-size: var(--text-small);
-  font-weight: 550;
+  min-height: 2.75rem;
+  padding: 0.5rem var(--space-4);
+  font-size: var(--text-body);
+  font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
   cursor: pointer;
@@ -284,13 +294,15 @@ body {
 /* Instant confirmation that the interface heard the press. */
 .btn:active:not(:disabled) { transform: scale(0.97); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-lg { padding: 0.75rem var(--space-5); font-size: var(--text-body); }
-.btn-sm { padding: 0.375rem var(--space-3); font-size: var(--text-caption); }
+.btn-lg { min-height: 3.5rem; padding: 0.75rem var(--space-5); font-size: 1.0625rem; border-radius: var(--radius-lg); }
+.btn-sm { min-height: 2.25rem; padding: 0.375rem var(--space-3); font-size: var(--text-small); }
+.btn-block { display: flex; width: 100%; }
 
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:active:not(:disabled) { background: var(--accent-hover); }
 
 .btn-quiet { border: 1px solid var(--border-strong); background: var(--surface); color: var(--foreground); }
+.btn-soft { background: var(--accent-soft); color: var(--accent); }
 
 .btn-ghost { color: var(--muted); }
 
@@ -299,15 +311,17 @@ body {
   border: 1px solid var(--border-strong);
   background: var(--surface);
   border-radius: var(--radius);
-  padding: 0.5625rem var(--space-3);
+  min-height: 3rem;
+  padding: 0.625rem var(--space-4);
   font: inherit;
-  font-size: var(--text-body);
+  font-size: 1rem;
   color: var(--foreground);
 }
+textarea.field { line-height: var(--leading-normal); }
 .field::placeholder { color: color-mix(in oklab, var(--muted) 70%, transparent); }
 .field:disabled { background: var(--sunken); cursor: not-allowed; }
 
-.label { display: block; font-size: var(--text-small); font-weight: 550; margin-bottom: var(--space-2); }
+.label { display: block; font-size: var(--text-small); font-weight: 600; margin-bottom: var(--space-2); }
 .hint { display: block; font-size: var(--text-caption); line-height: var(--leading-snug); color: var(--muted); margin-top: var(--space-2); }
 .field-group > * + * { margin-top: var(--space-4); }
 
@@ -343,6 +357,7 @@ body {
   .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
   .btn-quiet:hover:not(:disabled) { background: var(--sunken); }
   .btn-ghost:hover:not(:disabled) { background: var(--sunken); color: var(--foreground); }
+  .btn-soft:hover:not(:disabled) { background: color-mix(in oklab, var(--accent-soft) 80%, var(--accent)); }
   .choice:hover { border-color: var(--border-strong); }
   .card-press:hover { border-color: var(--border-strong); }
 }
@@ -359,9 +374,116 @@ body {
 }
 .pill-done { border-color: color-mix(in oklab, var(--live) 40%, transparent); background: var(--live-soft); color: var(--live); }
 
+/* A status, in words and colour. Small and square-ish, never a button. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.5rem;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.tag-done { background: var(--live-soft); color: var(--live); }
+.tag-warn { background: var(--warn-soft); color: var(--warn); }
+.tag-info { background: var(--info-soft); color: var(--info); }
+.tag-quiet { background: var(--sunken); color: var(--muted); }
+/* Minecraft's grass block, as the chip's swatch. */
+.tag-minecraft { background: #edf5e4; color: #3b5323; }
+.tag-minecraft::before {
+  content: "";
+  width: 0.625rem;
+  height: 0.625rem;
+  background: #866043;
+  border-top: 4px solid #5b9b2c;
+  box-sizing: border-box;
+}
+
+/* A student's initial on a tile. The colour comes from the name, so the same
+   child is always the same colour. */
+.avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+}
+.avatar-md { width: 3rem; height: 3rem; font-size: 1.375rem; }
+.avatar-lg { width: 4rem; height: 4rem; font-size: 1.75rem; border-radius: 1.125rem; }
+
+/* "This needs you" rows on the tutor's home. */
+.todo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+.todo-icon {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border-radius: var(--radius);
+}
+
+/* The three steps after a lesson: a bar each, green when done, amber when
+   it is the one waiting. */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.375rem;
+}
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--muted);
+}
+.step::before {
+  content: "";
+  height: 4px;
+  border-radius: 4px;
+  background: var(--border-strong);
+}
+.step-done { color: var(--foreground); }
+.step-done::before { background: var(--accent); }
+.step-next { color: var(--foreground); }
+.step-next::before { background: var(--warn); }
+
+/* Two or three choices in one control: language tabs, family tabs. */
+.segmented {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--radius);
+  background: #e9ecf1;
+}
+.segmented > * {
+  display: grid;
+  place-items: center;
+  min-height: 2.25rem;
+  padding: 0 0.875rem;
+  border-radius: 0.5625rem;
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--muted);
+  transition: background-color var(--dur-hover) ease, color var(--dur-hover) ease;
+}
+.segmented > [aria-current="page"],
+.segmented > [aria-selected="true"] {
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 1px 2px rgb(18 21 27 / 0.08);
+}
+
 .note { border-radius: var(--radius); padding: var(--space-3) var(--space-4); font-size: var(--text-small); line-height: var(--leading-snug); }
 .note-accent { background: var(--accent-soft); color: var(--foreground); }
-.note-warn { background: var(--accent-soft); border: 1px solid var(--accent); }
+.note-warn { background: var(--warn-soft); color: var(--warn); }
 .note-quiet { background: var(--sunken); color: var(--muted); }
 
 .empty {
@@ -738,6 +860,12 @@ body {
   font-size: 0.625rem;
   color: #ffff55;
   text-shadow: 2px 2px 0 #3f3f15;
+}
+.game-entry-meta {
+  display: block;
+  margin-top: 10px;
+  font-size: var(--text-small);
+  color: #e8ddd2;
 }
 .game-entry-minecraft .game-entry-title {
   margin-top: 10px;

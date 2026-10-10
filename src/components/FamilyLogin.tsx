@@ -68,8 +68,8 @@ export function FamilyLogin({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="t-subtitle">Family sign-in</h2>
-        <p className="t-caption t-muted mt-1">
+        <h2 className="t-title">Family sign-in</h2>
+        <p className="t-small t-muted mt-1">
           One sign-in for {studentName} and their parent. Inside there are two
           tabs: homework and goals for {studentName}, weekly notes for the parent.
         </p>
@@ -101,34 +101,25 @@ export function FamilyLogin({
         </div>
       )}
 
-      <div className="card flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <span className="t-small">
+      <div className="card space-y-4 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className="t-small t-muted">Username</span>
           {username ? (
-            <>
-              Username <span className="font-mono">{username}</span>
-            </>
+            <span className="font-mono text-[1.0625rem] font-semibold">{username}</span>
           ) : (
-            <span className="t-muted">No sign-in yet</span>
+            <span className="t-small t-muted">No sign-in yet</span>
           )}
-        </span>
-        <span className="flex shrink-0 gap-2">
-          <button
-            onClick={() => void issue()}
-            disabled={busy}
-            className="btn btn-quiet btn-sm"
-          >
+        </div>
+        <div className={`grid gap-2 ${username ? "grid-cols-2" : ""}`}>
+          <button onClick={() => void issue()} disabled={busy} className="btn btn-quiet">
             {busy ? "…" : username ? "Reset password" : "Create sign-in"}
           </button>
           {username && (
-            <button
-              onClick={() => void remove()}
-              disabled={busy}
-              className="btn btn-ghost btn-sm"
-            >
+            <button onClick={() => void remove()} disabled={busy} className="btn btn-quiet">
               Remove
             </button>
           )}
-        </span>
+        </div>
       </div>
       {error && <p className="note note-warn">{error}</p>}
     </section>

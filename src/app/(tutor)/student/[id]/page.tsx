@@ -5,8 +5,10 @@ import { GameStylePicker } from "@/components/GameStylePicker";
 import { ReportsPanel } from "@/components/ReportsPanel";
 import { ShareLinks } from "@/components/ShareLinks";
 import { SkillList } from "@/components/SkillList";
+import { Avatar, ChevronLeft, ChevronRight } from "@/components/ui";
 import { studentFor } from "@/lib/access";
 import { listLessons, listReports } from "@/lib/store";
+import type { Lesson } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -25,71 +27,109 @@ export default async function StudentPage({
     listReports(id),
   ]);
 
+  const since = lessons.at(-1)?.createdAt ?? student.createdAt;
+
   return (
     <div className="stack-lg">
-      <header>
-        <Link href="/" className="t-small t-muted">
-          ← Students
+      <header className="space-y-4">
+        <Link
+          href="/"
+          aria-label="Back to students"
+          className="-ml-3 grid h-11 w-11 place-items-center rounded-[var(--radius)]"
+        >
+          <ChevronLeft />
         </Link>
-        <h1 className="t-display mt-2">
-          {student.name}
-        </h1>
-        <p className="t-body t-muted mt-2">
-          {lessons.length} lessons &middot; {student.skills.length} topics
-          tracked
-        </p>
+        <div className="flex items-center gap-4">
+          <Avatar name={student.name} size="lg" />
+          <div className="min-w-0">
+            <h1 className="t-display truncate">{student.name}</h1>
+            <p className="t-small t-muted mt-1">
+              {lessons.length} {lessons.length === 1 ? "lesson" : "lessons"} · since{" "}
+              {DATE.format(new Date(since))}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <GameStylePicker studentId={student.id} value={student.gameStyle} />
+          <span className="tag tag-quiet min-h-9 px-3 t-small">
+            {student.recordingConsent ? "Both voices recorded" : "Tutor's voice only"}
+          </span>
+        </div>
       </header>
 
-      <GameStylePicker studentId={student.id} value={student.gameStyle} />
-
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
+      <div className="stack-lg min-w-0">
       <section className="space-y-3">
-        <h2 className="t-subtitle">Topics</h2>
+        <h2 className="t-title">Working on</h2>
         <SkillList skills={student.skills} />
       </section>
 
-      <ReportsPanel student={student} reports={reports} />
+      {lessons.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="t-title">Lessons</h2>
+          <ul className="card rows">
+            {lessons.map((lesson) => {
+              const next = nextStep(lesson);
+              return (
+                <li key={lesson.id}>
+                  <Link
+                    href={`/lesson/${lesson.id}/review`}
+                    className="row row-link py-3.5"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{lesson.title}</span>
+                      <span className="block t-small t-muted">
+                        {DATE.format(new Date(lesson.createdAt))} ·{" "}
+                        {lesson.mode === "classroom" ? "in the room" : "online"}
+                      </span>
+                    </span>
+                    <span className={`shrink-0 t-small font-semibold ${next.tone}`}>
+                      {next.text}
+                    </span>
+                    <span className="t-muted">
+                      <ChevronRight />
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
+      </div>
+
+      <div className="stack-lg min-w-0">
       <FamilyLogin
         studentId={student.id}
         studentName={student.name}
         username={student.login?.username}
       />
 
-      <ShareLinks student={student} />
+      <ReportsPanel student={student} reports={reports} />
 
-      {lessons.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="t-subtitle">Lessons</h2>
-          <ul className="divide-y divide-line card">
-            {lessons.map((lesson) => (
-              <li key={lesson.id}>
-                <Link
-                  href={`/lesson/${lesson.id}/review`}
-                  className="flex items-baseline justify-between gap-4 px-4 py-3"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate t-small">
-                      {lesson.title}
-                    </span>
-                    <span className="block t-caption t-muted">
-                      {lesson.createdAt.slice(0, 10)}
-                    </span>
-                  </span>
-                  <span className="shrink-0 t-caption t-muted">
-                    {lesson.homework?.answers
-                      ? "homework handed in"
-                      : lesson.homework?.sentAt
-                        ? "homework sent"
-                        : lesson.summary
-                          ? "needs homework"
-                          : "no summary"}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <details className="card group">
+        <summary className="flex cursor-pointer items-center justify-between gap-4 p-4 font-semibold">
+          Private links, no password
+          <span className="t-small t-muted font-normal group-open:hidden">Show</span>
+        </summary>
+        <div className="border-t border-line p-4">
+          <ShareLinks student={student} />
+        </div>
+      </details>
+      </div>
+      </div>
     </div>
   );
+}
+
+const DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+
+/** What this lesson is still waiting for, in the app's colours. */
+function nextStep(lesson: Lesson): { text: string; tone: string } {
+  if (lesson.homework?.answers) return { text: "Homework done", tone: "text-live" };
+  if (lesson.homework?.sentAt) return { text: "Homework sent", tone: "t-muted" };
+  if (lesson.summary) return { text: "Send homework", tone: "text-warn" };
+  if (lesson.debrief.length) return { text: "Review", tone: "text-warn" };
+  return { text: "Debrief", tone: "text-warn" };
 }
