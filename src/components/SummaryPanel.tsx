@@ -77,14 +77,29 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
               : "Nothing generated yet."}
         </p>
       ) : (
-        <div className="card space-y-5 p-5">
-          <p className="text-[1.125rem] font-medium leading-snug">{summary.whatMatters}</p>
+        <div className="card space-y-6 p-5">
+          {/* The one line that matters most, set apart from everything else. */}
+          <div className="flex gap-3 rounded-[var(--radius)] bg-accent-soft p-4">
+            <span className="mt-0.5 shrink-0 text-accent">
+              <TargetIcon />
+            </span>
+            <div>
+              <p className="t-eyebrow text-accent!">What matters</p>
+              <p className="mt-1.5 text-[1.0625rem] font-medium leading-snug">
+                {summary.whatMatters}
+              </p>
+            </div>
+          </div>
 
           {summary.covered.length > 0 && (
-            <Block title="Covered">
+            <Block title="Covered" tone="done" icon={<CheckIcon />}>
               <ul className="flex flex-wrap gap-1.5">
                 {summary.covered.map((item, i) => (
-                  <li key={i} className="rounded-lg bg-sunken px-2.5 py-1 t-small font-medium">
+                  <li
+                    key={i}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-live-soft px-2.5 py-1 t-small font-medium text-live"
+                  >
+                    <CheckIcon size={14} />
                     {item}
                   </li>
                 ))}
@@ -93,14 +108,23 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
           )}
 
           {summary.struggles.length > 0 && (
-            <Block title="Struggled" tone="text-warn">
-              <Notes notes={summary.struggles} />
+            <Block title="Struggled" tone="warn" icon={<AlertIcon />}>
+              <Notes notes={summary.struggles} tone="warn" />
             </Block>
           )}
 
           {summary.nextLesson.length > 0 && (
-            <Block title="Next lesson">
-              <List items={summary.nextLesson} />
+            <Block title="Next lesson" tone="info" icon={<ArrowIcon />}>
+              <ol className="space-y-2.5">
+                {summary.nextLesson.map((item, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-info text-xs font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <span className="pt-0.5">{item}</span>
+                  </li>
+                ))}
+              </ol>
             </Block>
           )}
 
@@ -109,26 +133,22 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
               <span className="group-open:hidden">Full summary</span>
               <span className="hidden group-open:inline">Less</span>
             </summary>
-            <div className="mt-4 space-y-5">
-              <Block title="Improved">
-                <Notes notes={summary.improvements} />
+            <div className="mt-5 space-y-6">
+              <Block title="Improved" tone="done" icon={<TrendIcon />}>
+                <Notes notes={summary.improvements} tone="done" />
               </Block>
-              <Block title="Teaching signals">
-                {summary.teachingSignals.length === 0 ? (
-                  <Empty />
-                ) : (
-                  <ul className="space-y-3">
-                    {summary.teachingSignals.map((s, i) => (
-                      <li key={i}>
-                        <span className="block font-semibold">{s.concept}</span>
-                        <span className="block t-small t-muted">&ldquo;{s.correction}&rdquo;</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+              <Block title="Teaching signals" tone="info" icon={<BulbIcon />}>
+                <Notes
+                  notes={summary.teachingSignals.map((s) => ({
+                    what: s.concept,
+                    evidence: s.correction,
+                  }))}
+                  tone="info"
+                />
               </Block>
               <p className="t-caption t-muted">
-                {summary.model} &middot; {new Date(summary.generatedAt).toLocaleString()}
+                {summary.model} &middot;{" "}
+                {new Date(summary.generatedAt).toLocaleString("en-GB")}
               </p>
             </div>
           </details>
@@ -138,42 +158,57 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
   );
 }
 
+type Tone = "done" | "warn" | "info";
+
+/** Each colour carries the meaning it has everywhere else in the app. */
+const TONE: Record<Tone, { tile: string; text: string; card: string }> = {
+  // `!`: .t-eyebrow sets its own grey, and it sits outside Tailwind's layer.
+  done: { tile: "bg-live-soft text-live", text: "text-live!", card: "bg-live-soft" },
+  warn: { tile: "bg-warn-soft text-warn", text: "text-warn!", card: "bg-warn-soft" },
+  info: { tile: "bg-info-soft text-info", text: "text-info!", card: "bg-info-soft" },
+};
+
 function Block({
   title,
-  tone = "",
+  tone,
+  icon,
   children,
 }: {
   title: string;
-  tone?: string;
+  tone: Tone;
+  icon: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <h3 className={`t-eyebrow mb-2 ${tone}`}>{title}</h3>
+    <section>
+      <h3 className="mb-3 flex items-center gap-2.5">
+        <span className={`grid h-7 w-7 place-items-center rounded-lg ${TONE[tone].tile}`}>
+          {icon}
+        </span>
+        <span className={`t-eyebrow ${TONE[tone].text}`}>{title}</span>
+      </h3>
       {children}
-    </div>
+    </section>
   );
 }
 
-function List({ items }: { items: string[] }) {
-  if (items.length === 0) return <Empty />;
-  return (
-    <ul className="list-disc space-y-1 pl-5">
-      {items.map((item, i) => (
-        <li key={i}>{item}</li>
-      ))}
-    </ul>
-  );
-}
-
-function Notes({ notes }: { notes: { what: string; evidence: string }[] }) {
+/** One tinted card per point, so points read as separate things. */
+function Notes({
+  notes,
+  tone,
+}: {
+  notes: { what: string; evidence: string }[];
+  tone: Tone;
+}) {
   if (notes.length === 0) return <Empty />;
   return (
-    <ul className="space-y-3">
+    <ul className="space-y-2">
       {notes.map((n, i) => (
-        <li key={i}>
+        <li key={i} className={`rounded-[var(--radius)] px-4 py-3 ${TONE[tone].card}`}>
           <span className="block font-semibold">{n.what}</span>
-          <span className="block t-small t-muted">&ldquo;{n.evidence}&rdquo;</span>
+          {n.evidence && (
+            <span className="mt-1 block t-small italic t-muted">&ldquo;{n.evidence}&rdquo;</span>
+          )}
         </li>
       ))}
     </ul>
@@ -183,3 +218,45 @@ function Notes({ notes }: { notes: { what: string; evidence: string }[] }) {
 function Empty() {
   return <p className="t-small t-muted">Nothing in the source for this.</p>;
 }
+
+function Icon({ children, size = 16 }: { children: React.ReactNode; size?: number }) {
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </svg>
+  );
+}
+const TargetIcon = () => (
+  <Icon size={20}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1" />
+  </Icon>
+);
+const CheckIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M20 6 9 17l-5-5" />
+  </Icon>
+);
+const AlertIcon = () => (
+  <Icon>
+    <path d="M12 9v4M12 17h.01" />
+    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+  </Icon>
+);
+const ArrowIcon = () => (
+  <Icon>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </Icon>
+);
+const TrendIcon = () => (
+  <Icon>
+    <path d="m3 17 6-6 4 4 8-8M15 7h6v6" />
+  </Icon>
+);
+const BulbIcon = () => (
+  <Icon>
+    <path d="M9 18h6M10 22h4" />
+    <path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />
+  </Icon>
+);
