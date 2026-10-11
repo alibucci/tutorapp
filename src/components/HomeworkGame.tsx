@@ -186,6 +186,13 @@ export function HomeworkGame({
               +{TASKS.length * XP_PER_TASK} {style.words.reward}. Your tutor will
               read your answers.
             </p>
+            {answered && (
+              <div className="mt-4 space-y-3">
+                <Answer label={TASKS[0].prompt} text={answered.describe} />
+                <Answer label={TASKS[1].prompt} text={answered.next} />
+                <Answer label="Your three words" text={answered.adjectives.join(" · ")} />
+              </div>
+            )}
             <Link href={backHref} className="game-button mt-4 block">
               Back
             </Link>
@@ -215,6 +222,15 @@ export function HomeworkGame({
           </ol>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Answer({ label, text }: { label: string; text: string }) {
+  return (
+    <div>
+      <p className="game-hint">{label}</p>
+      <p className="game-answer mt-1">{text}</p>
     </div>
   );
 }

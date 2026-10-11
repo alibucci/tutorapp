@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { pixelFont } from "@/lib/fonts";
 import { gameStyle } from "@/lib/gameStyles";
+import { XP_PER_LEVEL, XP_PER_QUEST, homeworkImageUrl } from "@/lib/homework";
 import { listLessons } from "@/lib/store";
 import type { Skill, Student } from "@/lib/types";
 
@@ -20,16 +21,24 @@ import type { Skill, Student } from "@/lib/types";
 export async function StudentHome({
   student,
   questHref,
+  linkKey,
 }: {
   student: Student;
   /** Where one lesson's homework opens, for this way of getting in. */
   questHref: (lessonId: string) => string;
+  /** The private link's key, when the child came in by link. */
+  linkKey?: string;
 }) {
   const quests = (await listLessons(student.id)).filter(
     (l) => l.homework?.sentAt,
   );
   const open = quests.filter((l) => !l.homework?.answers);
+  const finished = quests.filter((l) => l.homework?.answers);
   const style = gameStyle(student.gameStyle);
+
+  const xp = finished.length * XP_PER_QUEST;
+  const level = Math.floor(xp / XP_PER_LEVEL) + 1;
+  const toNext = (xp % XP_PER_LEVEL) / XP_PER_LEVEL;
 
   const working = student.skills.filter((s) => s.status !== "solid").slice(0, 3);
   const done = student.skills.filter((s) => s.status === "solid");
@@ -44,9 +53,13 @@ export async function StudentHome({
             ? open.length === 1
               ? "A new quest is waiting."
               : `${open.length} quests are waiting.`
-            : first
-              ? "Here's what to work on."
-              : "Nothing outstanding right now."}
+            : finished.length
+              ? first
+                ? "Quests done! Here's what's next."
+                : "All quests done. Nice work!"
+              : first
+                ? "Here's what to work on."
+                : "Nothing outstanding right now."}
         </h1>
       </header>
 
@@ -71,7 +84,24 @@ export async function StudentHome({
         </section>
       )}
 
-      {!first && done.length === 0 && open.length === 0 && (
+      {finished.length > 0 && (
+        // Progress, the way the game shows it: a level and a filling bar.
+        <section className={`game-stats game-stats-${style.id} ${pixelFont.variable}`}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="game-stats-level">Level {level}</span>
+            <span className="game-stats-xp">{xp} XP</span>
+          </div>
+          <div className="game-stats-bar" aria-label={`${Math.round(toNext * 100)}% to level ${level + 1}`}>
+            <div className="game-stats-fill" style={{ width: `${Math.max(4, toNext * 100)}%` }} />
+          </div>
+          <p className="game-stats-note">
+            {finished.length} {finished.length === 1 ? "quest" : "quests"} done ·{" "}
+            {XP_PER_LEVEL - (xp % XP_PER_LEVEL)} XP to level {level + 1}
+          </p>
+        </section>
+      )}
+
+      {!first && done.length === 0 && quests.length === 0 && (
         <p className="empty">
           Nothing here yet. It fills in after your next lesson.
         </p>
@@ -79,11 +109,29 @@ export async function StudentHome({
 
       {first && <FocusGoal skill={first} />}
 
-      {quests.length > open.length && (
-        <p className="t-small t-muted">
-          {quests.length - open.length} quest
-          {quests.length - open.length === 1 ? "" : "s"} done
-        </p>
+      {finished.length > 0 && (
+        <section>
+          <h2 className="t-eyebrow mb-3">Your quests</h2>
+          <ul className="grid grid-cols-2 gap-3">
+            {finished.map((lesson) => {
+              const src = homeworkImageUrl(lesson, linkKey);
+              return (
+                <li key={lesson.id}>
+                  <Link href={questHref(lesson.id)} className="quest-tile card-press">
+                    {src && (
+                      // eslint-disable-next-line @next/next/no-img-element -- private upload
+                      <img src={src} alt="" className="quest-tile-img" />
+                    )}
+                    <span className={`quest-tile-badge ${pixelFont.variable}`}>
+                      +{XP_PER_QUEST} XP
+                    </span>
+                    <span className="quest-tile-label">{lesson.title}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       {rest.length > 0 && (

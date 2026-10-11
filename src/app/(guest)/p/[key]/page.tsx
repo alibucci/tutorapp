@@ -15,5 +15,5 @@ export default async function ParentView({
   const { key } = await params;
   const student = await getStudentByKey("parentKey", key);
   if (!student) notFound();
-  return <ParentHome student={student} />;
+  return <ParentHome student={student} linkKey={key} />;
 }

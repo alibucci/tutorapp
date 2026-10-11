@@ -225,11 +225,11 @@ const report = await a(`/api/students/${sA.id}/reports`, post({}));
 check("parent note drafted", Boolean(report.json?.body?.trajectory), report.json?.error);
 
 const parentBefore = (await anon(`/p/${keys.parentKey}`)).text;
-check("parent sees nothing before approval", parentBefore.includes("No notes yet"));
+check("parent sees nothing before approval", parentBefore.includes("No weekly note yet"));
 
 await a(`/api/reports/${report.json.id}`, patch({ approved: true }));
 const parentAfter = (await anon(`/p/${keys.parentKey}`)).text;
-check("parent sees the note after approval", !parentAfter.includes("No notes yet"));
+check("parent sees the note after approval", !parentAfter.includes("No weekly note yet"));
 
 // --- what a tutor may write ------------------------------------------------
 // Both of these were exploitable: a blanket Partial<> on the two PATCH routes
@@ -412,6 +412,9 @@ function picture(bytes) {
     (await answer({ describe: "again", next: "again", adjectives: ["a", "b", "c"] })).status === 409);
   const hw = (await a(`/api/lessons/${lessonA.id}`)).json.homework;
   check("the tutor sees the answers", hw?.answers?.adjectives?.join() === "calm,warm,sleepy");
+  check("once handed in, the parent link sees the picture", (await img(keys.parentKey)).status === 200);
+  check("the parent page lists the homework and the answers",
+    (await anon(`/p/${keys.parentKey}`)).text.includes("sleepy"));
   check("answered homework cannot be taken back",
     (await a(`/api/lessons/${lessonA.id}/homework`, patch({ send: false }))).status === 409);
 }
@@ -433,7 +436,7 @@ function picture(bytes) {
   check("the family signs in with a username", signIn.json?.next === "/me", signIn.text);
   check("one sign-in opens the child's page", (await family("/me")).status === 200);
   check("the same sign-in opens the parent's page",
-    !(await family("/family")).text.includes("No notes yet"));
+    !(await family("/family")).text.includes("No weekly note yet"));
   check("the family can open the homework picture",
     (await family(`/api/lessons/${lessonA.id}/homework/image`)).status === 200);
   check("a family session is not a tutor session",
