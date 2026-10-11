@@ -8,6 +8,12 @@
 export type GameStyle = {
   id: string;
   name: string;
+  /**
+   * How pictures in this style are described to the image model. Never the
+   * game's name or its characters: the service refuses prompts it reads as
+   * trademark use, and we should not be asking for them anyway.
+   */
+  imageStyle: string;
   words: {
     start: string;
     step: string;
@@ -21,6 +27,8 @@ export const GAME_STYLES: GameStyle[] = [
   {
     id: "minecraft",
     name: "Minecraft",
+    imageStyle:
+      "3D voxel art: a blocky world built entirely from cubes, cube-shaped trees, square sun, blocky characters with square heads, pixelated textures, bright saturated colours, soft daylight, video game screenshot look",
     words: {
       start: "Start the quest",
       step: "Level",

@@ -79,15 +79,37 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!found) {
     return NextResponse.json({ error: "No such lesson." }, { status: 404 });
   }
-  const parsed = await readJson<{ focus?: string; send?: boolean }>(request, LIMIT.small);
+  const parsed = await readJson<{ focus?: string; send?: boolean; pick?: string }>(
+    request,
+    LIMIT.small,
+  );
   if (parsed instanceof Response) return parsed;
   const body = parsed;
 
   let problem: { error: string; status: number } | null = null;
+  let dropped: string[] = [];
   const lesson = await updateLesson(id, (current) => {
     const next: Homework = {
       ...(current.homework ?? blankHomework(current.summary?.homeworkFocus)),
     };
+    // Choosing one of the drawn options makes it the picture; the rest, and
+    // the picture it replaces, go.
+    if (typeof body.pick === "string") {
+      if (next.answers) {
+        problem = { error: "It has already been answered.", status: 409 };
+        return null;
+      }
+      if (!next.candidates?.includes(body.pick)) {
+        problem = { error: "That picture is not one of the options.", status: 400 };
+        return null;
+      }
+      dropped = [
+        ...next.candidates.filter((n) => n !== body.pick),
+        ...(next.imageFile && next.imageFile !== body.pick ? [next.imageFile] : []),
+      ];
+      next.imageFile = body.pick;
+      next.candidates = [];
+    }
     if (typeof body.focus === "string") next.focus = body.focus.trim().slice(0, 300);
     if (body.send === true) {
       if (!next.imageFile) {
@@ -110,5 +132,6 @@ export async function PATCH(request: Request, { params }: Params) {
     const { error, status } = problem;
     return NextResponse.json({ error }, { status });
   }
+  await Promise.all(dropped.map((n) => deleteImage(n)));
   return NextResponse.json(lesson?.homework);
 }

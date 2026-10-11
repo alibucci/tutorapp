@@ -244,6 +244,10 @@ export type Homework = {
   imageFile?: string;
   /** One line for the child on what to practise while answering. */
   focus: string;
+  /** Pictures drawn for this lesson, waiting for the tutor to pick one. */
+  candidates?: string[];
+  /** The scene they were drawn from, kept so a redraw can vary it. */
+  scene?: string;
   /** The child sees nothing until the tutor sends it. */
   sentAt?: string;
   answers?: HomeworkAnswers;

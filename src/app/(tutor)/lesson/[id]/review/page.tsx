@@ -6,6 +6,8 @@ import { SkillReview } from "@/components/SkillReview";
 import { SummaryPanel } from "@/components/SummaryPanel";
 import { ChevronLeft } from "@/components/ui";
 import { lessonFor } from "@/lib/access";
+import { gameStyle } from "@/lib/gameStyles";
+import { canDrawPictures } from "@/lib/imageGen";
 import { DEBRIEF_PROMPTS, INTERRUPTION_LABEL } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -117,7 +119,12 @@ export default async function ReviewPage({
 
       <div className="stack-lg min-w-0">
       {lesson.summary && (
-        <HomeworkPanel lesson={lesson} studentName={student?.name ?? "the student"} />
+        <HomeworkPanel
+          lesson={lesson}
+          studentName={student?.name ?? "the student"}
+          styleName={gameStyle(student?.gameStyle).name}
+          canDraw={canDrawPictures()}
+        />
       )}
 
       <div id="parent" className="scroll-mt-20">

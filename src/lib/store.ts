@@ -288,17 +288,24 @@ export async function listReports(studentId?: string): Promise<ParentReport[]> {
 // --- homework pictures -----------------------------------------------------
 
 /** A fresh name per upload, so a replaced picture is never served from cache. */
-export async function saveImage(lessonId: string, data: ArrayBuffer): Promise<string> {
+/** Our own picture names only: never a path, never another extension. */
+const IMAGE_NAME = /^[\w-]+\.(jpg|png|webp)$/;
+
+export async function saveImage(
+  lessonId: string,
+  data: ArrayBuffer,
+  ext: "jpg" | "png" | "webp" = "jpg",
+): Promise<string> {
   if (!SAFE_ID.test(lessonId)) throw new Error("Bad lesson id.");
   await ensureDirs();
-  const name = `${lessonId}-${randomBytes(6).toString("hex")}.jpg`;
+  const name = `${lessonId}-${randomBytes(6).toString("hex")}.${ext}`;
   await fs.writeFile(path.join(IMAGE_DIR, name), Buffer.from(data));
   return name;
 }
 
 export async function readImage(name: string): Promise<Buffer | null> {
   // Names are generated here; anything else is not ours to read.
-  if (!/^[\w-]+\.jpg$/.test(name)) return null;
+  if (!IMAGE_NAME.test(name)) return null;
   try {
     return await fs.readFile(path.join(IMAGE_DIR, name));
   } catch {
@@ -307,6 +314,6 @@ export async function readImage(name: string): Promise<Buffer | null> {
 }
 
 export async function deleteImage(name: string | undefined): Promise<void> {
-  if (!name || !/^[\w-]+\.jpg$/.test(name)) return;
+  if (!name || !IMAGE_NAME.test(name)) return;
   await fs.rm(path.join(IMAGE_DIR, name), { force: true });
 }

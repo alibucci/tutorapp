@@ -2,7 +2,7 @@
 
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImageIcon } from "@/components/ui";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type Lesson } from "@/lib/types";
 
@@ -44,9 +44,15 @@ async function toJpeg(file: File): Promise<Blob> {
 export function HomeworkPanel({
   lesson,
   studentName,
+  styleName,
+  canDraw,
 }: {
   lesson: Lesson;
   studentName: string;
+  /** The student's game style, for the button's wording. */
+  styleName: string;
+  /** Whether this server can draw pictures (an image API key is set). */
+  canDraw: boolean;
 }) {
   const router = useRouter();
   const homework = lesson.homework;
@@ -59,6 +65,34 @@ export function HomeworkPanel({
 
   const sent = Boolean(homework?.sentAt);
   const answers = homework?.answers;
+  const candidates = homework?.candidates ?? [];
+  const [seconds, setSeconds] = useState(0);
+
+  // Drawing takes from a few seconds to a minute or two; count it out loud.
+  useEffect(() => {
+    if (busy !== "draw") return;
+    const timer = window.setInterval(() => setSeconds((n) => n + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [busy]);
+
+  async function draw() {
+    setBusy("draw");
+    setSeconds(0);
+    setError(null);
+    const result = await api(
+      `/api/lessons/${lesson.id}/homework/draw`,
+      { method: "POST" },
+      "Could not draw the pictures. Try again.",
+    );
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
+  const imageUrl = (file: string) => `/api/lessons/${lesson.id}/homework/image?f=${file}`;
 
   async function upload(file: File) {
     setBusy("upload");
@@ -83,7 +117,10 @@ export function HomeworkPanel({
     }
   }
 
-  async function patch(payload: { focus?: string; send?: boolean }, label: string) {
+  async function patch(
+    payload: { focus?: string; send?: boolean; pick?: string },
+    label: string,
+  ) {
     setBusy(label);
     setError(null);
     const result = await api(
@@ -123,22 +160,80 @@ export function HomeworkPanel({
           />
         )}
 
-        {homework?.imageFile ? (
+        {busy === "draw" ? (
+          <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-[var(--radius)] bg-accent-soft text-center">
+            <SparkIcon />
+            <span className="font-semibold">Drawing {styleName} pictures… {seconds}s</span>
+            <span className="t-small t-muted px-6">
+              Usually under a minute. You can leave this page - they will be here
+              when you come back.
+            </span>
+          </div>
+        ) : candidates.length > 0 && !answers ? (
+          // Options drawn, none picked yet: the tutor chooses.
+          <div className="space-y-3">
+            <p className="t-small font-semibold">Tap the picture to use</p>
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {candidates.map((file) => (
+                <li key={file}>
+                  <button
+                    type="button"
+                    onClick={() => void patch({ pick: file }, "pick")}
+                    disabled={busy !== null}
+                    className="card-press block w-full overflow-hidden rounded-[var(--radius)] border-2 border-transparent hover:border-accent"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- private, per-lesson */}
+                    <img src={imageUrl(file)} alt="A drawn option" className="aspect-[4/3] w-full bg-sunken object-cover" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => void draw()} disabled={busy !== null} className="btn btn-quiet btn-sm">
+                Draw different ones
+              </button>
+              <label htmlFor={`hw-file-${lesson.id}`} className="btn btn-ghost btn-sm cursor-pointer">
+                Upload my own
+              </label>
+            </div>
+          </div>
+        ) : homework?.imageFile ? (
           <div className="space-y-2">
             {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-lesson upload; nothing to optimise */}
             <img
-              src={`/api/lessons/${lesson.id}/homework/image?f=${homework.imageFile}`}
+              src={imageUrl(homework.imageFile)}
               alt="Homework picture"
               className="max-h-80 w-full rounded-[var(--radius)] bg-sunken object-contain"
             />
             {!answers && (
-              <label
-                htmlFor={`hw-file-${lesson.id}`}
-                className="btn btn-ghost btn-sm cursor-pointer"
-              >
-                {busy === "upload" ? "Uploading…" : "Replace picture"}
-              </label>
+              <div className="flex flex-wrap gap-2">
+                {canDraw && (
+                  <button onClick={() => void draw()} disabled={busy !== null} className="btn btn-ghost btn-sm">
+                    Draw new ones
+                  </button>
+                )}
+                <label htmlFor={`hw-file-${lesson.id}`} className="btn btn-ghost btn-sm cursor-pointer">
+                  {busy === "upload" ? "Uploading…" : "Upload my own"}
+                </label>
+              </div>
             )}
+          </div>
+        ) : canDraw ? (
+          <div className="space-y-2">
+            <button
+              onClick={() => void draw()}
+              disabled={busy !== null}
+              className="flex h-44 w-full flex-col items-center justify-center gap-2 rounded-[var(--radius)] border-[1.5px] border-dashed border-accent bg-accent-soft font-semibold text-accent"
+            >
+              <SparkIcon />
+              Draw {styleName} pictures
+              <span className="t-small font-normal t-muted">
+                Three options from this lesson - you pick one
+              </span>
+            </button>
+            <label htmlFor={`hw-file-${lesson.id}`} className="btn btn-ghost btn-sm cursor-pointer">
+              {busy === "upload" ? "Uploading…" : "or upload my own picture"}
+            </label>
           </div>
         ) : (
           <label
@@ -221,5 +316,13 @@ function Answer({ label, text }: { label: string; text: string }) {
       <p className="t-small t-muted">{label}</p>
       <p className="mt-0.5 whitespace-pre-wrap">{text}</p>
     </div>
+  );
+}
+
+function SparkIcon() {
+  return (
+    <svg aria-hidden width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />
+    </svg>
   );
 }
