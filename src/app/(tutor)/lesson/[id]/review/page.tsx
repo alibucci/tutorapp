@@ -112,7 +112,7 @@ export default async function ReviewPage({
         <SummaryPanel lesson={lesson} />
       </div>
 
-      <SkillReview lesson={lesson} />
+      <SkillReview lesson={lesson} studentName={student?.name} />
       </div>
 
       <div className="stack-lg min-w-0">
