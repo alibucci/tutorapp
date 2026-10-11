@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import Link from "next/link";
 import { useState } from "react";
 import { pixelFont } from "@/lib/fonts";
-import type { GameStyle } from "@/lib/gameStyles";
+import { type GameStyle, paletteVars, skinOf } from "@/lib/gameStyles";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type HomeworkAnswers } from "@/lib/types";
 
 
@@ -72,7 +72,10 @@ export function HomeworkGame({
   }
 
   return (
-    <div className={`game game-${style.id} ${pixelFont.variable}`}>
+    <div
+      className={`game game-${skinOf(style)} ${pixelFont.variable}`}
+      style={paletteVars(style) as React.CSSProperties}
+    >
       <div className="game-inner" data-answering={task ? "" : undefined}>
         <div className="flex items-center justify-between">
           <Link href={backHref} className="game-small">
@@ -175,7 +178,7 @@ export function HomeworkGame({
           <div className="game-toast" role="status">
             <span aria-hidden className="game-toast-icon" />
             <span>
-              <span className="game-toast-title">Achievement get!</span>
+              <span className="game-toast-title">{style.words.cheer}</span>
               <span className="game-toast-text">{style.words.done}</span>
             </span>
           </div>

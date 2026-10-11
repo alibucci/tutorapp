@@ -244,10 +244,16 @@ database without touching a single caller.
 
 Homework is the same every time: describe the picture, say what happens next,
 give three adjectives. The child types the answers and hands in once; the tutor
-reads them on the lesson page. Game styles are a list in
-`src/lib/gameStyles.ts` plus a `.game-<id>` block in `globals.css`; Minecraft is
-the first. Its pixel font is bundled at build time, so nothing is fetched from
-Google - which matters in China.
+reads them on the lesson page. Themes are a list in `src/lib/gameStyles.ts`, and adding one is one entry -
+no CSS. An entry has a name, the words the game screen uses ("quest" /
+"story", "XP" / "stars"), `imageStyle` - how its pictures are described to
+the image model, never naming a game or brand - and a `palette` of five
+colours that paints the shared game skin, the child's quest card and the
+level bar. Minecraft alone has a hand-made skin with textures. Pictures are
+drawn by Alibaba Wan when `DASHSCOPE_API_KEY` is set (see `.env.example`):
+DeepSeek writes a scene from the lesson, Wan draws three options in the
+theme's style, the tutor picks one. The pixel font is bundled at build time,
+so nothing is fetched from Google - which matters in China.
 
 Outside that loop: **`/account`** for a tutor to replace the one-time password
 they were issued, and **`/check`** to test a device before recording on it.

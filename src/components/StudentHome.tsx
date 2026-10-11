@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { pixelFont } from "@/lib/fonts";
-import { gameStyle } from "@/lib/gameStyles";
+import { gameStyle, paletteVars, skinOf } from "@/lib/gameStyles";
 import { XP_PER_LEVEL, XP_PER_QUEST, homeworkImageUrl } from "@/lib/homework";
 import { listLessons } from "@/lib/store";
 import type { Skill, Student } from "@/lib/types";
@@ -69,13 +69,14 @@ export async function StudentHome({
             <Link
               key={lesson.id}
               href={questHref(lesson.id)}
-              className={`game-entry game-entry-${style.id} ${pixelFont.variable}`}
+              className={`game-entry game-entry-${skinOf(style)} ${pixelFont.variable}`}
+              style={paletteVars(style) as React.CSSProperties}
             >
               <span>
                 <span className="game-entry-kicker">{style.name} homework</span>
                 <span className="game-entry-title">Describe the picture</span>
                 <span className="game-entry-meta">
-                  From {lesson.title} · 3 tasks · 30 XP
+                  From {lesson.title} · 3 tasks · {XP_PER_QUEST} {style.words.reward}
                 </span>
               </span>
               <span aria-hidden className="game-entry-title">→</span>
@@ -86,17 +87,22 @@ export async function StudentHome({
 
       {finished.length > 0 && (
         // Progress, the way the game shows it: a level and a filling bar.
-        <section className={`game-stats game-stats-${style.id} ${pixelFont.variable}`}>
+        <section
+          className={`game-stats game-stats-${skinOf(style)} ${pixelFont.variable}`}
+          style={paletteVars(style) as React.CSSProperties}
+        >
           <div className="flex items-baseline justify-between gap-3">
             <span className="game-stats-level">Level {level}</span>
-            <span className="game-stats-xp">{xp} XP</span>
+            <span className="game-stats-xp">
+              {xp} {style.words.reward}
+            </span>
           </div>
           <div className="game-stats-bar" aria-label={`${Math.round(toNext * 100)}% to level ${level + 1}`}>
             <div className="game-stats-fill" style={{ width: `${Math.max(4, toNext * 100)}%` }} />
           </div>
           <p className="game-stats-note">
             {finished.length} {finished.length === 1 ? "quest" : "quests"} done ·{" "}
-            {XP_PER_LEVEL - (xp % XP_PER_LEVEL)} XP to level {level + 1}
+            {XP_PER_LEVEL - (xp % XP_PER_LEVEL)} {style.words.reward} to level {level + 1}
           </p>
         </section>
       )}
@@ -122,8 +128,11 @@ export async function StudentHome({
                       // eslint-disable-next-line @next/next/no-img-element -- private upload
                       <img src={src} alt="" className="quest-tile-img" />
                     )}
-                    <span className={`quest-tile-badge ${pixelFont.variable}`}>
-                      +{XP_PER_QUEST} XP
+                    <span
+                      className={`quest-tile-badge quest-tile-badge-${skinOf(style)} ${pixelFont.variable}`}
+                      style={paletteVars(style) as React.CSSProperties}
+                    >
+                      +{XP_PER_QUEST} {style.words.reward}
                     </span>
                     <span className="quest-tile-label">{lesson.title}</span>
                   </Link>

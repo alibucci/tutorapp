@@ -938,12 +938,22 @@ textarea.field { line-height: var(--leading-normal); }
   position: absolute;
   top: 8px;
   right: 8px;
+}
+.quest-tile-badge-minecraft {
   padding: 4px 6px;
   font-family: var(--font-pixel), monospace;
   font-size: 0.5625rem;
   color: #80ff20;
   background: rgb(0 0 0 / 0.75);
   border: 2px solid #000;
+}
+.quest-tile-badge-palette {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  color: var(--g-accent-ink);
+  background: var(--g-accent);
 }
 .quest-tile-label {
   position: absolute;
@@ -954,3 +964,217 @@ textarea.field { line-height: var(--leading-normal); }
   color: #fff;
   background: linear-gradient(transparent, rgb(0 0 0 / 0.7));
 }
+
+/* ---------------------------------------------------------------------------
+   The shared game skin. Every theme without a hand-made skin gets this, in its
+   own colours from `palette` in src/lib/gameStyles.ts (--g-*), so a new theme
+   needs no CSS at all. Rounded and soft rather than pixel-hard: it has to suit
+   a fairy tale as well as a space station.
+   --------------------------------------------------------------------------- */
+
+.game-palette {
+  color: var(--g-ink);
+  background:
+    radial-gradient(120% 60% at 50% 0%, color-mix(in oklab, var(--g-accent) 28%, transparent), transparent 70%),
+    var(--g-ground);
+}
+
+.game-palette .game-small {
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: color-mix(in oklab, var(--g-panel) 85%, transparent);
+}
+
+.game-palette .game-frame {
+  padding: 8px;
+  border-radius: 22px;
+  background: color-mix(in oklab, var(--g-panel) 92%, var(--g-accent));
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.5);
+}
+.game-palette .game-picture { border-radius: 16px; background: #000; }
+
+.game-palette .game-panel {
+  background: var(--g-panel);
+  color: var(--g-ink);
+  padding: var(--space-5);
+  border-radius: 22px;
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.45);
+}
+
+.game-palette .game-title {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.game-palette .game-panel > .game-title:first-child {
+  font-size: 1.5rem;
+}
+
+.game-palette .game-panel .game-step {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  color: var(--g-accent-ink);
+  background: var(--g-accent);
+}
+
+.game-palette .game-text { font-size: 1.0625rem; line-height: 1.5; }
+.game-palette .game-hint,
+.game-palette .game-error { font-size: 0.9375rem; color: color-mix(in oklab, var(--g-ink) 70%, transparent); }
+.game-palette .game-tip {
+  font-size: 0.9375rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--g-accent) 18%, var(--g-panel));
+}
+.game-palette .game-tip .game-small { color: var(--g-ink); margin-right: 6px; }
+
+.game-palette .game-input {
+  background: #fff;
+  color: #1d1d1d;
+  border: 2px solid color-mix(in oklab, var(--g-ink) 18%, transparent);
+  border-radius: 14px;
+}
+.game-palette .game-input:focus,
+.game-palette .game-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: var(--g-accent);
+}
+
+.game-palette .game-answer {
+  font-size: 1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--g-accent) 12%, white);
+}
+
+.game-palette .game-button {
+  flex: 1;
+  width: 100%;
+  padding: 0.95rem var(--space-4);
+  border-radius: 16px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--g-accent-ink);
+  background: var(--g-accent);
+  box-shadow: 0 4px 0 color-mix(in oklab, var(--g-accent) 70%, black);
+  transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-press) var(--ease-out);
+}
+.game-palette .game-button-small { flex: 0 0 4rem; }
+.game-palette .game-button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 color-mix(in oklab, var(--g-accent) 70%, black);
+}
+.game-palette .game-button:disabled { opacity: 0.45; }
+.game-palette .game-back { color: color-mix(in oklab, var(--g-panel) 80%, transparent); }
+
+.game-palette .game-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: 18px;
+  color: var(--g-accent-ink);
+  background: var(--g-accent);
+  animation: game-toast-in 400ms var(--ease-out);
+}
+.game-palette .game-toast-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--g-panel);
+  box-shadow: inset 0 0 0 6px color-mix(in oklab, var(--g-accent) 60%, white);
+}
+.game-palette .game-toast-title { display: block; font-size: var(--text-small); font-weight: 700; opacity: 0.8; }
+.game-palette .game-toast-text { display: block; font-size: 1.0625rem; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .game-palette .game-toast { animation: none; }
+}
+
+.game-palette .game-level {
+  text-align: center;
+  font-size: var(--text-small);
+  font-weight: 700;
+  color: var(--g-panel);
+}
+.game-palette .game-xp {
+  height: 10px;
+  margin: 6px auto 8px;
+  max-width: 22rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--g-panel) 22%, transparent);
+}
+.game-palette .game-xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--g-accent);
+  transition: width 400ms var(--ease-out);
+}
+.game-palette .game-hotbar {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.game-palette .game-slot {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: var(--g-panel);
+  border: 2px solid color-mix(in oklab, var(--g-panel) 40%, transparent);
+}
+.game-palette .game-slot-done { background: var(--g-accent); color: var(--g-accent-ink); border-color: var(--g-accent); }
+.game-palette .game-slot-on { border-color: var(--g-panel); box-shadow: 0 0 0 3px color-mix(in oklab, var(--g-panel) 30%, transparent); }
+
+/* The doorway and the progress block on the child's page, in the theme's colours. */
+.game-entry-palette {
+  color: var(--g-panel);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 120% at 100% 0%, color-mix(in oklab, var(--g-accent) 45%, transparent), transparent 60%),
+    var(--g-ground);
+}
+.game-entry-palette .game-entry-kicker {
+  font-family: inherit;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--g-accent);
+}
+.game-entry-palette .game-entry-title {
+  font-family: inherit;
+  margin-top: 6px;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.game-entry-palette .game-entry-meta { color: color-mix(in oklab, var(--g-panel) 75%, transparent); }
+
+.game-stats-palette {
+  color: var(--g-panel);
+  background: var(--g-ground);
+}
+.game-stats-palette .game-stats-level,
+.game-stats-palette .game-stats-xp { font-family: inherit; font-weight: 700; }
+.game-stats-palette .game-stats-level { font-size: 1.125rem; }
+.game-stats-palette .game-stats-xp { color: var(--g-accent); }
+.game-stats-palette .game-stats-bar {
+  height: 10px;
+  margin-top: var(--space-3);
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--g-panel) 22%, transparent);
+}
+.game-stats-palette .game-stats-fill { height: 100%; border-radius: 999px; background: var(--g-accent); }
+.game-stats-palette .game-stats-note { color: color-mix(in oklab, var(--g-panel) 75%, transparent); }

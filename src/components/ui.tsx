@@ -35,7 +35,25 @@ export function Avatar({ name, size = "md" }: { name: string; size?: "md" | "lg"
 
 export function StyleTag({ id }: { id?: string }) {
   if (!id) return <span className="tag tag-quiet">No game style</span>;
-  return <span className={`tag tag-${id}`}>{gameStyle(id).name}</span>;
+  const style = gameStyle(id);
+  if (style.skin) return <span className={`tag tag-${style.skin}`}>{style.name}</span>;
+  // Any other theme: a chip in its own accent, with a swatch of its ground.
+  return (
+    <span
+      className="tag"
+      style={{
+        background: `color-mix(in oklab, ${style.palette.accent} 18%, white)`,
+        color: style.palette.ink,
+      }}
+    >
+      <span
+        aria-hidden
+        className="h-2.5 w-2.5 rounded-sm"
+        style={{ background: style.palette.ground, border: `2px solid ${style.palette.accent}` }}
+      />
+      {style.name}
+    </span>
+  );
 }
 
 // Icons: stroke SVGs that take the text colour.
