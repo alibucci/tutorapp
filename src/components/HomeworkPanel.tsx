@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ImageIcon } from "@/components/ui";
+import { homeworkDone } from "@/lib/homework";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type Lesson } from "@/lib/types";
 
 /** Longest side of a stored picture. Plenty for a phone screen. */
@@ -66,6 +67,8 @@ export function HomeworkPanel({
   const sent = Boolean(homework?.sentAt);
   const answers = homework?.answers;
   const candidates = homework?.candidates ?? [];
+  const exercises = homework?.exercises ?? [];
+  const finished = homeworkDone(homework);
   const [seconds, setSeconds] = useState(0);
 
   // Drawing takes from a few seconds to a minute or two; count it out loud.
@@ -74,6 +77,22 @@ export function HomeworkPanel({
     const timer = window.setInterval(() => setSeconds((n) => n + 1), 1000);
     return () => window.clearInterval(timer);
   }, [busy]);
+
+  async function buildGames() {
+    setBusy("games");
+    setError(null);
+    const result = await api(
+      `/api/lessons/${lesson.id}/homework/exercises`,
+      { method: "POST" },
+      "Could not build the games. Try again.",
+    );
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
 
   async function draw() {
     setBusy("draw");
@@ -140,13 +159,13 @@ export function HomeworkPanel({
     <section id="homework" className="space-y-3 scroll-mt-20">
       <div className="flex items-center justify-between gap-4">
         <h2 className="t-title">Homework</h2>
-        <span className={`tag ${answers ? "tag-done" : sent ? "tag-info" : "tag-warn"}`}>
-          {answers ? "Handed in" : sent ? "Sent · waiting" : "Not sent"}
+        <span className={`tag ${finished ? "tag-done" : sent ? "tag-info" : "tag-warn"}`}>
+          {finished ? "Handed in" : sent ? "Sent · waiting" : "Not sent"}
         </span>
       </div>
 
       <div className="card space-y-5 p-5">
-        {!answers && (
+        {!finished && (
           <input
             ref={fileRef}
             type="file"
@@ -160,6 +179,66 @@ export function HomeworkPanel({
           />
         )}
 
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="t-eyebrow">Practice games</p>
+            {!finished && exercises.length > 0 && (
+              <button
+                onClick={() => void buildGames()}
+                disabled={busy !== null}
+                className="btn btn-ghost btn-sm"
+              >
+                {busy === "games" ? "Building…" : "Build different ones"}
+              </button>
+            )}
+          </div>
+
+          {exercises.length === 0 ? (
+            <button
+              onClick={() => void buildGames()}
+              disabled={busy !== null}
+              className="btn btn-soft btn-block"
+            >
+              {busy === "games"
+                ? "Reading the lesson…"
+                : `Build games from ${studentName}'s mistakes`}
+            </button>
+          ) : (
+            <ul className="space-y-2">
+              {exercises.map((exercise) => {
+                const result = (homework?.results ?? []).find((r) => r.kind === exercise.kind);
+                return (
+                  <li key={exercise.kind} className="rounded-[var(--radius)] bg-sunken p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="t-small font-semibold">{exercise.title}</span>
+                      {result ? (
+                        <span
+                          className={`tag ${
+                            result.right / result.total >= 0.7 ? "tag-done" : "tag-warn"
+                          }`}
+                        >
+                          {result.right}/{result.total}
+                        </span>
+                      ) : (
+                        <span className="tag tag-quiet">
+                          {exercise.rounds.length} rounds
+                        </span>
+                      )}
+                    </div>
+                    <p className="t-caption t-muted mt-0.5">{exercise.topic}</p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {exercises.length > 0 && !sent && (
+            <p className="hint">
+              Tap a game to check it before you send - the words come from this
+              lesson, but they are written by the model.
+            </p>
+          )}
+        </div>
+
         {busy === "draw" ? (
           <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-[var(--radius)] bg-accent-soft text-center">
             <SparkIcon />
@@ -169,7 +248,7 @@ export function HomeworkPanel({
               when you come back.
             </span>
           </div>
-        ) : candidates.length > 0 && !answers ? (
+        ) : candidates.length > 0 && !finished ? (
           // Options drawn, none picked yet: the tutor chooses.
           <div className="space-y-3">
             <p className="t-small font-semibold">Tap the picture to use</p>
@@ -205,7 +284,7 @@ export function HomeworkPanel({
               alt="Homework picture"
               className="max-h-80 w-full rounded-[var(--radius)] bg-sunken object-contain"
             />
-            {!answers && (
+            {!finished && (
               <div className="flex flex-wrap gap-2">
                 {canDraw && (
                   <button onClick={() => void draw()} disabled={busy !== null} className="btn btn-ghost btn-sm">
@@ -246,12 +325,15 @@ export function HomeworkPanel({
           </label>
         )}
 
-        <ol className="list-decimal space-y-1 pl-5">
-          {HOMEWORK_TASKS.map((task) => (
-            <li key={task.id}>{task.prompt}</li>
-          ))}
-          <li>{ADJECTIVES_TASK}</li>
-        </ol>
+        <div className={homework?.imageFile ? "" : "hidden"}>
+          <p className="t-eyebrow mb-2">With the picture</p>
+          <ol className="list-decimal space-y-1 pl-5">
+            {HOMEWORK_TASKS.map((task) => (
+              <li key={task.id}>{task.prompt}</li>
+            ))}
+            <li>{ADJECTIVES_TASK}</li>
+          </ol>
+        </div>
 
         <label className="block">
           <span className="label">Tip for {studentName}</span>
@@ -259,20 +341,20 @@ export function HomeworkPanel({
             value={focus}
             onChange={(e) => setFocus(e.target.value)}
             onBlur={() => {
-              if (!answers && focus !== (homework?.focus ?? "")) {
+              if (!finished && focus !== (homework?.focus ?? "")) {
                 void patch({ focus }, "focus");
               }
             }}
-            disabled={Boolean(answers)}
+            disabled={finished}
             placeholder="e.g. Use the past tense: ate, swam, went."
             className="field"
           />
-          {!answers && (
+          {!finished && (
             <span className="hint">Suggested from this lesson. Change it freely.</span>
           )}
         </label>
 
-        {!answers &&
+        {!finished &&
           (sent ? (
             <button
               onClick={() => void patch({ send: false }, "send")}
@@ -286,7 +368,11 @@ export function HomeworkPanel({
               onClick={() => void patch({ focus, send: true }, "send")}
               // Saving the tip on blur must not swallow this tap: the send
               // carries the tip anyway.
-              disabled={busy === "upload" || busy === "send" || !homework?.imageFile}
+              disabled={
+                busy === "upload" ||
+                busy === "send" ||
+                (!homework?.imageFile && exercises.length === 0)
+              }
               className="btn btn-primary btn-lg btn-block"
             >
               {busy === "send" ? "Sending…" : `Send to ${studentName}`}

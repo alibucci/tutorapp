@@ -242,8 +242,20 @@ database without touching a single caller.
    **`/p/[key]`** (by link) — what the child and the parent see. Homework opens
    full-screen as a game in the student's style.
 
-Homework is the same every time: describe the picture, say what happens next,
-give three adjectives. The child types the answers, or taps the microphone and
+Homework is practice games plus a picture, and either half can stand alone.
+
+The games are three fixed mechanics - pick the word for the gap, build the
+sentence from word tiles, keep the words that follow a rule - and only the
+words inside change. They are written by DeepSeek from what the child got
+wrong in that lesson (`src/lib/exercises.ts`): the wrong options in a
+multiple choice are the mistakes this child actually makes, not random words.
+The tutor builds them, reads them, and sends them. Every game reports how many
+it got right, and `src/lib/homework.ts` adds those up per topic, which is what
+the parent's page shows: not "did they do it" but "is the thing they kept
+getting wrong getting better".
+
+The picture half is the same every time: describe the picture, say what happens
+next, give three adjectives. The child types the answers, or taps the microphone and
 says them - the browser's recogniser turns speech into text (Apple in Safari,
 Google in Chrome) and only the text is kept; no recording of a child is ever
 made or stored here. They hand in once; the tutor

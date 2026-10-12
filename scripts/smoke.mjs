@@ -399,6 +399,32 @@ function picture(bytes) {
   check("the parent link cannot load the picture", (await img(keys.parentKey)).status === 404);
   check("the quest page opens", (await anon(`/s/${childKey}/quest/${lessonA.id}`)).status === 200);
 
+  // The games: built from the lesson, played by the child, scored for the parent.
+  const games = await a(`/api/lessons/${lessonA.id}/homework/exercises`, { method: "POST" });
+  const built = games.json?.exercises ?? [];
+  check("practice games are built from the lesson", built.length > 0, games.json?.error);
+  check("every game says which mistake it practises",
+    built.every((e) => e.topic && e.rounds?.length >= 2));
+  check("the choose game has a gap and three options",
+    built.filter((e) => e.kind === "choose").every((e) =>
+      e.rounds.every((r) => r.sentence.includes("___") && r.options.length === 3
+        && r.answer >= 0 && r.answer < 3)));
+  check("the catch game has words to keep and words to drop",
+    built.filter((e) => e.kind === "catch").every((e) =>
+      e.rounds.some((r) => r.keep) && e.rounds.some((r) => !r.keep)));
+
+  const firstGame = built[0];
+  const score = (body) => anon(`/api/lessons/${lessonA.id}/homework/results`, post({ key: childKey, ...body }));
+  check("a game nobody built is refused",
+    (await score({ kind: "nonsense", right: 1 })).status === 400);
+  check("a score cannot beat the number of rounds",
+    (await score({ kind: firstGame.kind, right: 999 })).json?.right === firstGame.rounds.length);
+  check("a replay replaces the earlier score, never adds to it",
+    (await score({ kind: firstGame.kind, right: 1 })).json?.right === 1
+      && ((await a(`/api/lessons/${lessonA.id}`)).json.homework.results ?? []).length === 1);
+  check("another family cannot score this homework",
+    (await anon(`/api/lessons/${lessonA.id}/homework/results`, post({ key: "wrong", kind: firstGame.kind, right: 3 }))).status === 404);
+
   const answer = (body) => anon(`/api/lessons/${lessonA.id}/homework/answers`, post({ key: childKey, ...body }));
   check("two adjectives are not enough",
     (await answer({ describe: "A cat.", next: "It jumps.", adjectives: ["big", "red"] })).status === 400);
@@ -408,6 +434,15 @@ function picture(bytes) {
     }))).status === 404);
   check("the child hands the homework in",
     (await answer({ describe: "A cat sat on a mat.", next: "It will sleep.", adjectives: ["calm", "warm", "sleepy"] })).status === 200);
+  // Homework is only finished when the games are played too.
+  check("the picture alone does not finish the homework",
+    (await anon(`/api/lessons/${lessonA.id}/homework/image?key=${keys.parentKey}`)).status === 404);
+  for (const game of built) {
+    await anon(`/api/lessons/${lessonA.id}/homework/results`, post({
+      key: childKey, kind: game.kind, right: game.rounds.length,
+    }));
+  }
+
   check("it can only be handed in once",
     (await answer({ describe: "again", next: "again", adjectives: ["a", "b", "c"] })).status === 409);
   const hw = (await a(`/api/lessons/${lessonA.id}`)).json.homework;

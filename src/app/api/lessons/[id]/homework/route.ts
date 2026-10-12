@@ -112,8 +112,8 @@ export async function PATCH(request: Request, { params }: Params) {
     }
     if (typeof body.focus === "string") next.focus = body.focus.trim().slice(0, 300);
     if (body.send === true) {
-      if (!next.imageFile) {
-        problem = { error: "Add a picture before sending.", status: 400 };
+      if (!next.imageFile && !next.exercises?.length) {
+        problem = { error: "Add a picture or build the games before sending.", status: 400 };
         return null;
       }
       next.sentAt ??= new Date().toISOString();

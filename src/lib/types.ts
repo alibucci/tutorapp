@@ -239,6 +239,66 @@ export type HomeworkAnswers = {
   submittedAt: string;
 };
 
+// ---------------------------------------------------------------------------
+// Practice games: the drill half of homework, built from this lesson's
+// mistakes. Three mechanics, each a different way to handle the same words.
+// ---------------------------------------------------------------------------
+
+/** Pick the word that belongs in the gap. */
+export type ChooseRound = {
+  /** The sentence, with "___" where the answer goes. */
+  sentence: string;
+  options: string[];
+  /** Index into `options`. */
+  answer: number;
+  /** One short line shown after the tap, in words a child knows. */
+  why: string;
+};
+
+/** Put the words in order to make the sentence. */
+export type BuildRound = {
+  /** The words in the right order; the game shuffles them. */
+  answer: string[];
+  /** What the sentence means, or when to use it. */
+  why: string;
+};
+
+/** Let the right words through and turn the wrong ones away. */
+export type CatchRound = {
+  word: string;
+  /** Whether this word follows the rule the game states. */
+  keep: boolean;
+};
+
+export type Exercise =
+  | { kind: "choose"; title: string; topic: string; rounds: ChooseRound[] }
+  | { kind: "build"; title: string; topic: string; rounds: BuildRound[] }
+  | {
+      kind: "catch";
+      title: string;
+      topic: string;
+      /** What the child is collecting, e.g. "past tense words". */
+      rule: string;
+      rounds: CatchRound[];
+    };
+
+export type ExerciseKind = Exercise["kind"];
+
+export const EXERCISE_LABEL: Record<ExerciseKind, string> = {
+  choose: "Pick the right word",
+  build: "Build the sentence",
+  catch: "Keep the right words",
+};
+
+/** How one game went. Written when the child finishes it. */
+export type ExerciseResult = {
+  kind: ExerciseKind;
+  topic: string;
+  right: number;
+  total: number;
+  finishedAt: string;
+};
+
 export type Homework = {
   /** Stored picture, uploaded by the tutor. */
   imageFile?: string;
@@ -248,9 +308,13 @@ export type Homework = {
   candidates?: string[];
   /** The scene they were drawn from, kept so a redraw can vary it. */
   scene?: string;
+  /** Games built from this lesson's mistakes, for the tutor to check. */
+  exercises?: Exercise[];
   /** The child sees nothing until the tutor sends it. */
   sentAt?: string;
   answers?: HomeworkAnswers;
+  /** One entry per game the child finished. */
+  results?: ExerciseResult[];
 };
 
 // ---------------------------------------------------------------------------

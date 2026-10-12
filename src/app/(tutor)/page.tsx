@@ -10,6 +10,7 @@ import {
   StyleTag,
 } from "@/components/ui";
 import { requireSession } from "@/lib/auth";
+import { homeworkDone } from "@/lib/homework";
 import { listLessons, listStudents } from "@/lib/store";
 import type { Lesson } from "@/lib/types";
 
@@ -93,7 +94,7 @@ function recentTodos(lessons: Lesson[], names: Map<string, string>): Todo[] {
 function statusFor(latest: Lesson | undefined): { text: string; tone: string } {
   if (!latest) return { text: "No lessons yet", tone: "t-muted" };
   const hw = latest.homework;
-  if (hw?.answers) return { text: "Homework handed in", tone: "text-live" };
+  if (homeworkDone(hw)) return { text: "Homework handed in", tone: "text-live" };
   if (hw?.sentAt) return { text: "Homework sent", tone: "t-muted" };
   if (latest.summary) return { text: "Homework not sent", tone: "text-warn" };
   return { text: `Last lesson ${DAY.format(new Date(latest.createdAt))}`, tone: "t-muted" };

@@ -3,6 +3,7 @@ import { lessonFor } from "@/lib/access";
 import { gameStyle } from "@/lib/gameStyles";
 import { PictureError, drawPictures } from "@/lib/imageGen";
 import { picturePrompt, writeScene } from "@/lib/scenePrompt";
+import { homeworkDone } from "@/lib/homework";
 import { deleteImage, saveImage, updateLesson } from "@/lib/store";
 import type { Lesson, Student } from "@/lib/types";
 
@@ -32,7 +33,7 @@ export async function POST(_request: Request, { params }: Params) {
       { status: 400 },
     );
   }
-  if (found.lesson.homework?.answers) {
+  if (homeworkDone(found.lesson.homework)) {
     return NextResponse.json({ error: "The homework has already been answered." }, { status: 409 });
   }
 

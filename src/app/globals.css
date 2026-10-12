@@ -1223,3 +1223,205 @@ textarea.field { line-height: var(--leading-normal); }
   color: var(--g-panel);
   background: color-mix(in oklab, var(--g-accent) 55%, #d33);
 }
+
+/* ---------------------------------------------------------------------------
+   Practice games. Shape and motion here; colour comes from the skin below, so
+   a new theme gets the games in its own colours without touching this.
+   --------------------------------------------------------------------------- */
+
+.game-sentence { font-size: 1.125rem; line-height: 1.6; }
+.game-gap {
+  display: inline-block;
+  min-width: 3.5rem;
+  padding: 0 0.5rem;
+  text-align: center;
+  font-weight: 700;
+}
+.game-rule { font-size: 1rem; font-weight: 600; }
+
+.game-option {
+  display: block;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.75rem var(--space-4);
+  font-size: 1.125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-hover) ease;
+}
+.game-option:active:not(:disabled) { transform: scale(0.97); }
+.game-option-yes { animation: game-pop 320ms var(--ease-out); }
+.game-option-no { animation: game-shake 320ms ease-in-out; }
+
+@keyframes game-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@keyframes game-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  45% { transform: translateX(6px); }
+  70% { transform: translateX(-4px); }
+}
+
+.game-verdict {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  animation: game-rise 260ms var(--ease-out);
+}
+.game-verdict-head { font-weight: 700; }
+.game-verdict-why { margin-top: 2px; font-size: 0.9375rem; line-height: 1.45; }
+@keyframes game-rise {
+  from { transform: translateY(8px); opacity: 0; }
+}
+
+/* Build: the line being made, and the pile of words to make it from. */
+.game-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 4rem;
+  padding: var(--space-3);
+}
+.game-line-empty { font-size: 0.9375rem; opacity: 0.6; }
+.game-pile { display: flex; flex-wrap: wrap; gap: 8px; }
+.game-tile {
+  padding: 0.6rem 0.85rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), opacity var(--dur-hover) ease;
+}
+.game-tile:active:not(:disabled) { transform: scale(0.95); }
+.game-tile-placed { animation: game-pop 240ms var(--ease-out); }
+.game-tile-used { opacity: 0.25; cursor: default; }
+
+/* Catch: one word drifts in, then flies off whichever way the child sent it. */
+.game-lane {
+  display: grid;
+  place-items: center;
+  min-height: 6.5rem;
+  overflow: hidden;
+}
+.game-float {
+  display: inline-block;
+  padding: 0.7rem 1.1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  animation: game-drift 520ms var(--ease-out);
+}
+@keyframes game-drift {
+  from { transform: translateX(60%); opacity: 0; }
+}
+.game-float-kept { animation: game-keep 420ms var(--ease-out) forwards; }
+.game-float-gone { animation: game-drop 420ms var(--ease-out) forwards; }
+@keyframes game-keep {
+  to { transform: translateY(-28px) scale(1.08); }
+}
+@keyframes game-drop {
+  to { transform: translateX(-70%) rotate(-8deg); opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-option-yes,
+  .game-option-no,
+  .game-tile-placed,
+  .game-verdict,
+  .game-float { animation: none; }
+  .game-float-kept,
+  .game-float-gone { animation: none; opacity: 0.5; }
+}
+
+/* --- the two skins ------------------------------------------------------- */
+
+.game-minecraft .game-gap { background: #3f3f3f; color: #fff; }
+.game-minecraft .game-gap-yes { background: #3c8a00; }
+.game-minecraft .game-gap-no { background: #a33; }
+.game-minecraft .game-rule { color: #3f3f3f; }
+.game-minecraft .game-option {
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f;
+  background: #6f6f6f;
+  border: 3px solid #000;
+  box-shadow: inset 3px 3px 0 #a9a9a9, inset -3px -3px 0 #4a4a4a;
+}
+.game-minecraft .game-option-yes { background: #3c8a00; box-shadow: inset 3px 3px 0 #80ff20, inset -3px -3px 0 #2a5f00; }
+.game-minecraft .game-option-no { background: #8a2b2b; box-shadow: inset 3px 3px 0 #d06b6b, inset -3px -3px 0 #5e1a1a; }
+.game-minecraft .game-verdict { border: 3px solid #000; background: #8b8b8b; color: #fff; }
+.game-minecraft .game-verdict-yes { background: #3c8a00; }
+.game-minecraft .game-verdict-no { background: #8a2b2b; }
+.game-minecraft .game-line { background: #000; border: 3px solid #a0a0a0; }
+.game-minecraft .game-line-yes { border-color: #80ff20; }
+.game-minecraft .game-line-no { border-color: #d06b6b; }
+.game-minecraft .game-line-empty { color: #7a7a7a; }
+.game-minecraft .game-tile {
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f;
+  background: #6f6f6f;
+  border: 3px solid #000;
+  box-shadow: inset 2px 2px 0 #a9a9a9, inset -2px -2px 0 #4a4a4a;
+}
+.game-minecraft .game-float { color: #fff; text-shadow: 2px 2px 0 #000; background: #6f6f6f; border: 3px solid #000; }
+.game-minecraft .game-button-no { background: #8a2b2b; box-shadow: inset 3px 3px 0 #d06b6b, inset -3px -4px 0 #5e1a1a; }
+
+.game-palette .game-gap { border-radius: 10px; background: color-mix(in oklab, var(--g-accent) 22%, white); }
+.game-palette .game-gap-yes { background: #cdebd4; color: #14532d; }
+.game-palette .game-gap-no { background: #f6d6d6; color: #7f1d1d; }
+.game-palette .game-rule { color: color-mix(in oklab, var(--g-ink) 80%, transparent); }
+.game-palette .game-option {
+  border-radius: 16px;
+  color: var(--g-ink);
+  background: color-mix(in oklab, var(--g-accent) 14%, white);
+  border: 2px solid color-mix(in oklab, var(--g-ink) 12%, transparent);
+}
+.game-palette .game-option-yes { background: #cdebd4; border-color: #15803d; color: #14532d; }
+.game-palette .game-option-no { background: #f6d6d6; border-color: #b91c1c; color: #7f1d1d; }
+.game-palette .game-verdict { border-radius: 14px; background: color-mix(in oklab, var(--g-accent) 14%, white); }
+.game-palette .game-verdict-yes { background: #cdebd4; color: #14532d; }
+.game-palette .game-verdict-no { background: #f6d6d6; color: #7f1d1d; }
+.game-palette .game-line {
+  border-radius: 16px;
+  background: #fff;
+  border: 2px dashed color-mix(in oklab, var(--g-ink) 25%, transparent);
+}
+.game-palette .game-line-yes { border-style: solid; border-color: #15803d; }
+.game-palette .game-line-no { border-style: solid; border-color: #b91c1c; }
+.game-palette .game-line-empty { color: color-mix(in oklab, var(--g-ink) 55%, transparent); }
+.game-palette .game-tile {
+  border-radius: 12px;
+  color: var(--g-ink);
+  background: color-mix(in oklab, var(--g-accent) 20%, white);
+  border: 2px solid color-mix(in oklab, var(--g-ink) 12%, transparent);
+}
+.game-palette .game-float {
+  border-radius: 16px;
+  color: var(--g-ink);
+  background: #fff;
+  box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.5);
+}
+.game-palette .game-button-no {
+  background: color-mix(in oklab, var(--g-ink) 18%, white);
+  color: var(--g-ink);
+  box-shadow: 0 4px 0 color-mix(in oklab, var(--g-ink) 35%, white);
+}
+
+/* How each game went, on the last screen of a quest. */
+.game-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.55rem 0.85rem;
+  font-size: 1rem;
+}
+.game-score-n { font-weight: 700; font-variant-numeric: tabular-nums; }
+.game-minecraft .game-score { background: #8b8b8b; color: #fff; border: 2px solid #373737; }
+.game-palette .game-score {
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--g-accent) 14%, white);
+  color: var(--g-ink);
+}

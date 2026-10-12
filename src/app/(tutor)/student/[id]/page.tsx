@@ -7,6 +7,7 @@ import { ShareLinks } from "@/components/ShareLinks";
 import { SkillList } from "@/components/SkillList";
 import { Avatar, ChevronLeft, ChevronRight } from "@/components/ui";
 import { studentFor } from "@/lib/access";
+import { homeworkDone } from "@/lib/homework";
 import { listLessons, listReports } from "@/lib/store";
 import type { Lesson } from "@/lib/types";
 
@@ -128,7 +129,9 @@ const DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }
 /** What this lesson is still waiting for, in the app's colours. */
 function nextStep(lesson: Lesson): { text: string; tone: string; href: string } {
   const base = `/lesson/${lesson.id}`;
-  if (lesson.homework?.answers) return { text: "Homework done", tone: "text-live", href: `${base}/review` };
+  if (homeworkDone(lesson.homework)) {
+    return { text: "Homework done", tone: "text-live", href: `${base}/review` };
+  }
   if (lesson.homework?.sentAt) return { text: "Homework sent", tone: "t-muted", href: `${base}/review` };
   if (lesson.summary) return { text: "Send homework", tone: "text-warn", href: `${base}/review#homework` };
   if (lesson.debrief.length) return { text: "Review", tone: "text-warn", href: `${base}/review` };

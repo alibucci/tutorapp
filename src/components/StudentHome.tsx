@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { pixelFont } from "@/lib/fonts";
 import { gameStyle, paletteVars, skinOf } from "@/lib/gameStyles";
-import { XP_PER_LEVEL, XP_PER_QUEST, homeworkImageUrl } from "@/lib/homework";
+import { XP_PER_LEVEL, XP_PER_QUEST, homeworkDone, homeworkImageUrl } from "@/lib/homework";
 import { listLessons } from "@/lib/store";
 import type { Skill, Student } from "@/lib/types";
 
@@ -32,8 +32,8 @@ export async function StudentHome({
   const quests = (await listLessons(student.id)).filter(
     (l) => l.homework?.sentAt,
   );
-  const open = quests.filter((l) => !l.homework?.answers);
-  const finished = quests.filter((l) => l.homework?.answers);
+  const open = quests.filter((l) => !homeworkDone(l.homework));
+  const finished = quests.filter((l) => homeworkDone(l.homework));
   const style = gameStyle(student.gameStyle);
 
   const xp = finished.length * XP_PER_QUEST;

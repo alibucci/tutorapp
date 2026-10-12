@@ -6,7 +6,14 @@ import { useState } from "react";
 import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
 import { pixelFont } from "@/lib/fonts";
 import { type GameStyle, paletteVars, skinOf } from "@/lib/gameStyles";
-import { ADJECTIVES_TASK, HOMEWORK_TASKS, type HomeworkAnswers } from "@/lib/types";
+import { PracticeGame } from "@/components/PracticeGame";
+import {
+  ADJECTIVES_TASK,
+  EXERCISE_LABEL,
+  HOMEWORK_TASKS,
+  type Exercise,
+  type HomeworkAnswers,
+} from "@/lib/types";
 
 
 const TASKS = [
@@ -14,6 +21,10 @@ const TASKS = [
   { id: "adjectives", prompt: ADJECTIVES_TASK, hint: "Say them or type them - one word in each box." },
 ];
 const XP_PER_TASK = 10;
+
+type Step =
+  | { type: "game"; exercise: Exercise }
+  | { type: "task"; task: (typeof TASKS)[number] };
 
 /**
  * The child's homework, dressed as the game they chose.
@@ -31,22 +42,40 @@ export function HomeworkGame({
   linkKey,
   backHref,
   answered,
+  exercises,
+  finished,
 }: {
   lessonId: string;
-  imageSrc: string;
+  /** Empty when this homework is games only. */
+  imageSrc?: string;
   focus: string;
   style: GameStyle;
   /** The private link key, when the child came in by link rather than login. */
   linkKey?: string;
   backHref: string;
   answered?: HomeworkAnswers;
+  /** Practice games built from the lesson, played before the picture. */
+  exercises?: Exercise[];
+  /** Everything was already handed in: open on the last screen. */
+  finished?: boolean;
 }) {
-  // 0 = intro, 1..TASKS.length = a task, TASKS.length + 1 = done.
-  const [step, setStep] = useState(answered ? TASKS.length + 1 : 0);
+  // Games first - they are quick and they warm up the words the picture task
+  // then asks the child to use.
+  const steps: Step[] = [
+    ...(exercises ?? []).map((exercise) => ({ type: "game" as const, exercise })),
+    ...(imageSrc ? TASKS.map((task) => ({ type: "task" as const, task })) : []),
+  ];
+
+  // 0 = intro, 1..steps.length = a step, steps.length + 1 = done.
+  const [step, setStep] = useState(finished ? steps.length + 1 : 0);
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [adjectives, setAdjectives] = useState(["", "", ""]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** This sitting's scores, so the last screen can say how it went. */
+  const [scores, setScores] = useState<
+    { kind: Exercise["kind"]; right: number; total: number }[]
+  >([]);
 
   // Speaking instead of typing, for children who cannot type yet. The
   // browser's recogniser turns speech into text; nothing records or keeps the
@@ -112,9 +141,29 @@ export function HomeworkGame({
       />
     ) : null;
 
-  const task = step >= 1 && step <= TASKS.length ? TASKS[step - 1] : null;
-  const done = step > TASKS.length;
-  const completed = done ? TASKS.length : Math.max(0, step - 1);
+  const current = step >= 1 && step <= steps.length ? steps[step - 1] : null;
+  const task = current?.type === "task" ? current.task : null;
+  const game = current?.type === "game" ? current.exercise : null;
+  const done = step > steps.length;
+  const completed = done ? steps.length : Math.max(0, step - 1);
+
+  /** A finished game sends its score, then the quest moves on. */
+  async function finishGame(kind: Exercise["kind"], right: number) {
+    const total = (exercises ?? []).find((e) => e.kind === kind)?.rounds.length ?? 0;
+    setScores((all) => [...all.filter((s) => s.kind !== kind), { kind, right, total }]);
+    // Sent without waiting: the score is a record for the tutor, and a child
+    // should never watch a spinner because the network is slow.
+    void api(`/api/lessons/${lessonId}/homework/results`, {
+      method: "POST",
+      json: { key: linkKey, kind, right },
+    });
+    if (step >= steps.length) {
+      // Games only: there is nothing to hand in afterwards.
+      setStep(steps.length + 1);
+      return;
+    }
+    go(step + 1);
+  }
 
   async function submit() {
     setBusy(true);
@@ -133,7 +182,7 @@ export function HomeworkGame({
       setError(result.error);
       return;
     }
-    setStep(TASKS.length + 1);
+    setStep(steps.length + 1);
   }
 
   return (
@@ -149,17 +198,24 @@ export function HomeworkGame({
           <span className="game-small">{style.name}</span>
         </div>
 
-        <div className="game-frame">
-          {/* eslint-disable-next-line @next/next/no-img-element -- private upload */}
-          <img src={imageSrc} alt="Your homework picture" className="game-picture" />
-        </div>
+        {imageSrc && !game && (
+          <div className="game-frame">
+            {/* eslint-disable-next-line @next/next/no-img-element -- private upload */}
+            <img src={imageSrc} alt="Your homework picture" className="game-picture" />
+          </div>
+        )}
 
         {step === 0 && (
           <div className="game-panel">
             <p className="game-title">New quest!</p>
             <p className="game-text mt-3">
-              Look at the picture. {TASKS.length} tasks, {TASKS.length * XP_PER_TASK}{" "}
-              {style.words.reward}.
+              {exercises?.length
+                ? imageSrc
+                  ? `${exercises.length} quick games, then the picture.`
+                  : `${exercises.length} quick games.`
+                : "Look at the picture."}{" "}
+              {steps.length} {steps.length === 1 ? "task" : "tasks"},{" "}
+              {steps.length * XP_PER_TASK} {style.words.reward}.
             </p>
             {focus && (
               <p className="game-tip mt-3">
@@ -170,6 +226,15 @@ export function HomeworkGame({
               {style.words.start}
             </button>
           </div>
+        )}
+
+        {game && (
+          <PracticeGame
+            key={`${game.kind}-${step}`}
+            exercise={game}
+            words={{ submit: style.words.submit }}
+            onDone={(right) => void finishGame(game.kind, right)}
+          />
         )}
 
         {task && task.id !== "adjectives" && (
@@ -253,9 +318,21 @@ export function HomeworkGame({
         {done && (
           <div className="game-panel">
             <p className="game-text">
-              +{TASKS.length * XP_PER_TASK} {style.words.reward}. Your tutor will
-              read your answers.
+              +{steps.length * XP_PER_TASK} {style.words.reward}. Your tutor will
+              see how you did.
             </p>
+            {scores.length > 0 && (
+              <ul className="mt-4 space-y-2">
+                {scores.map((s) => (
+                  <li key={s.kind} className="game-score">
+                    <span>{EXERCISE_LABEL[s.kind]}</span>
+                    <span className="game-score-n">
+                      {s.right}/{s.total}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
             {answered && (
               <div className="mt-4 space-y-3">
                 <Answer label={TASKS[0].prompt} text={answered.describe} />
@@ -272,16 +349,16 @@ export function HomeworkGame({
         {/* The hotbar: one slot per task, the current one selected. */}
         <div className="game-hud">
           <p className="game-level">{completed * XP_PER_TASK}</p>
-          <div className="game-xp" aria-label={`${completed} of ${TASKS.length} done`}>
+          <div className="game-xp" aria-label={`${completed} of ${steps.length} done`}>
             <div
               className="game-xp-fill"
-              style={{ width: `${(completed / TASKS.length) * 100}%` }}
+              style={{ width: `${(completed / Math.max(1, steps.length)) * 100}%` }}
             />
           </div>
           <ol className="game-hotbar">
-            {TASKS.map((t, i) => (
+            {steps.map((s, i) => (
               <li
-                key={t.id}
+                key={s.type === "game" ? `g${i}` : s.task.id}
                 className={`game-slot ${step === i + 1 ? "game-slot-on" : ""} ${
                   i < completed ? "game-slot-done" : ""
                 }`}

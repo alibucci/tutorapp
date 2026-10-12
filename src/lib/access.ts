@@ -1,4 +1,5 @@
 import { getFamilySession, getSession, type Session } from "./auth";
+import { homeworkDone } from "./homework";
 import { getLesson, getStudent } from "./store";
 import type { Lesson, Student } from "./types";
 
@@ -60,6 +61,6 @@ export async function homeworkFor(
   // The child sees homework only once the tutor has sent it.
   if (child && lesson.homework?.sentAt) return { lesson, student, tutor: false };
   const parent = key !== null && key.length > 0 && key === student.parentKey;
-  if (parent && lesson.homework?.answers) return { lesson, student, tutor: false };
+  if (parent && homeworkDone(lesson.homework)) return { lesson, student, tutor: false };
   return null;
 }
