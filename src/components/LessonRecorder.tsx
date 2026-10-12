@@ -142,6 +142,12 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   }, [transcribes, speech.segments, lesson.id]);
 
   async function begin() {
+    // The recogniser first, inside the tap: iOS refuses to start it after an
+    // await, without saying so.
+    if (transcribes) {
+      if (interrupted) speech.resume();
+      else speech.start();
+    }
     // Taken before recording so a lock cannot land in the gap.
     await wakeLock.acquire();
     if (!lesson.startedAt) {
@@ -150,11 +156,6 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ startedAt: new Date().toISOString() }),
       }).catch(() => {});
-    }
-    // Carrying on after an interruption keeps the restored lines.
-    if (transcribes) {
-      if (interrupted) speech.resume();
-      else speech.start();
     }
     setInterrupted(false);
     await rec.start();
@@ -208,10 +209,11 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   }
 
   async function resume() {
-    // The lock is gone after the screen went off - take it again first.
+    // Recogniser first, inside the tap (see begin), then the screen lock,
+    // which is gone after the screen went off.
+    if (transcribes) speech.resume();
     await wakeLock.acquire();
     await rec.resume();
-    if (transcribes) speech.resume();
   }
 
   return (

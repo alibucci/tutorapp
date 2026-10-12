@@ -187,19 +187,29 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
         .join(" "),
   }));
 
-  async function begin() {
-    await wakeLock.acquire();
+  /**
+   * Everything that touches the microphone happens synchronously, inside the
+   * tap, before any await. On an iPhone both matter:
+   * - iOS only lets the recogniser start within the user's gesture; started
+   *   after an await it is refused, silently, and the debrief comes back empty.
+   * - The level meter was holding the microphone through getUserMedia while
+   *   the recogniser wanted it too. Safari routes speech through its own audio
+   *   path and the two can fight, leaving the recogniser deaf. The meter has
+   *   done its job by now (showing the mic works), so it lets go first.
+   */
+  function begin() {
+    rec.release();
     boundariesRef.current = [];
     indexRef.current = 0;
     startedAtRef.current = performance.now();
     deadlineRef.current =
       performance.now() + DEBRIEF_PROMPTS[0].seconds * 1000;
-    setIndex(0);
-    setRemaining(DEBRIEF_PROMPTS[0].seconds);
     speech.setTag(DEBRIEF_PROMPTS[0].id);
     speech.start();
-    await rec.start();
+    setIndex(0);
+    setRemaining(DEBRIEF_PROMPTS[0].seconds);
     setPhase("running");
+    void wakeLock.acquire();
   }
 
   async function save() {
@@ -256,8 +266,9 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
         )}
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => void begin()}
-            disabled={rec.state === "idle"}
+            onClick={() => begin()}
+            // A meter that failed should not stop the recogniser being tried.
+            disabled={rec.state === "idle" && !rec.error}
             className="btn btn-primary btn-lg"
           >
             Start debrief ({DEBRIEF_TOTAL_SECONDS}s)
@@ -286,10 +297,17 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
           </p>
         </div>
 
-        <LevelMeter level={rec.level} gateOpen={rec.gateOpen} />
-
-        {speech.interim && (
-          <p className="text-center t-small t-muted">{speech.interim}</p>
+        {/* What the recogniser hears, as it hears it: the honest sign that it
+            is working, which a level meter is not. */}
+        {speech.error ? (
+          <p className="note note-warn">
+            {speech.error} Finish now and type your answers instead.
+          </p>
+        ) : (
+          <p className="text-center t-small t-muted min-h-[2.5rem]">
+            {speech.interim ||
+              (speech.listening ? "Listening… start talking." : "Starting the microphone…")}
+          </p>
         )}
 
         <div className="flex justify-center gap-3">
@@ -312,6 +330,14 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
   return (
     <div className="space-y-6">
+      {speech.segments.length === 0 && Object.keys(edits).length === 0 && !unfinished && (
+        <p className="note note-warn">
+          Nothing was transcribed
+          {speech.error ? ` - ${speech.error}` : ". The browser did not hear any speech."} Type
+          your answers below; they go into the summary all the same.
+        </p>
+      )}
+
       <p className="t-small t-muted">
         {unfinished && Object.keys(edits).length === 0
           ? "This debrief was interrupted. Here is what was saved - check it, fill any gaps, then save."
