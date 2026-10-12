@@ -13,9 +13,18 @@ const BASE = () =>
   (process.env.DASHSCOPE_BASE_URL ?? "https://dashscope-intl.aliyuncs.com").replace(/\/+$/, "");
 export const IMAGE_MODEL = process.env.DASHSCOPE_IMAGE_MODEL ?? "wan2.6-t2i";
 
-/** Pictures can be drawn only when a key is configured. */
+/**
+ * Drawing is off.
+ *
+ * It works - see the rest of this file - but homework is built around the
+ * practice games now, and the tutor uploads a picture in a few seconds. The
+ * code stays because turning it back on is one line, not a rewrite: set
+ * HOMEWORK_PICTURE_AI=on and give the server a key. Two switches on purpose,
+ * so a key that turns up for something else cannot quietly start spending
+ * money here.
+ */
 export function canDrawPictures(): boolean {
-  return KEY().length > 0;
+  return process.env.HOMEWORK_PICTURE_AI === "on" && KEY().length > 0;
 }
 
 /** Things the picture must never be, whatever the scene says. */

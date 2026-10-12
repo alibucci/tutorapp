@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
 import { gameStyle } from "@/lib/gameStyles";
-import { PictureError, drawPictures } from "@/lib/imageGen";
+import { PictureError, canDrawPictures, drawPictures } from "@/lib/imageGen";
 import { picturePrompt, writeScene } from "@/lib/scenePrompt";
 import { homeworkDone } from "@/lib/homework";
 import { deleteImage, saveImage, updateLesson } from "@/lib/store";
@@ -32,6 +32,9 @@ export async function POST(_request: Request, { params }: Params) {
       { error: "The pictures are drawn from the summary - write that first." },
       { status: 400 },
     );
+  }
+  if (!canDrawPictures()) {
+    return NextResponse.json({ error: "Drawing pictures is switched off." }, { status: 404 });
   }
   if (homeworkDone(found.lesson.homework)) {
     return NextResponse.json({ error: "The homework has already been answered." }, { status: 409 });
