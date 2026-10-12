@@ -1178,3 +1178,48 @@ textarea.field { line-height: var(--leading-normal); }
 }
 .game-stats-palette .game-stats-fill { height: 100%; border-radius: 999px; background: var(--g-accent); }
 .game-stats-palette .game-stats-note { color: color-mix(in oklab, var(--g-panel) 75%, transparent); }
+
+/* The talk button: big enough for a six-year-old's thumb, obvious when on. */
+.game-mic {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.game-mic:active:not(:disabled) { transform: scale(0.94); }
+.game-mic:disabled { opacity: 0.4; }
+@keyframes game-mic-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--mic-ring) 55%, transparent); }
+  100% { box-shadow: 0 0 0 18px transparent; }
+}
+.game-mic-on { animation: game-mic-pulse 1.2s var(--ease-out) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .game-mic-on { animation: none; outline: 4px solid var(--mic-ring); }
+}
+
+.game-minecraft .game-mic {
+  --mic-ring: #80ff20;
+  color: #fff;
+  background: #6f6f6f;
+  border: 3px solid #000;
+  box-shadow: inset 4px 4px 0 #a9a9a9, inset -4px -4px 0 #4a4a4a;
+}
+.game-minecraft .game-mic-on {
+  animation: none;
+  background: #3c8a00;
+  box-shadow: inset 4px 4px 0 #80ff20, inset -4px -4px 0 #2a5f00;
+}
+
+.game-palette .game-mic {
+  --mic-ring: var(--g-accent);
+  border-radius: 999px;
+  color: var(--g-accent-ink);
+  background: var(--g-accent);
+  box-shadow: 0 5px 0 color-mix(in oklab, var(--g-accent) 70%, black);
+}
+.game-palette .game-mic-on {
+  color: var(--g-panel);
+  background: color-mix(in oklab, var(--g-accent) 55%, #d33);
+}

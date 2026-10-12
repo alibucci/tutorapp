@@ -243,7 +243,10 @@ database without touching a single caller.
    full-screen as a game in the student's style.
 
 Homework is the same every time: describe the picture, say what happens next,
-give three adjectives. The child types the answers and hands in once; the tutor
+give three adjectives. The child types the answers, or taps the microphone and
+says them - the browser's recogniser turns speech into text (Apple in Safari,
+Google in Chrome) and only the text is kept; no recording of a child is ever
+made or stored here. They hand in once; the tutor
 reads them on the lesson page. Themes are a list in `src/lib/gameStyles.ts`, and adding one is one entry -
 no CSS. An entry has a name, the words the game screen uses ("quest" /
 "story", "XP" / "stars"), `imageStyle` - how its pictures are described to

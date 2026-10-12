@@ -220,7 +220,7 @@ export const HOMEWORK_TASKS = [
   {
     id: "describe",
     prompt: "Describe the picture. What do you see here?",
-    hint: "Write at least three sentences.",
+    hint: "Say or write at least three sentences.",
   },
   {
     id: "next",
