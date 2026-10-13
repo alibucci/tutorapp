@@ -28,7 +28,13 @@ const Build = z.object({
     .min(3)
     .max(8)
     .describe("The sentence, one word per entry, in the right order"),
-  why: z.string().min(3).max(90),
+  why: z
+    .string()
+    .min(3)
+    .max(90)
+    .describe(
+      "Why the words go in THIS order - the shape of the sentence, not the tense",
+    ),
 });
 
 const Catch = z.object({
@@ -73,6 +79,10 @@ The three games, always these:
 2. BUILD. Short sentences the child puts back in order, word by word. Each one
    uses the thing being practised. Three to eight words, no longer: a child
    taps these on a phone.
+   The mistake this game catches is WORD ORDER, so "why" must be about order:
+   "Who did it, then what, then where: I had pizza for dinner." Writing "use
+   'had' for the past" here explains a mistake the child did not make, and a
+   child who reads it learns nothing.
 3. CATCH. Single words drifting past. The child keeps the ones that follow one
    simple rule and waves the rest away. Write the rule as one short
    instruction a nine-year-old can read at a glance: "Keep the past tense

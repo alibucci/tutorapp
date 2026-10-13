@@ -416,14 +416,28 @@ function picture(bytes) {
   const firstGame = built[0];
   const score = (body) => anon(`/api/lessons/${lessonA.id}/homework/results`, post({ key: childKey, ...body }));
   check("a game nobody built is refused",
-    (await score({ kind: "nonsense", right: 1 })).status === 400);
-  check("a score cannot beat the number of rounds",
-    (await score({ kind: firstGame.kind, right: 999 })).json?.right === firstGame.rounds.length);
+    (await score({ kind: "nonsense", replies: [0] })).status === 400);
+  // The browser sends answers; the server marks them against the exercise.
+  const allRight = (game) => game.rounds.map((r) =>
+    game.kind === "choose" ? r.answer : game.kind === "build" ? r.answer : r.keep);
+  const allWrong = (game) => game.rounds.map((r) =>
+    game.kind === "choose" ? (r.answer + 1) % 3 : game.kind === "build" ? [...r.answer].reverse() : !r.keep);
+
+  check("the server marks a perfect round perfectly",
+    (await score({ kind: firstGame.kind, replies: allRight(firstGame) })).json?.right
+      === firstGame.rounds.length);
+  check("a score cannot be sent in, only earned",
+    (await score({ kind: firstGame.kind, replies: allWrong(firstGame) })).json?.right === 0);
+  check("extra answers beyond the rounds are ignored",
+    (await score({ kind: firstGame.kind, replies: [...allRight(firstGame), 0, 0, 0] })).json?.right
+      === firstGame.rounds.length);
   check("a replay replaces the earlier score, never adds to it",
-    (await score({ kind: firstGame.kind, right: 1 })).json?.right === 1
-      && ((await a(`/api/lessons/${lessonA.id}`)).json.homework.results ?? []).length === 1);
+    ((await a(`/api/lessons/${lessonA.id}`)).json.homework.results ?? []).length === 1);
+  check("the tutor can read back what the child answered",
+    (((await a(`/api/lessons/${lessonA.id}`)).json.homework.results ?? [])[0]?.rounds ?? []).length
+      === firstGame.rounds.length);
   check("another family cannot score this homework",
-    (await anon(`/api/lessons/${lessonA.id}/homework/results`, post({ key: "wrong", kind: firstGame.kind, right: 3 }))).status === 404);
+    (await anon(`/api/lessons/${lessonA.id}/homework/results`, post({ key: "wrong", kind: firstGame.kind, replies: allRight(firstGame) }))).status === 404);
 
   const answer = (body) => anon(`/api/lessons/${lessonA.id}/homework/answers`, post({ key: childKey, ...body }));
   check("two adjectives are not enough",
@@ -439,7 +453,7 @@ function picture(bytes) {
     (await anon(`/api/lessons/${lessonA.id}/homework/image?key=${keys.parentKey}`)).status === 404);
   for (const game of built) {
     await anon(`/api/lessons/${lessonA.id}/homework/results`, post({
-      key: childKey, kind: game.kind, right: game.rounds.length,
+      key: childKey, kind: game.kind, replies: allRight(game),
     }));
   }
 

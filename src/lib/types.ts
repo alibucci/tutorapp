@@ -290,6 +290,22 @@ export const EXERCISE_LABEL: Record<ExerciseKind, string> = {
   catch: "Keep the right words",
 };
 
+/**
+ * What the child sent back for one round: the option they picked, the words
+ * they put in order, or whether they kept the word. The server turns this
+ * into a verdict - it holds the exercise, the browser only holds a copy.
+ */
+export type RoundReply = number | string[] | boolean;
+
+/** One round, as the tutor reads it back. */
+export type RoundAnswer = {
+  /** What was asked, short enough to scan in a list. */
+  asked: string;
+  /** What the child answered. */
+  answered: string;
+  right: boolean;
+};
+
 /** How one game went. Written when the child finishes it. */
 export type ExerciseResult = {
   kind: ExerciseKind;
@@ -297,6 +313,8 @@ export type ExerciseResult = {
   right: number;
   total: number;
   finishedAt: string;
+  /** Every round, so the tutor sees where it went wrong, not just how often. */
+  rounds?: RoundAnswer[];
 };
 
 export type Homework = {

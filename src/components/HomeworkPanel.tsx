@@ -226,6 +226,36 @@ export function HomeworkPanel({
                       )}
                     </div>
                     <p className="t-caption t-muted mt-0.5">{exercise.topic}</p>
+
+                    {/* The rounds themselves: a score says how often, this
+                        says on what. */}
+                    {result?.rounds?.length ? (
+                      <details className="group mt-2">
+                        <summary className="cursor-pointer t-small font-semibold text-accent">
+                          <span className="group-open:hidden">See the answers</span>
+                          <span className="hidden group-open:inline">Hide</span>
+                        </summary>
+                        <ul className="mt-2 space-y-1.5">
+                          {result.rounds.map((round, i) => (
+                            <li
+                              key={i}
+                              className={`rounded-[var(--radius-sm)] px-3 py-2 t-small ${
+                                round.right ? "bg-live-soft" : "bg-warn-soft"
+                              }`}
+                            >
+                              <span className="block t-muted">{round.asked}</span>
+                              <span
+                                className={`block font-semibold ${
+                                  round.right ? "text-live" : "text-warn"
+                                }`}
+                              >
+                                {round.right ? "✓" : "✗"} {round.answered}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
                   </li>
                 );
               })}

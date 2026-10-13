@@ -13,6 +13,7 @@ import {
   HOMEWORK_TASKS,
   type Exercise,
   type HomeworkAnswers,
+  type RoundReply,
 } from "@/lib/types";
 
 
@@ -20,7 +21,11 @@ const TASKS = [
   ...HOMEWORK_TASKS.map((t) => ({ id: t.id, prompt: t.prompt, hint: t.hint })),
   { id: "adjectives", prompt: ADJECTIVES_TASK, hint: "Say them or type them - one word in each box." },
 ];
-const XP_PER_TASK = 10;
+/** A point per round answered right first time, so the most on offer is the
+ *  number of rounds. Picture tasks are not scored - there is no right answer. */
+function pointsOnOffer(exercises: Exercise[] | undefined): number {
+  return (exercises ?? []).reduce((n, e) => n + e.rounds.length, 0);
+}
 
 type Step =
   | { type: "game"; exercise: Exercise }
@@ -76,6 +81,12 @@ export function HomeworkGame({
   const [scores, setScores] = useState<
     { kind: Exercise["kind"]; right: number; total: number }[]
   >([]);
+  /** Rounds answered right first time, across the whole quest. */
+  const [points, setPoints] = useState(0);
+  /** Bumped on a replay so the game starts from a clean slate. */
+  const [replay, setReplay] = useState(0);
+  /** Rounds answered so far in the game on screen, for the bar. */
+  const [inGame, setInGame] = useState(0);
 
   // Speaking instead of typing, for children who cannot type yet. The
   // browser's recogniser turns speech into text; nothing records or keeps the
@@ -146,23 +157,48 @@ export function HomeworkGame({
   const game = current?.type === "game" ? current.exercise : null;
   const done = step > steps.length;
   const completed = done ? steps.length : Math.max(0, step - 1);
+  const maxPoints = pointsOnOffer(exercises);
+  const slice = 100 / Math.max(1, steps.length);
+  const within = game && game.rounds.length ? Math.min(1, inGame / game.rounds.length) : 0;
+  const progressPercent = Math.min(100, completed * slice + within * slice);
 
-  /** A finished game sends its score, then the quest moves on. */
-  async function finishGame(kind: Exercise["kind"], right: number) {
-    const total = (exercises ?? []).find((e) => e.kind === kind)?.rounds.length ?? 0;
-    setScores((all) => [...all.filter((s) => s.kind !== kind), { kind, right, total }]);
-    // Sent without waiting: the score is a record for the tutor, and a child
-    // should never watch a spinner because the network is slow.
-    void api(`/api/lessons/${lessonId}/homework/results`, {
+  /** A finished game sends what was answered; the server marks it. */
+  async function finishGame(kind: Exercise["kind"], replies: RoundReply[]) {
+    const exercise = (exercises ?? []).find((e) => e.kind === kind);
+    const total = exercise?.rounds.length ?? 0;
+    setInGame(0);
+
+    // Sent without waiting: a child should never watch a spinner because the
+    // network is slow. The marked score comes back and replaces the guess.
+    const guess = { kind, right: 0, total };
+    setScores((all) => [...all.filter((s) => s.kind !== kind), guess]);
+    void api<{ right: number; total: number }>(`/api/lessons/${lessonId}/homework/results`, {
       method: "POST",
-      json: { key: linkKey, kind, right },
+      json: { key: linkKey, kind, replies },
+    }).then((result) => {
+      if (result.ok) {
+        setScores((all) => [
+          ...all.filter((s) => s.kind !== kind),
+          { kind, right: result.data.right, total: result.data.total },
+        ]);
+      }
     });
+
     if (step >= steps.length) {
       // Games only: there is nothing to hand in afterwards.
       setStep(steps.length + 1);
       return;
     }
     go(step + 1);
+  }
+
+  /** Play a game again from the last screen. The new score replaces the old. */
+  function playAgain(kind: Exercise["kind"]) {
+    const index = steps.findIndex((s) => s.type === "game" && s.exercise.kind === kind);
+    if (index < 0) return;
+    setInGame(0);
+    setReplay((n) => n + 1);
+    go(index + 1);
   }
 
   async function submit() {
@@ -214,8 +250,8 @@ export function HomeworkGame({
                   ? `${exercises.length} quick games, then the picture.`
                   : `${exercises.length} quick games.`
                 : "Look at the picture."}{" "}
-              {steps.length} {steps.length === 1 ? "task" : "tasks"},{" "}
-              {steps.length * XP_PER_TASK} {style.words.reward}.
+              {steps.length} {steps.length === 1 ? "task" : "tasks"}
+              {maxPoints > 0 && `, up to ${maxPoints} ${style.words.reward}`}.
             </p>
             {focus && (
               <p className="game-tip mt-3">
@@ -230,10 +266,14 @@ export function HomeworkGame({
 
         {game && (
           <PracticeGame
-            key={`${game.kind}-${step}`}
+            key={`${game.kind}-${step}-${replay}`}
             exercise={game}
             words={{ submit: style.words.submit }}
-            onDone={(right) => void finishGame(game.kind, right)}
+            onRound={(right) => {
+              setInGame((n) => n + 1);
+              if (right) setPoints((n) => n + 1);
+            }}
+            onDone={(replies) => void finishGame(game.kind, replies)}
           />
         )}
 
@@ -318,16 +358,23 @@ export function HomeworkGame({
         {done && (
           <div className="game-panel">
             <p className="game-text">
-              +{steps.length * XP_PER_TASK} {style.words.reward}. Your tutor will
-              see how you did.
+              {points} {style.words.reward}. Your tutor will see how you did.
             </p>
             {scores.length > 0 && (
               <ul className="mt-4 space-y-2">
                 {scores.map((s) => (
                   <li key={s.kind} className="game-score">
                     <span>{EXERCISE_LABEL[s.kind]}</span>
-                    <span className="game-score-n">
-                      {s.right}/{s.total}
+                    <span className="flex items-center gap-3">
+                      <span className="game-score-n">
+                        {s.right}/{s.total}
+                      </span>
+                      <button
+                        onClick={() => playAgain(s.kind)}
+                        className="game-score-again"
+                      >
+                        Play again
+                      </button>
                     </span>
                   </li>
                 ))}
@@ -348,11 +395,18 @@ export function HomeworkGame({
 
         {/* The hotbar: one slot per task, the current one selected. */}
         <div className="game-hud">
-          <p className="game-level">{completed * XP_PER_TASK}</p>
-          <div className="game-xp" aria-label={`${completed} of ${steps.length} done`}>
+          <p className="game-level">
+            {points} {style.words.reward}
+          </p>
+          <div
+            className="game-xp"
+            aria-label={`${completed} of ${steps.length} done`}
+          >
+            {/* Whole steps behind, and the game in hand filling the next slot,
+                so something moves on every answer rather than once a game. */}
             <div
               className="game-xp-fill"
-              style={{ width: `${(completed / Math.max(1, steps.length)) * 100}%` }}
+              style={{ width: `${progressPercent}%` }}
             />
           </div>
           <ol className="game-hotbar">
