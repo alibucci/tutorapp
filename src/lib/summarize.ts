@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { MODEL, complete } from "./llm";
 import type { Lesson, LessonSummary, Student } from "./types";
-import { DEBRIEF_PROMPTS } from "./types";
+import { promptLabel } from "./types";
 
 export { MODEL } from "./llm";
 
@@ -83,6 +83,24 @@ function speakerTag(seg: { speaker?: string }, student: Student): string {
   return "UNKNOWN";
 }
 
+const SYSTEM_INTRO = `You read a tutor's spoken notes about a child they have
+not taught yet, and lay out what to work on.
+
+There is no lesson here: the tutor is describing the child from a first
+meeting, a trial, or what a parent told them. So:
+- "covered" is what the child can already do, as far as the tutor can tell.
+- "struggles" is what the tutor says the child finds hard. This is the most
+  important field - the practice games are built from it - so be concrete:
+  "past tense of irregular verbs", not "grammar".
+- "improvements" will usually be empty. That is correct; do not invent any.
+- "nextLesson" is where the tutor says they will start.
+
+Everything is the tutor's own judgement rather than evidence from a recording,
+so do not quote as though you heard it. Where the tutor did not say something,
+leave it out.
+
+${COMMON}`;
+
 export function renderLesson(lesson: Lesson, student: Student): string {
   const both = lesson.capture === "both";
   const transcript = lesson.transcript.length
@@ -98,8 +116,7 @@ export function renderLesson(lesson: Lesson, student: Student): string {
   const debrief = lesson.debrief.length
     ? lesson.debrief
         .map((a) => {
-          const prompt = DEBRIEF_PROMPTS.find((p) => p.id === a.promptId);
-          return `Q: ${prompt?.label ?? a.promptId}\nA: ${a.text || "(no answer)"}`;
+          return `Q: ${promptLabel(a.promptId)}\nA: ${a.text || "(no answer)"}`;
         })
         .join("\n\n")
     : "(no debrief recorded)";
@@ -114,7 +131,9 @@ export function renderLesson(lesson: Lesson, student: Student): string {
       : "=== TUTOR AUDIO TRANSCRIPT ===",
     transcript,
     "",
-    "=== 60-SECOND POST-LESSON DEBRIEF ===",
+    lesson.kind === "intro"
+      ? "=== THE TUTOR'S NOTES ON THIS CHILD ==="
+      : "=== 60-SECOND POST-LESSON DEBRIEF ===",
     debrief,
   ].join("\n");
 }
@@ -124,7 +143,12 @@ export async function summarizeLesson(
   student: Student,
 ): Promise<LessonSummary> {
   const parsed = await complete({
-    system: lesson.capture === "both" ? SYSTEM_BOTH : SYSTEM_TUTOR_ONLY,
+    system:
+      lesson.kind === "intro"
+        ? SYSTEM_INTRO
+        : lesson.capture === "both"
+          ? SYSTEM_BOTH
+          : SYSTEM_TUTOR_ONLY,
     user: renderLesson(lesson, student),
     schema: SummarySchema,
     schemaName: "LessonSummary",

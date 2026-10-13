@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Nightly snapshot of everything the app owns.
 #
-# `data/` holds lesson recordings, transcripts and notes about children. It sits
-# on one disk with no replication, so without this a failed volume loses the lot
-# with no way back. Restoring is `tar xzf` over an empty data directory.
+# `data/` holds transcripts, summaries, homework and notes about children - no
+# recordings, those are never stored. It is small (kilobytes) and sits on one
+# disk with no replication, so without this a failed volume loses the lot with
+# no way back. Restoring is `tar xzf` over an empty data directory.
 #
 #   0 3 * * *  /opt/tutorapp/deploy/backup.sh >> /var/log/tutorapp-backup.log 2>&1
 

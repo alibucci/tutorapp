@@ -228,7 +228,8 @@ export async function getStudentByKey(
 // --- lessons ---------------------------------------------------------------
 
 export async function createLesson(
-  input: Pick<Lesson, "title" | "mode" | "studentId" | "capture" | "language">,
+  input: Pick<Lesson, "title" | "mode" | "studentId" | "capture" | "language"> &
+    Partial<Pick<Lesson, "kind">>,
 ): Promise<Lesson> {
   await ensureDirs();
   const lesson: Lesson = {
@@ -238,6 +239,7 @@ export async function createLesson(
     mode: input.mode,
     capture: input.capture,
     language: input.language,
+    ...(input.kind && { kind: input.kind }),
     createdAt: new Date().toISOString(),
     interruptions: [],
     transcript: [],

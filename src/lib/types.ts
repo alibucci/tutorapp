@@ -100,6 +100,11 @@ export type Lesson = {
   language: string;
   /** Fixed when the lesson is created, from the student's consent. */
   capture: Capture;
+  /**
+   * "intro" is a spoken note about a child nobody has taught yet: no
+   *  recording, different questions, and the summary knows it is not a lesson.
+   */
+  kind?: "intro";
   createdAt: string;
   startedAt?: string;
   endedAt?: string;
@@ -371,6 +376,27 @@ export const DEBRIEF_PROMPTS = [
   { id: "matters", label: "What matters most here?", seconds: 11 },
   { id: "next", label: "What should happen next lesson?", seconds: 10 },
 ] as const;
+
+/**
+ * The five questions for a child you have not taught yet.
+ *
+ * "What did you cover?" is meaningless before the first lesson, but everything
+ * downstream - topics, games, the note home - is built from a debrief, so a
+ * new child gets the same machine with the questions changed.
+ */
+export const INTRO_PROMPTS = [
+  { id: "level", label: "Where are they now, roughly?", seconds: 12 },
+  { id: "hard", label: "What do they find hard?", seconds: 15 },
+  { id: "likes", label: "What are they into?", seconds: 10 },
+  { id: "goal", label: "What do they need to get to?", seconds: 12 },
+  { id: "start", label: "Where will you start?", seconds: 11 },
+] as const;
+
+/** Every prompt the app asks, whichever set it came from. */
+export function promptLabel(id: string): string {
+  const all = [...DEBRIEF_PROMPTS, ...INTRO_PROMPTS] as { id: string; label: string }[];
+  return all.find((p) => p.id === id)?.label ?? id;
+}
 
 export const DEBRIEF_TOTAL_SECONDS = DEBRIEF_PROMPTS.reduce(
   (n, p) => n + p.seconds,

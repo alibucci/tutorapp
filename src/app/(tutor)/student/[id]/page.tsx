@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FamilyLogin } from "@/components/FamilyLogin";
+import { IntroNoteButton } from "@/components/IntroNoteButton";
 import { GameStylePicker } from "@/components/GameStylePicker";
 import { ReportsPanel } from "@/components/ReportsPanel";
 import { ShareLinks } from "@/components/ShareLinks";
@@ -64,6 +65,12 @@ export default async function StudentPage({
         <h2 className="t-title">Working on</h2>
         <SkillList skills={student.skills} />
       </section>
+
+      {/* A child with no lessons yet has nothing to build from. This is how
+          they get a starting point without waiting for the first lesson. */}
+      {lessons.length === 0 && (
+        <IntroNoteButton studentId={student.id} studentName={student.name} />
+      )}
 
       {lessons.length > 0 && (
         <section className="space-y-3">

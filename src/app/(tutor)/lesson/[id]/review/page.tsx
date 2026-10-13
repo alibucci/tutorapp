@@ -8,7 +8,7 @@ import { ChevronLeft } from "@/components/ui";
 import { lessonFor } from "@/lib/access";
 import { gameStyle } from "@/lib/gameStyles";
 import { canDrawPictures } from "@/lib/imageGen";
-import { DEBRIEF_PROMPTS, INTERRUPTION_LABEL } from "@/lib/types";
+import { INTERRUPTION_LABEL, promptLabel } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -147,8 +147,7 @@ export default async function ReviewPage({
             {lesson.debrief.map((answer) => (
               <div key={answer.promptId} className="px-4 py-3">
                 <dt className="t-caption t-muted">
-                  {DEBRIEF_PROMPTS.find((p) => p.id === answer.promptId)?.label ??
-                    answer.promptId}
+                  {promptLabel(answer.promptId)}
                 </dt>
                 <dd className="mt-1 t-small">{answer.text || "—"}</dd>
               </div>

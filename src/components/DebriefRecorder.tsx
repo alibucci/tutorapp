@@ -8,7 +8,7 @@ import { useTutorRecorder } from "@/hooks/useTutorRecorder";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import {
   DEBRIEF_PROMPTS,
-  DEBRIEF_TOTAL_SECONDS,
+  INTRO_PROMPTS,
   type DebriefAnswer,
   type Lesson,
   type TranscriptSegment,
@@ -35,6 +35,10 @@ function readDraft(id: string): Draft | null {
 }
 
 export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
+  // An intro note asks about the child; a debrief asks about the lesson.
+  const PROMPTS: readonly { id: string; label: string; seconds: number }[] =
+    lesson.kind === "intro" ? INTRO_PROMPTS : DEBRIEF_PROMPTS;
+  const totalSeconds = PROMPTS.reduce((n, p) => n + p.seconds, 0);
   const router = useRouter();
   const rec = useTutorRecorder();
   const speech = useSpeechTranscript(lesson.language);
@@ -45,7 +49,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const unfinished = lesson.debrief.length === 0 && lesson.debriefTranscript.length > 0;
   const [phase, setPhase] = useState<Phase>(unfinished ? "review" : "ready");
   const [index, setIndex] = useState(0);
-  const [remaining, setRemaining] = useState<number>(DEBRIEF_PROMPTS[0].seconds);
+  const [remaining, setRemaining] = useState<number>(PROMPTS[0].seconds);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,16 +90,16 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
   function advance() {
     const next = indexRef.current + 1;
-    if (next >= DEBRIEF_PROMPTS.length) {
+    if (next >= PROMPTS.length) {
       finish();
       return;
     }
     indexRef.current = next;
-    speech.setTag(DEBRIEF_PROMPTS[next].id);
+    speech.setTag(PROMPTS[next].id);
     boundariesRef.current.push(performance.now() - startedAtRef.current);
-    deadlineRef.current = performance.now() + DEBRIEF_PROMPTS[next].seconds * 1000;
+    deadlineRef.current = performance.now() + PROMPTS[next].seconds * 1000;
     setIndex(next);
-    setRemaining(DEBRIEF_PROMPTS[next].seconds);
+    setRemaining(PROMPTS[next].seconds);
   }
 
   /** Copy what has been said so far to the server, without marking it done. */
@@ -131,7 +135,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
     const id = window.setInterval(() => {
       let left = deadlineRef.current - performance.now();
-      while (left <= 0 && indexRef.current < DEBRIEF_PROMPTS.length - 1) {
+      while (left <= 0 && indexRef.current < PROMPTS.length - 1) {
         advanceRef.current();
         left = deadlineRef.current - performance.now();
       }
@@ -156,7 +160,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", onPageHide);
     };
-  }, [phase]);
+  }, [phase, PROMPTS.length]);
 
   // The device keeps its own copy too, including what the tutor has typed.
   useEffect(() => {
@@ -177,7 +181,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
    * once, because the recogniser can still be handing over the last utterance
    * while the review screen is already up - a snapshot would miss it.
    */
-  const answers: DebriefAnswer[] = DEBRIEF_PROMPTS.map((prompt) => ({
+  const answers: DebriefAnswer[] = PROMPTS.map((prompt) => ({
     promptId: prompt.id,
     text:
       edits[prompt.id] ??
@@ -203,11 +207,11 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     indexRef.current = 0;
     startedAtRef.current = performance.now();
     deadlineRef.current =
-      performance.now() + DEBRIEF_PROMPTS[0].seconds * 1000;
-    speech.setTag(DEBRIEF_PROMPTS[0].id);
+      performance.now() + PROMPTS[0].seconds * 1000;
+    speech.setTag(PROMPTS[0].id);
     speech.start();
     setIndex(0);
-    setRemaining(DEBRIEF_PROMPTS[0].seconds);
+    setRemaining(PROMPTS[0].seconds);
     setPhase("running");
     void wakeLock.acquire();
   }
@@ -243,7 +247,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     return (
       <div className="space-y-6">
         <ol className="space-y-2 card p-5 t-small">
-          {DEBRIEF_PROMPTS.map((p) => (
+          {PROMPTS.map((p) => (
             <li key={p.id} className="flex justify-between gap-4">
               <span>{p.label}</span>
               <span className="shrink-0 font-mono t-caption t-muted">
@@ -271,7 +275,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
             disabled={rec.state === "idle" && !rec.error}
             className="btn btn-primary btn-lg"
           >
-            Start debrief ({DEBRIEF_TOTAL_SECONDS}s)
+            {lesson.kind === "intro" ? "Start" : "Start debrief"} ({totalSeconds}s)
           </button>
           <button onClick={() => setPhase("review")} className="btn btn-quiet btn-lg">
             Type it instead
@@ -282,12 +286,12 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   }
 
   if (phase === "running") {
-    const prompt = DEBRIEF_PROMPTS[index];
+    const prompt = PROMPTS[index];
     return (
       <div className="stack-lg">
         <div className="card p-8 text-center">
           <p className="t-eyebrow">
-            {index + 1} of {DEBRIEF_PROMPTS.length}
+            {index + 1} of {PROMPTS.length}
           </p>
           <p className="mt-3 t-title">
             {prompt.label}
@@ -344,7 +348,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
           : "Transcribed from what you said. Fix anything the recogniser got wrong - it goes straight into the summary."}
       </p>
 
-      {DEBRIEF_PROMPTS.map((prompt, i) => (
+      {PROMPTS.map((prompt, i) => (
         <label key={prompt.id} className="block">
           <span className="label">{prompt.label}</span>
           <textarea

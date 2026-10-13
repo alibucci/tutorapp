@@ -10,6 +10,7 @@ import {
   StyleTag,
 } from "@/components/ui";
 import { requireSession } from "@/lib/auth";
+import { recentActivity, timeAgo } from "@/lib/feed";
 import { homeworkDone } from "@/lib/homework";
 import { listLessons, listStudents } from "@/lib/store";
 import type { Lesson } from "@/lib/types";
@@ -107,6 +108,7 @@ export default async function Home() {
   const lessons = (await listLessons()).filter((l) => names.has(l.studentId));
 
   const todos = recentTodos(lessons, names);
+  const activity = recentActivity(lessons, students);
 
   const latest = new Map<string, Lesson>();
   for (const lesson of lessons) {
@@ -145,6 +147,31 @@ export default async function Home() {
                   <span className="t-muted">
                     <ChevronRight />
                   </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {activity.length > 0 && (
+        <section className="space-y-2.5">
+          <h2 className="t-eyebrow">What the children have been doing</h2>
+          <ul className="card rows">
+            {activity.map((event) => (
+              <li key={event.href + event.at}>
+                <Link href={event.href} className="row row-link py-3">
+                  <span
+                    aria-hidden
+                    className={`h-2 w-2 shrink-0 rounded-full ${
+                      event.done ? "bg-live" : "bg-info"
+                    }`}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{event.what}</span>
+                    <span className="block truncate t-small t-muted">{event.detail}</span>
+                  </span>
+                  <span className="shrink-0 t-small t-muted">{timeAgo(event.at)}</span>
                 </Link>
               </li>
             ))}

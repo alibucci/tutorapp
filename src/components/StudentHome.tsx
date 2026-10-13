@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { pixelFont } from "@/lib/fonts";
 import { gameStyle, paletteVars, skinOf } from "@/lib/gameStyles";
-import { XP_PER_LEVEL, XP_PER_QUEST, homeworkDone, homeworkImageUrl } from "@/lib/homework";
+import {
+  XP_PER_LEVEL,
+  XP_PER_QUEST,
+  gameScore,
+  homeworkDone,
+  homeworkImageUrl,
+} from "@/lib/homework";
 import { listLessons } from "@/lib/store";
 import type { Skill, Student } from "@/lib/types";
 
@@ -121,18 +127,35 @@ export async function StudentHome({
           <ul className="grid grid-cols-2 gap-3">
             {finished.map((lesson) => {
               const src = homeworkImageUrl(lesson, linkKey);
+              const score = gameScore(lesson.homework);
+              const games = lesson.homework?.exercises?.length ?? 0;
               return (
                 <li key={lesson.id}>
-                  <Link href={questHref(lesson.id)} className="quest-tile card-press">
-                    {src && (
+                  <Link
+                    href={questHref(lesson.id)}
+                    className={`quest-tile card-press ${
+                      src ? "" : `quest-tile-blank quest-tile-blank-${skinOf(style)}`
+                    }`}
+                    style={paletteVars(style) as React.CSSProperties}
+                  >
+                    {src ? (
                       // eslint-disable-next-line @next/next/no-img-element -- private upload
                       <img src={src} alt="" className="quest-tile-img" />
+                    ) : (
+                      // Homework with no picture is all games, so the tile says
+                      // what is inside rather than leaving a blank card.
+                      <span className={`quest-tile-face ${pixelFont.variable}`}>
+                        <span className="quest-tile-games">
+                          {games} {games === 1 ? "game" : "games"}
+                        </span>
+                      </span>
                     )}
                     <span
                       className={`quest-tile-badge quest-tile-badge-${skinOf(style)} ${pixelFont.variable}`}
-                      style={paletteVars(style) as React.CSSProperties}
                     >
-                      +{XP_PER_QUEST} {style.words.reward}
+                      {score.total > 0
+                        ? `${score.right}/${score.total}`
+                        : `+${XP_PER_QUEST} ${style.words.reward}`}
                     </span>
                     <span className="quest-tile-label">{lesson.title}</span>
                   </Link>

@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 data/
+
+# Pulled server backups: secrets and children's names. Never commit these.
+backups/

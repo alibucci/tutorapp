@@ -18,10 +18,12 @@ export default async function DebriefPage({
     <div className="stack-lg">
       <header>
         <h1 className="t-display">
-          60-second debrief
+          {lesson.kind === "intro" ? "About this child" : "60-second debrief"}
         </h1>
         <p className="t-body t-muted mt-2">
-          {lesson.title} &middot; five prompts, one minute, then you&rsquo;re done.
+          {lesson.kind === "intro"
+            ? "Five questions, one minute. Everything else is built from this."
+            : `${lesson.title} · five prompts, one minute, then you're done.`}
         </p>
       </header>
 

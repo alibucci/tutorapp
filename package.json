@@ -9,7 +9,8 @@
     "lint": "eslint",
     "dev:https": "next dev --experimental-https",
     "smoke": "node scripts/smoke.mjs",
-    "release": "bash scripts/release.sh"
+    "release": "bash scripts/release.sh",
+    "backup:pull": "bash scripts/backup-pull.sh"
   },
   "dependencies": {
     "next": "16.3.8",

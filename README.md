@@ -254,6 +254,16 @@ it got right, and `src/lib/homework.ts` adds those up per topic, which is what
 the parent's page shows: not "did they do it" but "is the thing they kept
 getting wrong getting better".
 
+A wrong answer is worth one more go: the child reads why and puts it right
+while the explanation still means something. The score counts the first
+answer - the retry is for learning, not for the number. The browser sends
+what the child answered and the server does the marking, so a score cannot be
+sent in from outside, and every round is kept for the tutor to read back.
+
+A child nobody has taught yet does not have to wait for a lesson: `kind:
+"intro"` on a lesson swaps the debrief questions for five about the child, and
+everything downstream - topics, games, the note home - is built from that.
+
 The picture half is the same every time: describe the picture, say what happens
 next, give three adjectives. The child types the answers, or taps the microphone and
 says them - the browser's recogniser turns speech into text (Apple in Safari,
@@ -339,9 +349,10 @@ movement. Nothing triggered many times an hour animates at all.
 
 - **No automatic delivery.** The tutor copies the parent message into WeChat by
   hand; the weekly note waits for the parent to open it.
-- **Single machine.** Files on disk, no migrations, no second instance.
-  `deploy/backup.sh` covers backups once someone installs the cron entry and
-  points `BACKUP_REMOTE` off the box — until then there is still only one copy.
+- **Single machine.** Files on disk, no migrations, no second instance. The
+  nightly `deploy/backup.sh` runs from `/etc/cron.d/tutorapp-backup`, and
+  `npm run backup:pull` brings the newest archive to a second machine. Set
+  `BACKUP_REMOTE` to an rclone target for an automatic offsite copy.
 - **Foreign services in the path.** The transcript goes through Google's
   recogniser and the model calls go to DeepSeek. For a deployment where
   data must stay in one jurisdiction, both need replacing — the capture layer

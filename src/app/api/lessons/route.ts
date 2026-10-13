@@ -35,6 +35,7 @@ export async function POST(request: Request) {
     mode?: LessonMode;
     studentId?: string;
     language?: string;
+    kind?: string;
   }>(request, LIMIT.small);
   if (parsed instanceof Response) return parsed;
   const body = parsed;
@@ -62,6 +63,9 @@ export async function POST(request: Request) {
     // student is not recorded, whatever the request asks for.
     capture: student.recordingConsent ? "both" : "tutor",
     studentId: body.studentId,
+    // A spoken note about a child nobody has taught yet. Nothing is recorded,
+    // so consent does not come into it.
+    ...(body.kind === "intro" && { kind: "intro" as const }),
   });
 
   return NextResponse.json(lesson, { status: 201 });
