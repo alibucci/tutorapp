@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { homeworkFor } from "@/lib/access";
 import { LIMIT, readJson } from "@/lib/http";
+import { noticeHomeworkDone } from "@/lib/notices";
 import { updateLesson } from "@/lib/store";
 import type { Exercise, ExerciseKind, RoundAnswer, RoundReply } from "@/lib/types";
 
@@ -79,7 +80,8 @@ export async function POST(request: Request, { params }: Params) {
     .filter((r): r is RoundAnswer => r !== null);
   const right = rounds.filter((r) => r.right).length;
 
-  await updateLesson(id, (current) => {
+  const before = found.lesson;
+  const after = await updateLesson(id, (current) => {
     const homework = current.homework;
     if (!homework?.sentAt) return null;
     const rest = (homework.results ?? []).filter((r) => r.kind !== kind);
@@ -100,6 +102,7 @@ export async function POST(request: Request, { params }: Params) {
       },
     };
   });
+  noticeHomeworkDone(before, after);
 
   return NextResponse.json({ right, total: exercise.rounds.length });
 }

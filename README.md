@@ -190,6 +190,23 @@ Two gates keep the model away from people:
 2. **Per week** — the tutor edits the parent note and approves it. Until then the
    parent's page shows nothing.
 
+## Telling the tutor
+
+The tutor's home carries a feed of what the children have been doing. With
+`TELEGRAM_BOT_TOKEN` set, the same two events also go to Telegram: a child
+finished their homework, and - the one worth interrupting for - a child
+finished it badly enough that the topic needs explaining again.
+
+Connecting is two taps: the tutor presses a button, presses Start in Telegram,
+and the page notices. No codes typed, no chat ids. It is HTTP calls to one
+address - no library, no webhook, no second process (`src/lib/telegram.ts`).
+
+The server reaches Telegram from wherever it runs; a tutor in mainland China
+needs a VPN to read. Telegram holds messages until the client fetches them, so
+nothing is missed by being offline - only the live popup. If Telegram is
+unreachable when something happens the message is dropped rather than queued:
+the site's own feed is the record, this is the convenience on top.
+
 ## Running it
 
 ```bash

@@ -1,6 +1,8 @@
 import { PasswordForm } from "@/components/PasswordForm";
+import { TelegramConnect } from "@/components/TelegramConnect";
 import { requireSession } from "@/lib/auth";
 import { getTutor } from "@/lib/store";
+import { canNotify } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,8 @@ export default async function AccountPage() {
         <h1 className="t-display mt-2">{session.name}</h1>
       </header>
       <PasswordForm first={Boolean(tutor?.mustChangePassword)} />
+
+      {canNotify() && <TelegramConnect connectedTo={tutor?.telegram?.name} />}
     </div>
   );
 }

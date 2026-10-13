@@ -332,6 +332,15 @@ check("parent sees the note after approval", !parentAfter.includes("No weekly no
     (await other("/api/students")).status === 403);
   check("the tab that changed it stays signed in",
     (await a("/api/students")).status === 200);
+
+  // Telegram is hidden entirely unless the server has a bot token.
+  const tg = await a("/api/account/telegram", { method: "POST" });
+  const configured = Boolean(env.TELEGRAM_BOT_TOKEN);
+  check("Telegram is hidden without a bot token, offered with one",
+    configured ? tg.status === 200 || tg.status === 502 : tg.status === 404);
+  check("a signed-out visitor cannot start a Telegram link",
+    (await anon("/api/account/telegram", { method: "POST" })).status === 403
+      || !configured);
 }
 
 {

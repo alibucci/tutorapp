@@ -1,6 +1,7 @@
 import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { homeworkFor } from "@/lib/access";
+import { noticeHomeworkDone } from "@/lib/notices";
 import { updateLesson } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -46,7 +47,8 @@ export async function POST(request: Request, { params }: Params) {
   // Checked again under the lock: two taps on "Craft it" must not both land,
   // and the tutor may have taken the homework back meanwhile.
   let accepted = false;
-  await updateLesson(id, (current) => {
+  const before = found.lesson;
+  const after = await updateLesson(id, (current) => {
     if (!current.homework?.sentAt || current.homework.answers) return null;
     accepted = true;
     return {
@@ -64,5 +66,6 @@ export async function POST(request: Request, { params }: Params) {
   if (!accepted) {
     return NextResponse.json({ error: "Already handed in." }, { status: 409 });
   }
+  noticeHomeworkDone(before, after);
   return NextResponse.json({ ok: true });
 }

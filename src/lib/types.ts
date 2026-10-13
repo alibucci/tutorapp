@@ -184,6 +184,10 @@ export type Tutor = {
   tokenVersion: number;
   active: boolean;
   createdAt: string;
+  /** Where to send notices, once this tutor has connected Telegram. */
+  telegram?: { chatId: string; name: string; linkedAt: string };
+  /** A connection in progress: the code the tutor is about to send the bot. */
+  telegramLink?: { code: string; expiresAt: string };
 };
 
 export type Student = {
