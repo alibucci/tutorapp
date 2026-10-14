@@ -1,15 +1,9 @@
 import Link from "next/link";
 import { pixelFont } from "@/lib/fonts";
 import { gameStyle, paletteVars, skinOf } from "@/lib/gameStyles";
-import {
-  XP_PER_LEVEL,
-  XP_PER_QUEST,
-  gameScore,
-  homeworkDone,
-  homeworkImageUrl,
-} from "@/lib/homework";
+import { gameScore, homeworkDone, homeworkImageUrl } from "@/lib/homework";
 import { listLessons } from "@/lib/store";
-import type { Skill, Student } from "@/lib/types";
+import type { Lesson, Skill, Student } from "@/lib/types";
 
 /**
  * The student's own screen.
@@ -21,8 +15,11 @@ import type { Skill, Student } from "@/lib/types";
  * carded so they cannot compete, and exactly one surface on the screen carries
  * the accent - if everything is highlighted, nothing is.
  *
- * The count of things already beaten is the largest number on the page. It is
- * the only reason anyone opens this twice.
+ * There is no level and no XP here. Points belong inside a game, where they
+ * mean "answers you got right"; a second kind of point on this screen only
+ * made one word mean two things, and a level that unlocks nothing is
+ * decoration pretending to be a system. What a child has actually won is the
+ * list of things they can now do, so that is what the screen shows.
  */
 export async function StudentHome({
   student,
@@ -41,10 +38,6 @@ export async function StudentHome({
   const open = quests.filter((l) => !homeworkDone(l.homework));
   const finished = quests.filter((l) => homeworkDone(l.homework));
   const style = gameStyle(student.gameStyle);
-
-  const xp = finished.length * XP_PER_QUEST;
-  const level = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const toNext = (xp % XP_PER_LEVEL) / XP_PER_LEVEL;
 
   const working = student.skills.filter((s) => s.status !== "solid").slice(0, 3);
   const done = student.skills.filter((s) => s.status === "solid");
@@ -82,7 +75,7 @@ export async function StudentHome({
                 <span className="game-entry-kicker">{style.name} homework</span>
                 <span className="game-entry-title">Describe the picture</span>
                 <span className="game-entry-meta">
-                  From {lesson.title} · 3 tasks · {XP_PER_QUEST} {style.words.reward}
+                  From {lesson.title} · {taskCount(lesson)}
                 </span>
               </span>
               <span aria-hidden className="game-entry-title">→</span>
@@ -91,25 +84,24 @@ export async function StudentHome({
         </section>
       )}
 
-      {finished.length > 0 && (
-        // Progress, the way the game shows it: a level and a filling bar.
+      {done.length > 0 && (
+        // What they have actually won. Same frame the level bar used, because
+        // that is the spot on the screen a child looks at first.
         <section
           className={`game-stats game-stats-${skinOf(style)} ${pixelFont.variable}`}
           style={paletteVars(style) as React.CSSProperties}
         >
           <div className="flex items-baseline justify-between gap-3">
-            <span className="game-stats-level">Level {level}</span>
-            <span className="game-stats-xp">
-              {xp} {style.words.reward}
-            </span>
+            <span className="game-stats-level">You can now do</span>
+            <span className="game-stats-xp">{done.length}</span>
           </div>
-          <div className="game-stats-bar" aria-label={`${Math.round(toNext * 100)}% to level ${level + 1}`}>
-            <div className="game-stats-fill" style={{ width: `${Math.max(4, toNext * 100)}%` }} />
-          </div>
-          <p className="game-stats-note">
-            {finished.length} {finished.length === 1 ? "quest" : "quests"} done ·{" "}
-            {XP_PER_LEVEL - (xp % XP_PER_LEVEL)} {style.words.reward} to level {level + 1}
-          </p>
+          <ul className="collection">
+            {done.map((skill) => (
+              <li key={skill.topic} className="collection-item">
+                {skill.topic}
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
@@ -120,51 +112,6 @@ export async function StudentHome({
       )}
 
       {first && <FocusGoal skill={first} />}
-
-      {finished.length > 0 && (
-        <section>
-          <h2 className="t-eyebrow mb-3">Your quests</h2>
-          <ul className="grid grid-cols-2 gap-3">
-            {finished.map((lesson) => {
-              const src = homeworkImageUrl(lesson, linkKey);
-              const score = gameScore(lesson.homework);
-              const games = lesson.homework?.exercises?.length ?? 0;
-              return (
-                <li key={lesson.id}>
-                  <Link
-                    href={questHref(lesson.id)}
-                    className={`quest-tile card-press ${
-                      src ? "" : `quest-tile-blank quest-tile-blank-${skinOf(style)}`
-                    }`}
-                    style={paletteVars(style) as React.CSSProperties}
-                  >
-                    {src ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- private upload
-                      <img src={src} alt="" className="quest-tile-img" />
-                    ) : (
-                      // Homework with no picture is all games, so the tile says
-                      // what is inside rather than leaving a blank card.
-                      <span className={`quest-tile-face ${pixelFont.variable}`}>
-                        <span className="quest-tile-games">
-                          {games} {games === 1 ? "game" : "games"}
-                        </span>
-                      </span>
-                    )}
-                    <span
-                      className={`quest-tile-badge quest-tile-badge-${skinOf(style)} ${pixelFont.variable}`}
-                    >
-                      {score.total > 0
-                        ? `${score.right}/${score.total}`
-                        : `+${XP_PER_QUEST} ${style.words.reward}`}
-                    </span>
-                    <span className="quest-tile-label">{lesson.title}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
 
       {rest.length > 0 && (
         <section>
@@ -177,25 +124,59 @@ export async function StudentHome({
         </section>
       )}
 
-      {done.length > 0 && (
-        <section className="card card-pad">
-          <p className="stat">{done.length}</p>
-          <p className="t-subtitle mt-1">
-            {done.length === 1
-              ? "thing you couldn't do before"
-              : "things you couldn't do before"}
-          </p>
-          <ul className="mt-4 flex flex-wrap gap-2">
-            {done.map((skill) => (
-              <li key={skill.topic} className="pill pill-done">
-                {skill.topic}
-              </li>
-            ))}
+      {finished.length > 0 && (
+        <section>
+          <h2 className="t-eyebrow mb-3">Quests you have done</h2>
+          <ul className="space-y-2.5">
+            {finished.map((lesson) => {
+              const src = homeworkImageUrl(lesson, linkKey);
+              const score = gameScore(lesson.homework);
+              return (
+                <li key={lesson.id}>
+                  <Link href={questHref(lesson.id)} className="quest-row card card-press">
+                    <span
+                      className={`quest-row-face quest-row-face-${skinOf(style)}`}
+                      style={paletteVars(style) as React.CSSProperties}
+                    >
+                      {src ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- private upload
+                        <img src={src} alt="" className="quest-row-img" />
+                      ) : (
+                        <span className={`quest-row-games ${pixelFont.variable}`}>
+                          {lesson.homework?.exercises?.length ?? 0}
+                        </span>
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{lesson.title}</span>
+                      <span className="block t-small t-muted">
+                        {score.total > 0
+                          ? `${score.right} of ${score.total} right`
+                          : taskCount(lesson)}
+                      </span>
+                      <span className="mt-1 block t-small font-semibold text-accent">
+                        Play again →
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
+
     </div>
   );
+}
+
+/** "3 games", or "3 games and a picture" - whatever this homework holds. */
+function taskCount(lesson: Lesson): string {
+  const games = lesson.homework?.exercises?.length ?? 0;
+  const picture = Boolean(lesson.homework?.imageFile);
+  const parts = [games > 0 ? `${games} ${games === 1 ? "game" : "games"}` : null];
+  if (picture) parts.push("a picture");
+  return parts.filter(Boolean).join(" and ") || "a picture";
 }
 
 /** The entry point. The only accented surface on the screen. */

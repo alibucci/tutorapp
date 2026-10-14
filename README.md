@@ -359,7 +359,11 @@ workspace stays compact because someone is in it all day.
 
 Each screen has exactly one focal surface (`.card-focus`) and one dominant
 element. On the student's page that is the first goal; the other goals are
-listed, not carded, so they cannot compete. On the parent's page the opening
+listed, not carded, so they cannot compete. There is no level or XP on that
+page: points belong inside a game, where they mean "answers you got right",
+and a level that unlocks nothing is decoration pretending to be a system.
+What the child has actually won - the things they can now do - takes that
+place instead. On the parent's page the opening
 paragraph is the largest thing because it answers "is this working?", and the
 at-home block is the only accented surface because it is the only thing on the
 page a parent does.

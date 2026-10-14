@@ -1464,3 +1464,65 @@ textarea.field { line-height: var(--leading-normal); }
     var(--g-ground);
 }
 .quest-tile-blank-palette .quest-tile-games { color: var(--g-panel); }
+
+/* What the child has actually won, in the frame the level bar used to hold. */
+.collection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: var(--space-3);
+}
+.collection-item {
+  padding: 0.3rem 0.6rem;
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+.game-stats-minecraft .collection-item {
+  color: #fff;
+  background: #5b9b2c;
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 #7bc443, inset -2px -2px 0 #3c6b1a;
+}
+.game-stats-palette .collection-item {
+  border-radius: 999px;
+  color: var(--g-ground);
+  background: var(--g-panel);
+}
+
+/* A finished quest: wide enough to say what it is and what tapping does. */
+.quest-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+}
+.quest-row-face {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+.quest-row-img { width: 100%; height: 100%; object-fit: cover; }
+.quest-row-face-minecraft {
+  background: url("/game/minecraft/dirt.svg") 0 0 / 48px 48px;
+  border: 2px solid #000;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+.quest-row-face-palette {
+  background:
+    radial-gradient(120% 120% at 100% 0%, color-mix(in oklab, var(--g-accent) 55%, transparent), transparent 60%),
+    var(--g-ground);
+}
+
+/* No picture: the thumbnail says how many games are in there. */
+.quest-row-games { font-size: 1.5rem; font-weight: 700; color: #fff; }
+.quest-row-face-minecraft .quest-row-games {
+  font-family: var(--font-pixel), monospace;
+  font-size: 1.125rem;
+  text-shadow: 2px 2px 0 #000;
+}
+.quest-row-face-palette .quest-row-games { color: var(--g-panel); }
