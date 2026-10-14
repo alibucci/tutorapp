@@ -58,7 +58,7 @@ export async function StudentHome({
                 : "All quests done. Nice work!"
               : first
                 ? "Here's what to work on."
-                : "Nothing outstanding right now."}
+                : "Nothing to do right now."}
         </h1>
       </header>
 
@@ -92,7 +92,7 @@ export async function StudentHome({
           style={paletteVars(style) as React.CSSProperties}
         >
           <div className="flex items-baseline justify-between gap-3">
-            <span className="game-stats-level">You can now do</span>
+            <span className="game-stats-level">You&rsquo;ve learned</span>
             <span className="game-stats-xp">{done.length}</span>
           </div>
           <ul className="collection">

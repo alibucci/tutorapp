@@ -502,7 +502,7 @@ function MicButton({
         onClick={listening ? onStop : onStart}
         disabled={busy}
         aria-pressed={listening}
-        aria-label={listening ? "Stop talking" : "Talk your answer"}
+        aria-label={listening ? "Stop recording" : "Say your answer"}
         className={`game-mic ${listening ? "game-mic-on" : ""}`}
       >
         {listening ? (
