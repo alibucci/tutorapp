@@ -17,7 +17,7 @@ export async function QuestPage({
   const found = await homeworkFor(lessonId, linkKey ?? null);
   const homework = found?.lesson.homework;
   // Homework is games, a picture, or both - but it has to be something.
-  if (!found || found.tutor || !homework) notFound();
+  if (!found || !homework) notFound();
   if (!homework.imageFile && !homework.exercises?.length) notFound();
 
   return (
@@ -32,6 +32,8 @@ export async function QuestPage({
       exercises={homework.exercises}
       finished={homeworkDone(homework)}
       results={homework.results}
+      // A tutor is looking at the child's screen, not doing the homework.
+      preview={found.tutor}
     />
   );
 }

@@ -407,6 +407,11 @@ function picture(bytes) {
   check("a wrong key cannot load the picture", (await img("wrong-key")).status === 404);
   check("the parent link cannot load the picture", (await img(keys.parentKey)).status === 404);
   check("the quest page opens", (await anon(`/s/${childKey}/quest/${lessonA.id}`)).status === 200);
+  check("the tutor can look at the child's screen without breaking it",
+    (await a(`/s/${childKey}/quest/${lessonA.id}`)).status === 200);
+  check("a tutor's play is never written to the child's score",
+    (await a(`/api/lessons/${lessonA.id}/homework/results`,
+      post({ kind: "choose", replies: [0] }))).status === 404);
 
   // The games: built from the lesson, played by the child, scored for the parent.
   const games = await a(`/api/lessons/${lessonA.id}/homework/exercises`, { method: "POST" });

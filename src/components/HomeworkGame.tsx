@@ -51,6 +51,7 @@ export function HomeworkGame({
   exercises,
   finished,
   results,
+  preview,
 }: {
   lessonId: string;
   /** Empty when this homework is games only. */
@@ -67,6 +68,8 @@ export function HomeworkGame({
   finished?: boolean;
   /** Scores from earlier sittings, so coming back shows how it went. */
   results?: ExerciseResult[];
+  /** The tutor looking at the child's screen. Nothing is recorded. */
+  preview?: boolean;
 }) {
   // Games first - they are quick and they warm up the words the picture task
   // then asks the child to use.
@@ -179,17 +182,22 @@ export function HomeworkGame({
     // network is slow. The marked score comes back and replaces the guess.
     const guess = { kind, right: 0, total };
     setScores((all) => [...all.filter((s) => s.kind !== kind), guess]);
-    void api<{ right: number; total: number }>(`/api/lessons/${lessonId}/homework/results`, {
-      method: "POST",
-      json: { key: linkKey, kind, replies },
-    }).then((result) => {
-      if (result.ok) {
-        setScores((all) => [
-          ...all.filter((s) => s.kind !== kind),
-          { kind, right: result.data.right, total: result.data.total },
-        ]);
-      }
-    });
+    // A tutor trying the game must not write a score to the child's record.
+    // The server refuses it too; this only avoids the pointless request - the
+    // quest itself carries on, or a preview would stop at the first game.
+    if (!preview) {
+      void api<{ right: number; total: number }>(`/api/lessons/${lessonId}/homework/results`, {
+        method: "POST",
+        json: { key: linkKey, kind, replies },
+      }).then((result) => {
+        if (result.ok) {
+          setScores((all) => [
+            ...all.filter((s) => s.kind !== kind),
+            { kind, right: result.data.right, total: result.data.total },
+          ]);
+        }
+      });
+    }
 
     if (step >= steps.length) {
       // Games only: there is nothing to hand in afterwards.
@@ -246,8 +254,15 @@ export function HomeworkGame({
           <Link href={backHref} className="game-small">
             ← Back
           </Link>
-          <span className="game-small">{style.name}</span>
+          <span className="game-small">{preview ? "Preview" : style.name}</span>
         </div>
+
+        {preview && (
+          <p className="game-tip">
+            <span className="game-small">You are seeing this as the child does.</span>{" "}
+            Nothing you answer here is saved.
+          </p>
+        )}
 
         {imageSrc && !game && (
           <div className="game-frame">

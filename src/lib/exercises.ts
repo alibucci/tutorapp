@@ -46,17 +46,19 @@ const ExercisesSchema = z.object({
   topic: z
     .string()
     .min(3)
-    .max(60)
-    .describe("The one mistake all three games practise, in plain words"),
-  chooseTitle: z.string().min(3).max(50),
+    .max(160)
+    .describe(
+      "The one mistake all three games practise, in plain words - under 60 characters",
+    ),
+  chooseTitle: z.string().min(3).max(120),
   choose: z.array(Choose).min(4).max(6),
-  buildTitle: z.string().min(3).max(50),
+  buildTitle: z.string().min(3).max(120),
   build: z.array(Build).min(3).max(4),
-  catchTitle: z.string().min(3).max(50),
+  catchTitle: z.string().min(3).max(120),
   catchRule: z
     .string()
     .min(5)
-    .max(60)
+    .max(160)
     .describe(
       'An instruction to the child, e.g. "Keep the past tense words" - a whole short sentence',
     ),
@@ -148,6 +150,12 @@ export async function buildExercises(
     outputLanguage: "English",
   });
 
+  // Trim rather than reject: a label a few characters over is a worse reason
+  // to lose a whole set of games than a label that reads a little short.
+  const short = (text: string, limit = 60) =>
+    text.trim().length <= limit ? text.trim() : `${text.trim().slice(0, limit - 1)}…`;
+  const topic = short(parsed.topic);
+
   const choose = parsed.choose.filter(usableChoose);
   // Half of each is worth playing; less than that is not a game.
   const keeps = parsed.catchWords.filter((w) => w.keep).length;
@@ -157,25 +165,25 @@ export async function buildExercises(
   if (choose.length >= 3) {
     exercises.push({
       kind: "choose",
-      title: parsed.chooseTitle,
-      topic: parsed.topic,
+      title: short(parsed.chooseTitle, 50),
+      topic,
       rounds: choose,
     });
   }
   if (parsed.build.length >= 2) {
     exercises.push({
       kind: "build",
-      title: parsed.buildTitle,
-      topic: parsed.topic,
+      title: short(parsed.buildTitle, 50),
+      topic,
       rounds: parsed.build,
     });
   }
   if (keeps >= 2 && drops >= 2) {
     exercises.push({
       kind: "catch",
-      title: parsed.catchTitle,
-      topic: parsed.topic,
-      rule: parsed.catchRule,
+      title: short(parsed.catchTitle, 50),
+      topic,
+      rule: short(parsed.catchRule, 70),
       rounds: parsed.catchWords,
     });
   }

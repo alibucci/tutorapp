@@ -46,11 +46,14 @@ async function toJpeg(file: File): Promise<Blob> {
 export function HomeworkPanel({
   lesson,
   studentName,
+  studentKey,
   styleName,
   canDraw,
 }: {
   lesson: Lesson;
   studentName: string;
+  /** The child's private link key, for previewing their screen. */
+  studentKey: string;
   /** The student's game style, for the button's wording. */
   styleName: string;
   /** Whether this server can draw pictures (an image API key is set). */
@@ -392,6 +395,17 @@ export function HomeworkPanel({
             <span className="hint">Suggested from this lesson. Change it freely.</span>
           )}
         </label>
+
+        {sent && (
+          <a
+            href={`/s/${studentKey}/quest/${lesson.id}`}
+            target="_blank"
+            rel="noopener"
+            className="btn btn-ghost btn-sm"
+          >
+            See it as {studentName} sees it
+          </a>
+        )}
 
         {finished && (
           <button
