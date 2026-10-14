@@ -440,6 +440,14 @@ function picture(bytes) {
   check("extra answers beyond the rounds are ignored",
     (await score({ kind: firstGame.kind, replies: [...allRight(firstGame), 0, 0, 0] })).json?.right
       === firstGame.rounds.length);
+  // Played right, then wrong, then right again: the first score must survive
+  // all of it, because the parent's progress is built from it.
+  {
+    const stored = ((await a(`/api/lessons/${lessonA.id}`)).json.homework.results ?? [])[0];
+    check("a replay keeps the first score as the honest measure",
+      stored?.firstRight === firstGame.rounds.length && (stored?.attempts ?? 0) >= 3,
+      JSON.stringify({ firstRight: stored?.firstRight, attempts: stored?.attempts }));
+  }
   check("a replay replaces the earlier score, never adds to it",
     ((await a(`/api/lessons/${lessonA.id}`)).json.homework.results ?? []).length === 1);
   check("the tutor can read back what the child answered",

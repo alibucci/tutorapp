@@ -31,6 +31,7 @@ export async function QuestPage({
       answered={homework.answers}
       exercises={homework.exercises}
       finished={homeworkDone(homework)}
+      results={homework.results}
     />
   );
 }

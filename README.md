@@ -271,6 +271,13 @@ it got right, and `src/lib/homework.ts` adds those up per topic, which is what
 the parent's page shows: not "did they do it" but "is the thing they kept
 getting wrong getting better".
 
+Everything can be played again - one game or the whole quest from the child's
+last screen, and the tutor can hand the homework back entirely. A replay
+overwrites the score the child sees, but the FIRST score is kept and never
+changes: the parent's progress is built from first attempts, so a child
+replaying from memory cannot make the picture look better than what they
+actually knew.
+
 A wrong answer is worth one more go: the child reads why and puts it right
 while the explanation still means something. The score counts the first
 answer - the retry is for learning, not for the number. The browser sends

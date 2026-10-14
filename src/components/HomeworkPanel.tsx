@@ -3,6 +3,7 @@
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ImageIcon } from "@/components/ui";
 import { homeworkDone } from "@/lib/homework";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type Lesson } from "@/lib/types";
@@ -69,6 +70,7 @@ export function HomeworkPanel({
   const candidates = homework?.candidates ?? [];
   const exercises = homework?.exercises ?? [];
   const finished = homeworkDone(homework);
+  const [confirmReopen, setConfirmReopen] = useState(false);
   const [seconds, setSeconds] = useState(0);
 
   // Drawing takes from a few seconds to a minute or two; count it out loud.
@@ -137,7 +139,7 @@ export function HomeworkPanel({
   }
 
   async function patch(
-    payload: { focus?: string; send?: boolean; pick?: string },
+    payload: { focus?: string; send?: boolean; pick?: string; reopen?: boolean },
     label: string,
   ) {
     setBusy(label);
@@ -212,12 +214,19 @@ export function HomeworkPanel({
                     <div className="flex items-center justify-between gap-3">
                       <span className="t-small font-semibold">{exercise.title}</span>
                       {result ? (
-                        <span
-                          className={`tag ${
-                            result.right / result.total >= 0.7 ? "tag-done" : "tag-warn"
-                          }`}
-                        >
-                          {result.right}/{result.total}
+                        <span className="flex items-center gap-2">
+                          {(result.attempts ?? 1) > 1 && (
+                            <span className="t-caption t-muted">
+                              first go {result.firstRight ?? result.right}/{result.total}
+                            </span>
+                          )}
+                          <span
+                            className={`tag ${
+                              result.right / result.total >= 0.7 ? "tag-done" : "tag-warn"
+                            }`}
+                          >
+                            {result.right}/{result.total}
+                          </span>
                         </span>
                       ) : (
                         <span className="tag tag-quiet">
@@ -384,6 +393,16 @@ export function HomeworkPanel({
           )}
         </label>
 
+        {finished && (
+          <button
+            onClick={() => setConfirmReopen(true)}
+            disabled={busy !== null}
+            className="btn btn-quiet btn-block"
+          >
+            Let {studentName} do it again
+          </button>
+        )}
+
         {!finished &&
           (sent ? (
             <button
@@ -422,6 +441,19 @@ export function HomeworkPanel({
       </div>
 
       {error && <p className="note note-warn">{error}</p>}
+
+      <ConfirmDialog
+        open={confirmReopen}
+        title={`Let ${studentName} do it again?`}
+        body="Their scores and written answers for this homework are cleared, and it goes back to waiting. There is no undo."
+        confirmLabel="Clear and hand back"
+        cancelLabel="Keep it as it is"
+        onConfirm={() => {
+          setConfirmReopen(false);
+          void patch({ reopen: true }, "reopen");
+        }}
+        onCancel={() => setConfirmReopen(false)}
+      />
     </section>
   );
 }

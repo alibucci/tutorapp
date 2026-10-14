@@ -79,10 +79,12 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!found) {
     return NextResponse.json({ error: "No such lesson." }, { status: 404 });
   }
-  const parsed = await readJson<{ focus?: string; send?: boolean; pick?: string }>(
-    request,
-    LIMIT.small,
-  );
+  const parsed = await readJson<{
+    focus?: string;
+    send?: boolean;
+    pick?: string;
+    reopen?: boolean;
+  }>(request, LIMIT.small);
   if (parsed instanceof Response) return parsed;
   const body = parsed;
 
@@ -92,6 +94,14 @@ export async function PATCH(request: Request, { params }: Params) {
     const next: Homework = {
       ...(current.homework ?? blankHomework(current.summary?.homeworkFocus)),
     };
+    // Hand it back for another go. Everything the child did is cleared -
+    // that is the point - so the tutor is warned before this is called.
+    if (body.reopen === true) {
+      delete next.answers;
+      delete next.results;
+      return { homework: next };
+    }
+
     // Choosing one of the drawn options makes it the picture; the rest, and
     // the picture it replaces, go.
     if (typeof body.pick === "string") {

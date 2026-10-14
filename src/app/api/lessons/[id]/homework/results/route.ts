@@ -84,6 +84,7 @@ export async function POST(request: Request, { params }: Params) {
   const after = await updateLesson(id, (current) => {
     const homework = current.homework;
     if (!homework?.sentAt) return null;
+    const previous = (homework.results ?? []).find((r) => r.kind === kind);
     const rest = (homework.results ?? []).filter((r) => r.kind !== kind);
     return {
       homework: {
@@ -97,6 +98,9 @@ export async function POST(request: Request, { params }: Params) {
             total: exercise.rounds.length,
             finishedAt: new Date().toISOString(),
             rounds,
+            attempts: (previous?.attempts ?? 0) + 1,
+            // Set once, on the first play, and carried through every replay.
+            firstRight: previous?.firstRight ?? previous?.right ?? right,
           },
         ],
       },

@@ -52,7 +52,9 @@ export function progressByTopic(
   for (const lesson of lessons) {
     for (const result of lesson.homework?.results ?? []) {
       const at = byTopic.get(result.topic) ?? { right: 0, total: 0 };
-      at.right += result.right;
+      // The first attempt, always: a child replaying from memory should not
+      // make the picture look better than what they actually knew.
+      at.right += result.firstRight ?? result.right;
       at.total += result.total;
       byTopic.set(result.topic, at);
     }

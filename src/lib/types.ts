@@ -324,6 +324,16 @@ export type ExerciseResult = {
   finishedAt: string;
   /** Every round, so the tutor sees where it went wrong, not just how often. */
   rounds?: RoundAnswer[];
+  /** How many times it has been played. 1, or absent, means once. */
+  attempts?: number;
+  /**
+   * The score the first time, which never changes.
+   *
+   * A replay overwrites `right`, and without this a child who played again
+   * from memory would quietly erase the only honest measure of what they knew
+   * - which is exactly what the parent's progress is built from.
+   */
+  firstRight?: number;
 };
 
 export type Homework = {

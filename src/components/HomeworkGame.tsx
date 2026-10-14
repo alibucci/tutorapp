@@ -12,6 +12,7 @@ import {
   EXERCISE_LABEL,
   HOMEWORK_TASKS,
   type Exercise,
+  type ExerciseResult,
   type HomeworkAnswers,
   type RoundReply,
 } from "@/lib/types";
@@ -49,6 +50,7 @@ export function HomeworkGame({
   answered,
   exercises,
   finished,
+  results,
 }: {
   lessonId: string;
   /** Empty when this homework is games only. */
@@ -63,6 +65,8 @@ export function HomeworkGame({
   exercises?: Exercise[];
   /** Everything was already handed in: open on the last screen. */
   finished?: boolean;
+  /** Scores from earlier sittings, so coming back shows how it went. */
+  results?: ExerciseResult[];
 }) {
   // Games first - they are quick and they warm up the words the picture task
   // then asks the child to use.
@@ -80,9 +84,12 @@ export function HomeworkGame({
   /** This sitting's scores, so the last screen can say how it went. */
   const [scores, setScores] = useState<
     { kind: Exercise["kind"]; right: number; total: number }[]
-  >([]);
+  >(() => (results ?? []).map((r) => ({ kind: r.kind, right: r.right, total: r.total })));
   /** Rounds answered right first time, across the whole quest. */
-  const [points, setPoints] = useState(0);
+  // Opening a finished quest shows what was scored before, not a zero.
+  const [points, setPoints] = useState(() =>
+    finished ? (results ?? []).reduce((n, r) => n + r.right, 0) : 0,
+  );
   /** Bumped on a replay so the game starts from a clean slate. */
   const [replay, setReplay] = useState(0);
   /** Rounds answered so far in the game on screen, for the bar. */
@@ -190,6 +197,14 @@ export function HomeworkGame({
       return;
     }
     go(step + 1);
+  }
+
+  /** Start the whole quest over. Scores update; the first go is kept. */
+  function playAll() {
+    setInGame(0);
+    setPoints(0);
+    setReplay((n) => n + 1);
+    go(1);
   }
 
   /** Play a game again from the last screen. The new score replaces the old. */
@@ -387,9 +402,16 @@ export function HomeworkGame({
                 <Answer label="Your three words" text={answered.adjectives.join(" · ")} />
               </div>
             )}
-            <Link href={backHref} className="game-button mt-4 block">
-              Back
-            </Link>
+            <div className="mt-4 flex gap-3">
+              <Link href={backHref} className="game-button game-button-no block">
+                Back
+              </Link>
+              {steps.some((s) => s.type === "game") && (
+                <button onClick={playAll} className="game-button">
+                  Play it all again
+                </button>
+              )}
+            </div>
           </div>
         )}
 
