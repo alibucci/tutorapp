@@ -53,6 +53,7 @@ export async function homeworkFor(
 
   const session = await getSession();
   if (session && owns(session, student)) return { lesson, student, tutor: true };
+  if (student.archivedAt) return null;
 
   const family = await getFamilySession();
   const child =

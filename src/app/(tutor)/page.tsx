@@ -103,7 +103,10 @@ function statusFor(latest: Lesson | undefined): { text: string; tone: string } {
 
 export default async function Home() {
   const session = await requireSession();
-  const students = await listStudents(session.id);
+  const [students, archived] = await Promise.all([
+    listStudents(session.id),
+    listStudents(session.id, "archived"),
+  ]);
   const names = new Map(students.map((s) => [s.id, s.name]));
   const lessons = (await listLessons()).filter((l) => names.has(l.studentId));
 
@@ -215,6 +218,26 @@ export default async function Home() {
           </li>
         </ul>
       </section>
+
+      {archived.length > 0 && (
+        <details className="group">
+          <summary className="t-eyebrow cursor-pointer">
+            Archived · {archived.length}
+          </summary>
+          <ul className="card rows mt-2.5">
+            {archived.map((student) => (
+              <li key={student.id}>
+                <Link href={`/student/${student.id}`} className="row row-link py-3">
+                  <span className="min-w-0 flex-1 truncate font-medium">{student.name}</span>
+                  <span className="t-muted">
+                    <ChevronRight />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {/* A phone's thumb lives at the bottom; so does the one thing a tutor
           opens the app to do. */}

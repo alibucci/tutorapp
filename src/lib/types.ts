@@ -203,6 +203,12 @@ export type Student = {
   /** Id from GAME_STYLES - what the child's homework looks like. */
   gameStyle?: string;
   skills: Skill[];
+  /**
+   * Set when the tutor archives the child. Off the tutor's list, and every
+   * way in for the family stops working - links, sign-in, open sessions - but
+   * the lessons and homework are kept, and restoring brings it all back.
+   */
+  archivedAt?: string;
 };
 
 /**

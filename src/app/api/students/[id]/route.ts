@@ -35,6 +35,7 @@ export async function PATCH(request: Request, { params }: Params) {
     consentFrom?: string | null;
     rotateLinks?: boolean;
     gameStyle?: string;
+    archived?: boolean;
   }>(request, LIMIT.small);
   if (parsed instanceof Response) return parsed;
   const body = parsed;
@@ -61,6 +62,11 @@ export async function PATCH(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Unknown game style." }, { status: 400 });
     }
     patch.gameStyle = body.gameStyle;
+  }
+
+  // Archiving keeps everything; restoring is the same call with false.
+  if (typeof body.archived === "boolean") {
+    patch.archivedAt = body.archived ? new Date().toISOString() : undefined;
   }
 
   // A shared link cannot be taken back once it is out; a new one can replace it.

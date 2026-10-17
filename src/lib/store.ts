@@ -197,11 +197,19 @@ export async function updateStudent(
   return updateRecord<Student>(STUDENT_DIR, id, change);
 }
 
-/** Omit `tutorId` only where the caller is the superadmin. */
-export async function listStudents(tutorId?: string): Promise<Student[]> {
+/**
+ * Omit `tutorId` only where the caller is the superadmin. Archived students
+ * are left out unless asked for: everywhere a tutor picks or sees children,
+ * an archived one should not be there.
+ */
+export async function listStudents(
+  tutorId?: string,
+  which: "active" | "archived" = "active",
+): Promise<Student[]> {
   const students = await readAll<Student>(STUDENT_DIR);
   return students
     .filter((s) => !tutorId || s.tutorId === tutorId)
+    .filter((s) => (which === "archived") === Boolean(s.archivedAt))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -222,7 +230,8 @@ export async function getStudentByKey(
 ): Promise<Student | null> {
   if (!key) return null;
   const students = await readAll<Student>(STUDENT_DIR);
-  return students.find((s) => s[kind] === key) ?? null;
+  // An archived child's links stop working, like their sign-in.
+  return students.find((s) => s[kind] === key && !s.archivedAt) ?? null;
 }
 
 // --- lessons ---------------------------------------------------------------

@@ -59,7 +59,10 @@ export async function POST(request: Request) {
 
   // No @ means a username, and usernames belong to families.
   if (!email.includes("@")) {
-    const student = await getStudentByUsername(email);
+    const found = await getStudentByUsername(email);
+    // An archived child keeps their username, so nobody else takes it, but it
+    // no longer signs anyone in.
+    const student = found?.archivedAt ? null : found;
     const login = student?.login;
     if (!student || !login) burnPasswordCheck(password);
     if (!student || !login || !verifyPassword(password, login.passwordHash)) {

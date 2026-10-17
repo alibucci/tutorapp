@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArchiveStudent } from "@/components/ArchiveStudent";
 import { FamilyLogin } from "@/components/FamilyLogin";
 import { IntroNoteButton } from "@/components/IntroNoteButton";
 import { GameStylePicker } from "@/components/GameStylePicker";
@@ -57,6 +58,9 @@ export default async function StudentPage({
             {student.recordingConsent ? "Both voices recorded" : "Tutor's voice only"}
           </span>
         </div>
+        {student.archivedAt && (
+          <ArchiveStudent studentId={student.id} studentName={student.name} archived />
+        )}
       </header>
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
@@ -68,7 +72,7 @@ export default async function StudentPage({
 
       {/* A child with no lessons yet has nothing to build from. This is how
           they get a starting point without waiting for the first lesson. */}
-      {lessons.length === 0 && (
+      {lessons.length === 0 && !student.archivedAt && (
         <IntroNoteButton studentId={student.id} studentName={student.name} />
       )}
 
@@ -125,6 +129,10 @@ export default async function StudentPage({
           <ShareLinks student={student} />
         </div>
       </details>
+
+      {!student.archivedAt && (
+        <ArchiveStudent studentId={student.id} studentName={student.name} archived={false} />
+      )}
       </div>
       </div>
     </div>

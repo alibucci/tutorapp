@@ -356,6 +356,9 @@ check("parent sees the note after approval", !parentAfter.includes("No weekly no
     (await live("/api/students")).status === 403);
 
   await admin(`/api/tutors/${t2id}`, patch({ active: true }));
+  // Suspending signed tutor B out everywhere, including the `b` client the
+  // checks below act through. Without this they ran against a dead session.
+  await b("/api/auth", post({ email: t2.email, password: t2.password }));
 }
 
 // --- pages render ------------------------------------------------------------
@@ -549,6 +552,34 @@ function picture(bytes) {
   // A new sign-in after a removal must not bring the removed one back.
   await a(`/api/students/${sA.id}/logins`, { method: "POST" });
   check("a new sign-in does not revive a removed one", (await again("/me")).status === 307);
+
+  // --- archiving a student ---------------------------------------------------
+  // Tutor B's family, so the checks after this one still have tutor A's.
+  const bKeys = (await b(`/api/students/${sB.id}`)).json;
+  const bFamily = actor();
+  await bFamily("/api/auth", post({ email: otherFamily.username, password: otherFamily.password }));
+  check("another tutor cannot archive a student",
+    (await a(`/api/students/${sB.id}`, patch({ archived: true }))).status === 404);
+  const archiving = await b(`/api/students/${sB.id}`, patch({ archived: true }));
+  check("a tutor archives a student", Boolean(archiving.json?.archivedAt),
+    `${archiving.status} ${archiving.text.slice(0, 200)}`);
+  check("an archived student leaves the tutor's list",
+    !(await b("/api/students")).json.some((s) => s.id === sB.id));
+  check("an archived child's link stops working", (await anon(`/s/${bKeys.studentKey}`)).status === 404);
+  check("an archived parent's link stops working", (await anon(`/p/${bKeys.parentKey}`)).status === 404);
+  check("an archived family is signed out", (await bFamily("/me")).status === 307);
+  check("an archived family cannot sign in",
+    (await actor()("/api/auth", post({ email: otherFamily.username, password: otherFamily.password }))).status === 401);
+  check("an archived student cannot be given a lesson",
+    (await b("/api/lessons", post({ title: "x", mode: "online", language: "en-US", studentId: sB.id }))).status >= 400);
+  check("the tutor can still open an archived student",
+    (await b(`/student/${sB.id}`)).status === 200);
+
+  const restored = (await b(`/api/students/${sB.id}`, patch({ archived: false }))).json;
+  check("restoring clears the archive", restored && !restored.archivedAt);
+  check("a restored child's link works again", (await anon(`/s/${bKeys.studentKey}`)).status === 200);
+  check("a restored family can sign in again",
+    (await actor()("/api/auth", post({ email: otherFamily.username, password: otherFamily.password }))).status === 200);
 }
 
 // --- leakage --------------------------------------------------------------

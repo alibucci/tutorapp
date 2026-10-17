@@ -257,7 +257,7 @@ export async function getFamilySession(): Promise<FamilySession | null> {
 
   const student = await getStudent(claims.id);
   const login = student?.login;
-  if (!login || login.tokenVersion !== claims.v) return null;
+  if (!login || student.archivedAt || login.tokenVersion !== claims.v) return null;
   return { id: claims.id, v: claims.v };
 }
 

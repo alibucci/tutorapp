@@ -52,6 +52,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No such student." }, { status: 404 });
   }
   const { student } = found;
+  if (student.archivedAt) {
+    return NextResponse.json(
+      { error: "This student is archived. Restore them first." },
+      { status: 409 },
+    );
+  }
 
   const lesson = await createLesson({
     title: body.title.trim(),
