@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LevelMeter } from "@/components/LevelMeter";
-import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
+import { useClipTranscriber } from "@/hooks/useClipTranscriber";
 import { useTutorRecorder } from "@/hooks/useTutorRecorder";
 import { LESSON_LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/types";
 
@@ -12,17 +12,20 @@ type Row = { label: string; state: State; detail: string };
 
 /**
  * Everything the recording path depends on, checked in the order it would fail.
- * Static capability checks first, then the microphone, then the recogniser -
- * the last one is the only test that can tell you whether a transcript will
- * exist at all.
+ * Static capability checks first, then the microphone, then a recording sent
+ * to the server's recogniser - the last one is the only test that can tell you
+ * whether a transcript will exist at all.
  */
 export function MicCheck() {
   const [rows, setRows] = useState<Row[]>([]);
   const [language, setLanguage] = useState<string>(DEFAULT_LANGUAGE);
   const [listening, setListening] = useState(false);
+  const [tested, setTested] = useState(false);
+  /** Ends a test that runs on: the recogniser reads at most a minute. */
+  const autoStopRef = useRef<number | undefined>(undefined);
 
   const rec = useTutorRecorder({ gate: { threshold: 0.012, holdMs: 700 } });
-  const speech = useSpeechTranscript(language);
+  const speech = useClipTranscriber(language);
   const peakRef = useRef(0);
   const [peak, setPeak] = useState(0);
 
@@ -97,58 +100,6 @@ export function MicCheck() {
       add("Recorder", "fail", "MediaRecorder is missing");
     }
 
-    const ua = navigator.userAgent;
-    const brands =
-      (navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } })
-        .userAgentData?.brands?.map((b) => b.brand) ?? [];
-    const named = brands.find(
-      (b) => !/Not.?A.?Brand|Chromium/i.test(b),
-    );
-    const guess = named
-      ?? (/\bArc\//.test(ua) ? "Arc"
-        : /\bBrave\//.test(ua) ? "Brave"
-        : /\bEdg\//.test(ua) ? "Edge"
-        : /\bChrome\//.test(ua) ? "Chrome"
-        : /\bSafari\//.test(ua) ? "Safari"
-        : /\bFirefox\//.test(ua) ? "Firefox"
-        : "unknown");
-    // Which engine does the transcription decides both whether it works and
-    // where the audio goes. Safari hands it to Apple; Chrome and Edge hand it
-    // to Google; other Chromium builds ship without the keys for either and
-    // fail with a misleading "network" error.
-    const engine: Record<string, { state: State; detail: string }> = {
-      Safari: {
-        state: "pass",
-        detail:
-          "Safari — transcription runs through Apple, not Google, so it keeps working where Google is unreachable.",
-      },
-      Chrome: { state: "pass", detail: "Chrome — transcription runs through Google." },
-      "Google Chrome": { state: "pass", detail: "Chrome — transcription runs through Google." },
-      Edge: { state: "pass", detail: "Edge — transcription runs through Google." },
-      "Microsoft Edge": { state: "pass", detail: "Edge — transcription runs through Google." },
-      Firefox: {
-        state: "fail",
-        detail: "Firefox has no speech recognition. Audio would record with no transcript.",
-      },
-    };
-    const known = engine[guess];
-    add(
-      "Browser",
-      known?.state ?? "warn",
-      known?.detail ??
-        `${guess} — Chromium builds other than Chrome and Edge ship without speech keys and fail with a misleading "network" error. Safari and Chrome both work.`,
-    );
-
-    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
-    const hasSpeech = Boolean(w.SpeechRecognition ?? w.webkitSpeechRecognition);
-    add(
-      "Speech recognition",
-      hasSpeech ? "pass" : "warn",
-      hasSpeech
-        ? "available — test it below"
-        : "not in this browser. Audio still records, but there will be no transcript and nothing downstream can read the lesson. Use Chrome or Edge.",
-    );
-
     const hasWake = "wakeLock" in navigator;
     add(
       "Screen wake lock",
@@ -170,16 +121,28 @@ export function MicCheck() {
     setPeak(0);
   }
 
+  // Inside the tap, so the browser lets the audio run.
   function startListening() {
-    speech.start();
-    setListening(true);
+    speech.reset();
+    setTested(false);
+    peakRef.current = 0;
+    if (rec.startClip()) {
+      setListening(true);
+      autoStopRef.current = window.setTimeout(() => void stopListening(), 55_000);
+    }
   }
 
-  function stopListening() {
-    speech.stop();
+  async function stopListening() {
+    window.clearTimeout(autoStopRef.current);
     setListening(false);
     setPeak(peakRef.current);
+    const clip = await rec.endClip();
+    if (clip) await speech.send(clip, 0);
+    setTested(true);
   }
+
+  const busy = speech.pending.length > 0;
+  const failure = speech.failed[speech.failed.length - 1]?.error;
 
   return (
     <div className="stack-lg">
@@ -261,21 +224,25 @@ export function MicCheck() {
           </select>
         </label>
 
-        {!listening ? (
-          <button
-            onClick={startListening}
-            disabled={!speech.supported}
-            className="btn btn-primary"
-          >
-            Start listening
+        {rec.state === "idle" ? (
+          <p className="t-small t-muted">Test the microphone above first.</p>
+        ) : !listening ? (
+          <button onClick={startListening} disabled={busy} className="btn btn-primary">
+            {busy ? "Transcribing…" : "Record a sentence"}
           </button>
         ) : (
-          <button onClick={stopListening} className="btn btn-quiet">
-            Stop
+          <button onClick={() => void stopListening()} className="btn btn-quiet">
+            Stop and transcribe
           </button>
         )}
 
-        {(speech.segments.length > 0 || speech.interim) && (
+        {listening && (
+          <p className="t-small t-muted">
+            Recording… say a full sentence in the language you selected, then stop.
+          </p>
+        )}
+
+        {speech.segments.length > 0 && (
           <div className="card card-pad" style={{ background: "var(--sunken)" }}>
             <p className="t-eyebrow mb-2">Heard</p>
             {speech.segments.map((s, i) => (
@@ -283,31 +250,28 @@ export function MicCheck() {
                 {s.text}
               </p>
             ))}
-            {speech.interim && (
-              <p className="t-body t-muted">{speech.interim}</p>
-            )}
           </div>
         )}
 
-        {listening && speech.segments.length === 0 && !speech.interim && (
-          <p className="t-small t-muted">
-            Listening… speak a full sentence in the language you selected.
-          </p>
-        )}
-
-        {speech.error && (
+        {failure && (
           <div className="card card-pad" style={{ borderColor: "var(--accent)" }}>
-            <p className="t-subtitle">Speech recognition failed</p>
-            <p className="t-body t-muted mt-2">{speech.error}</p>
+            <p className="t-subtitle">Transcription failed</p>
+            <p className="t-body t-muted mt-2">{failure}</p>
             <p className="t-small mt-3">
               Without a transcript the lesson cannot be summarised, topics
-              cannot be updated, and no parent note can be written. Audio would
-              still record, but nothing would read it.
+              cannot be updated, and no parent note can be written.
             </p>
           </div>
         )}
 
-        {!listening && speech.segments.length > 0 && (
+        {tested && !busy && !failure && speech.segments.length === 0 && (
+          <p className="note note-warn">
+            No speech was heard. Check the bar above moves when you talk, and
+            speak for a few seconds before stopping.
+          </p>
+        )}
+
+        {!listening && !busy && !failure && speech.segments.length > 0 && (
           <p className="note note-accent">
             Transcript works. Peak input level was {peak.toFixed(3)} — the gate
             threshold is 0.012, so anything below that would be discarded.

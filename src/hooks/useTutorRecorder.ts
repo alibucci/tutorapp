@@ -69,6 +69,9 @@ export function useTutorRecorder(options: Options = {}) {
   const ctxRef = useRef<AudioContext | null>(null);
   const nodeRef = useRef<AudioWorkletNode | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  /** The metered (and, in classroom mode, gated) signal clips are cut from. */
+  const outputRef = useRef<MediaStream | null>(null);
+  const clipRef = useRef<{ recorder: MediaRecorder; chunks: Blob[] } | null>(null);
   const moduleLoadedRef = useRef(false);
   const recordingRef = useRef(false);
   const onAutoPauseRef = useRef(onAutoPause);
@@ -163,6 +166,7 @@ export function useTutorRecorder(options: Options = {}) {
         source.connect(node);
         node.connect(dest);
         nodeRef.current = node;
+        outputRef.current = dest.stream;
         pushConfig(gateRef.current);
 
         const recorder = new MediaRecorder(dest.stream, {
@@ -257,8 +261,49 @@ export function useTutorRecorder(options: Options = {}) {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [noteInterruption, pause]);
 
+  /**
+   * Begin one self-contained recording - a debrief answer, a microphone test -
+   * that is kept, unlike the lesson recorder's chunks, so it can be sent to be
+   * transcribed. Each clip is its own file with its own header; slicing one
+   * long recording would leave every piece after the first unreadable.
+   *
+   * Call it inside the tap: a context that has not been resumed by a gesture
+   * records silence.
+   */
+  const startClip = useCallback((): boolean => {
+    const stream = outputRef.current;
+    if (!stream) return false;
+    if (ctxRef.current && ctxRef.current.state !== "running") void ctxRef.current.resume();
+    const recorder = new MediaRecorder(stream, {
+      mimeType: pickMimeType(),
+      audioBitsPerSecond: 24000,
+    });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size) chunks.push(e.data);
+    };
+    recorder.start();
+    clipRef.current = { recorder, chunks };
+    return true;
+  }, []);
+
+  /** Finish the current clip. Null if none was running. */
+  const endClip = useCallback((): Promise<Blob | null> => {
+    const clip = clipRef.current;
+    clipRef.current = null;
+    if (!clip || clip.recorder.state === "inactive") return Promise.resolve(null);
+    return new Promise((resolve) => {
+      clip.recorder.onstop = () =>
+        resolve(new Blob(clip.chunks, { type: clip.recorder.mimeType || "audio/webm" }));
+      clip.recorder.stop();
+    });
+  }, []);
+
   const release = useCallback(() => {
     recordingRef.current = false;
+    if (clipRef.current?.recorder.state !== "inactive") clipRef.current?.recorder.stop();
+    clipRef.current = null;
+    outputRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     nodeRef.current?.disconnect();
@@ -287,6 +332,8 @@ export function useTutorRecorder(options: Options = {}) {
     resume,
     stop,
     release,
+    startClip,
+    endClip,
     refreshDevices,
   };
 }

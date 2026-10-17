@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { LevelMeter } from "@/components/LevelMeter";
-import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
+import { useClipTranscriber } from "@/hooks/useClipTranscriber";
 import { useTutorRecorder } from "@/hooks/useTutorRecorder";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import {
@@ -41,7 +41,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const totalSeconds = PROMPTS.reduce((n, p) => n + p.seconds, 0);
   const router = useRouter();
   const rec = useTutorRecorder();
-  const speech = useSpeechTranscript(lesson.language);
+  const speech = useClipTranscriber(lesson.language);
   const wakeLock = useWakeLock();
 
   // A debrief that was under way when the page died comes back on the review
@@ -52,6 +52,8 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const [remaining, setRemaining] = useState<number>(PROMPTS[0].seconds);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  /** The last clip is still being written after Finish. */
+  const [closing, setClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /** Start ms (relative to the debrief) of each prompt, so a tutor can advance early. */
@@ -60,6 +62,8 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const indexRef = useRef(0);
   /** Wall-clock deadline for the current prompt, not a tick count. */
   const deadlineRef = useRef(0);
+  /** When the clip now recording began, ms into the debrief. */
+  const clipStartRef = useRef(0);
 
   useEffect(() => {
     void rec.arm();
@@ -80,11 +84,28 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * End the clip for the prompt on screen and send it off. Each prompt is its
+   * own recording, so an answer is tagged by where it was said, not by when
+   * the text came back.
+   */
+  function cutClip(): Promise<void> {
+    const tag = PROMPTS[indexRef.current].id;
+    const t = clipStartRef.current;
+    return rec.endClip().then((clip) => {
+      if (clip) void speech.send(clip, t, tag);
+    });
+  }
+
   function finish() {
-    speech.stop();
     void wakeLock.release();
     setPhase("review");
-    rec.stop();
+    // The microphone is let go only once the last clip has been written.
+    setClosing(true);
+    void cutClip().then(() => {
+      rec.release();
+      setClosing(false);
+    });
     saveRef.current(false);
   }
 
@@ -94,9 +115,11 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
       finish();
       return;
     }
+    void cutClip();
     indexRef.current = next;
-    speech.setTag(PROMPTS[next].id);
-    boundariesRef.current.push(performance.now() - startedAtRef.current);
+    clipStartRef.current = performance.now() - startedAtRef.current;
+    rec.startClip();
+    boundariesRef.current.push(clipStartRef.current);
     deadlineRef.current = performance.now() + PROMPTS[next].seconds * 1000;
     setIndex(next);
     setRemaining(PROMPTS[next].seconds);
@@ -192,24 +215,23 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   }));
 
   /**
-   * Everything that touches the microphone happens synchronously, inside the
-   * tap, before any await. On an iPhone both matter:
-   * - iOS only lets the recogniser start within the user's gesture; started
-   *   after an await it is refused, silently, and the debrief comes back empty.
-   * - The level meter was holding the microphone through getUserMedia while
-   *   the recogniser wanted it too. Safari routes speech through its own audio
-   *   path and the two can fight, leaving the recogniser deaf. The meter has
-   *   done its job by now (showing the mic works), so it lets go first.
+   * Recording starts synchronously inside the tap, before any await: a
+   * browser only lets audio run from a user's gesture, and one started after
+   * an await can record silence.
    */
   function begin() {
-    rec.release();
+    if (!rec.startClip()) {
+      setError("The microphone is not ready. Allow it for this site and reload, or type your answers instead.");
+      return;
+    }
+    setError(null);
+    speech.reset();
     boundariesRef.current = [];
     indexRef.current = 0;
+    clipStartRef.current = 0;
     startedAtRef.current = performance.now();
     deadlineRef.current =
       performance.now() + PROMPTS[0].seconds * 1000;
-    speech.setTag(PROMPTS[0].id);
-    speech.start();
     setIndex(0);
     setRemaining(PROMPTS[0].seconds);
     setPhase("running");
@@ -263,16 +285,15 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
             their own; you can skip ahead at any time.
           </p>
         </div>
-        {rec.error && (
+        {(rec.error || error) && (
           <p className="note note-warn">
-            {rec.error} Or type the debrief instead.
+            {rec.error ?? error} Or type the debrief instead.
           </p>
         )}
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => begin()}
-            // A meter that failed should not stop the recogniser being tried.
-            disabled={rec.state === "idle" && !rec.error}
+            disabled={rec.state === "idle"}
             className="btn btn-primary btn-lg"
           >
             {lesson.kind === "intro" ? "Start" : "Start debrief"} ({totalSeconds}s)
@@ -301,18 +322,18 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
           </p>
         </div>
 
-        {/* What the recogniser hears, as it hears it: the honest sign that it
-            is working, which a level meter is not. */}
-        {speech.error ? (
-          <p className="note note-warn">
-            {speech.error} Finish now and type your answers instead.
-          </p>
-        ) : (
+        <div className="space-y-2">
+          <LevelMeter level={rec.level} gateOpen />
+          {/* The last answer as the server heard it: the honest sign that
+              transcription works, which a moving bar is not. */}
           <p className="text-center t-small t-muted min-h-[2.5rem]">
-            {speech.interim ||
-              (speech.listening ? "Listening… start talking." : "Starting the microphone…")}
+            {speech.failed.length > 0
+              ? `${speech.failed[speech.failed.length - 1].error} Keep talking - it can be retried at the end.`
+              : speech.segments.length > 0
+                ? `Heard: “${speech.segments[speech.segments.length - 1].text}”`
+                : "Recording. Each answer is transcribed when its prompt ends."}
           </p>
-        )}
+        </div>
 
         <div className="flex justify-center gap-3">
           <button
@@ -332,15 +353,37 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     );
   }
 
+  const transcribing = closing || speech.pending.length > 0;
+
   return (
     <div className="space-y-6">
-      {speech.segments.length === 0 && Object.keys(edits).length === 0 && !unfinished && (
-        <p className="note note-warn">
-          Nothing was transcribed
-          {speech.error ? ` - ${speech.error}` : ". The browser did not hear any speech."} Type
-          your answers below; they go into the summary all the same.
-        </p>
+      {transcribing && (
+        <p className="note note-quiet">Transcribing what you said…</p>
       )}
+
+      {speech.failed.length > 0 && !transcribing && (
+        <div className="note note-warn space-y-2">
+          <p>
+            {speech.failed.length === 1 ? "One answer" : `${speech.failed.length} answers`} could
+            not be transcribed: {speech.failed[0].error} The recording is still on this
+            page - retry, or type the answer below.
+          </p>
+          <button onClick={() => speech.retry()} className="btn btn-quiet">
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!transcribing &&
+        speech.failed.length === 0 &&
+        speech.segments.length === 0 &&
+        Object.keys(edits).length === 0 &&
+        !unfinished && (
+          <p className="note note-warn">
+            Nothing was transcribed - no speech was heard. Type your answers below;
+            they go into the summary all the same.
+          </p>
+        )}
 
       <p className="t-small t-muted">
         {unfinished && Object.keys(edits).length === 0
@@ -358,6 +401,9 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
             }
             rows={3}
             className="field"
+            placeholder={
+              transcribing && speech.pending.includes(prompt.id) ? "Transcribing…" : undefined
+            }
           />
         </label>
       ))}
@@ -366,10 +412,11 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
       <button
         onClick={() => void save()}
-        disabled={saving}
+        // Saving now would drop the answers still on their way back.
+        disabled={saving || transcribing}
         className="btn btn-primary btn-lg"
       >
-        {saving ? "Saving..." : "Save debrief"}
+        {saving ? "Saving..." : transcribing ? "Transcribing…" : "Save debrief"}
       </button>
     </div>
   );

@@ -62,13 +62,30 @@ const subscribeNever = () => () => {};
  * a person, which is worse than useless - `network` in particular looks like a
  * transcribed word.
  */
+/**
+ * Whether the recogniser here is Apple's: Safari, or any browser on an iPhone
+ * or iPad, since there they all run on WebKit. The advice for a failure is
+ * different - nothing about Google applies.
+ */
+function recognisedByApple(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/\b(iPhone|iPad|iPod)\b/.test(ua)) return true;
+  return /\bSafari\//.test(ua) && !/\b(Chrome|Chromium|Edg|OPR|Firefox)\//.test(ua);
+}
+
 export function explainSpeechError(code: string): string {
+  const apple = recognisedByApple();
   switch (code) {
     case "network":
-      return "The recogniser could not reach its server. Chrome sends audio to Google to transcribe it, and this fails for two very different reasons: a Chromium-based browser built without Google's speech keys (Brave, Arc, Vivaldi, plain Chromium) never works at all, while real Chrome fails only when Google is unreachable. Try genuine Google Chrome before concluding the network is at fault.";
+      return apple
+        ? "The recogniser could not reach Apple's speech server - Safari sends audio to Apple to transcribe it. Check that Dictation is switched on (System Settings → Keyboard → Dictation on a Mac, Settings → General → Keyboard on an iPhone), and that the network or a VPN is not blocking Apple. Trying English tells the two apart: if English works and this language does not, the server for this language is what cannot be reached."
+        : "The recogniser could not reach its server. Chrome sends audio to Google to transcribe it, and this fails for two very different reasons: a Chromium-based browser built without Google's speech keys (Brave, Arc, Vivaldi, plain Chromium) never works at all, while real Chrome fails only when Google is unreachable. Try genuine Google Chrome before concluding the network is at fault.";
     case "not-allowed":
     case "service-not-allowed":
-      return "The browser refused microphone access for speech recognition. Check the site permissions, and note that some managed browsers disable it outright.";
+      return apple
+        ? "Speech recognition was refused. Safari needs both microphone access for this site and Dictation switched on (System Settings → Keyboard → Dictation on a Mac, Settings → General → Keyboard on an iPhone)."
+        : "The browser refused microphone access for speech recognition. Check the site permissions, and note that some managed browsers disable it outright.";
     case "audio-capture":
       return "No microphone was available to the recogniser.";
     case "language-not-supported":

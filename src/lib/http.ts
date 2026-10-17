@@ -24,7 +24,7 @@ function tooLarge() {
   return NextResponse.json({ error: "That request is too large." }, { status: 413 });
 }
 
-async function readBytes(request: Request, limit: number): Promise<Uint8Array | Response> {
+export async function readBytes(request: Request, limit: number): Promise<Uint8Array | Response> {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > limit) return tooLarge();
   if (!request.body) return new Uint8Array();
