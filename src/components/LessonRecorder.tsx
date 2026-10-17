@@ -5,13 +5,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LevelMeter } from "@/components/LevelMeter";
 import { MicPicker } from "@/components/MicPicker";
-import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
+import { useClipTranscriber } from "@/hooks/useClipTranscriber";
 import { useTutorRecorder } from "@/hooks/useTutorRecorder";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { INTERRUPTION_LABEL, type Lesson, type TranscriptSegment } from "@/lib/types";
 
 /** How often a running lesson's transcript is copied to the server. */
 const AUTOSAVE_MS = 10_000;
+
+/**
+ * The lesson goes to the recogniser in pieces. A piece ends at the first pause
+ * in speech once it is MIN long, so a word is not cut in half, and at MAX
+ * whatever is happening, so text never lags far behind the room.
+ */
+const MIN_CLIP_MS = 8_000;
+const MAX_CLIP_MS = 25_000;
 
 function draftKey(id: string) {
   return `tutor-signal:lesson:${id}`;
@@ -39,6 +47,9 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [confirmingRestart, setConfirmingRestart] = useState(false);
+  /** Finish was pressed and the last pieces are still being transcribed. */
+  const [finishing, setFinishing] = useState(false);
   /** The end-of-lesson save failed; the transcript is still here to retry. */
   const [unsaved, setUnsaved] = useState(false);
   /**
@@ -56,10 +67,13 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     [isClassroom, capturesStudent, threshold],
   );
 
-  const speech = useSpeechTranscript(lesson.language);
+  /** Time from before an interruption, so a carried-on lesson stays in order. */
+  const baseRef = useRef(0);
+  const speech = useClipTranscriber(lesson.language);
   const rec = useTutorRecorder({
     gate,
-    onAutoPause: () => speech.stop(),
+    // The screen went off: what was said up to now goes off to be read.
+    onAutoPause: () => void clipsRef.current.cut(),
   });
   const wakeLock = useWakeLock();
 
@@ -70,7 +84,11 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     void rec.arm();
     if (interrupted) {
       const local = readDraft(lesson.id);
-      speech.restore(local.length > lesson.transcript.length ? local : lesson.transcript);
+      const saved = local.length > lesson.transcript.length ? local : lesson.transcript;
+      speech.restore(saved);
+      // Carrying on starts the clock at zero again; this keeps new lines after
+      // the old ones.
+      baseRef.current = saved.length ? saved[saved.length - 1].t + 1000 : 0;
     }
     // one-shot on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,10 +98,69 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   const paused = rec.state === "paused";
   const live = recording || paused;
 
-  // Only run the recogniser where the student is a consenting participant.
-  // It listens to the room, not to the gated stream, so in tutor-only mode it
-  // would transcribe people who never agreed to be recorded.
+  // Only transcribe where the student is a consenting participant. The gate
+  // cuts by loudness, not by who is speaking, so in tutor-only mode a
+  // transcript could still hold the words of a child nobody agreed to record.
   const transcribes = capturesStudent;
+
+  // --- the lesson, in pieces, to the recogniser ----------------------------
+
+  const elapsedRef = useRef(0);
+  const gateOpenRef = useRef(true);
+  /** Whether the gate opened at all during the piece now recording. */
+  const heardRef = useRef(false);
+  useEffect(() => {
+    elapsedRef.current = rec.elapsedMs;
+    gateOpenRef.current = rec.gateOpen;
+    if (rec.gateOpen) heardRef.current = true;
+  }, [rec.elapsedMs, rec.gateOpen]);
+  const lessonMs = () => baseRef.current + elapsedRef.current;
+
+  /** Lesson time where the piece now recording began; null when none is. */
+  const clipStartRef = useRef<number | null>(null);
+
+  function openClip() {
+    if (!transcribes || clipStartRef.current !== null) return;
+    if (rec.startClip()) {
+      clipStartRef.current = lessonMs();
+      heardRef.current = gateOpenRef.current;
+    }
+  }
+
+  /** End the piece now recording and send it. Resolves once it is sent off. */
+  function cutClip(): Promise<void> {
+    const t = clipStartRef.current;
+    if (t === null) return Promise.resolve();
+    clipStartRef.current = null;
+    // A piece the gate never opened for is room noise or silence: there is
+    // nothing in it to read, and sending it would only be paid for.
+    const heard = heardRef.current;
+    return rec.endClip().then((clip) => {
+      if (clip && heard) void speech.send(clip, t);
+    });
+  }
+
+  // The interval and the auto-pause outlive any one render; they call through
+  // this, as the autosave below does.
+  const clipsRef = useRef({ open: openClip, cut: cutClip });
+  useEffect(() => {
+    clipsRef.current = { open: openClip, cut: cutClip };
+  });
+
+  useEffect(() => {
+    if (!recording || !transcribes) return;
+    const id = window.setInterval(() => {
+      const start = clipStartRef.current;
+      if (start === null) return;
+      const length = lessonMs() - start;
+      // The gate closing is a pause in speech: a clean place to cut.
+      if (length >= MAX_CLIP_MS || (length >= MIN_CLIP_MS && !gateOpenRef.current)) {
+        void clipsRef.current.cut();
+        clipsRef.current.open();
+      }
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [recording, transcribes]);
 
   // --- keeping a running lesson safe ---------------------------------------
 
@@ -142,12 +219,6 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   }, [transcribes, speech.segments, lesson.id]);
 
   async function begin() {
-    // The recogniser first, inside the tap: iOS refuses to start it after an
-    // await, without saying so.
-    if (transcribes) {
-      if (interrupted) speech.resume();
-      else speech.start();
-    }
     // Taken before recording so a lock cannot land in the gap.
     await wakeLock.acquire();
     if (!lesson.startedAt) {
@@ -159,6 +230,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     }
     setInterrupted(false);
     await rec.start();
+    openClip();
   }
 
   /** Save the end of the lesson. Safe to call again if it failed. */
@@ -196,24 +268,71 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
 
   async function end() {
     setConfirmingEnd(false);
-    // Waits for the recogniser to hand over the line it was still holding.
-    const transcript = await speech.stopAndFlush();
+    setFinishing(true);
+    // The last piece, then every piece still out, before anything is saved.
+    await cutClip();
     // Audio is never kept, so only the transcript and the timings are saved.
     rec.stop();
+    const transcript = await speech.settle();
+    setFinishing(false);
+    // Leaving now would lose what failed - it exists only on this page.
+    if (speech.failedRef.current.length) return;
     await finishSave(transcript);
   }
 
+  /** After a failed piece: try it again, then finish once all are back. */
+  async function retryAndFinish() {
+    setFinishing(true);
+    speech.retry();
+    const transcript = await speech.settle();
+    setFinishing(false);
+    if (speech.failedRef.current.length) return;
+    await finishSave(transcript);
+  }
+
+  /**
+   * Throw the take away and go back to before Start: transcript, timings and
+   * interruptions, here and on the server. The lesson record itself stays.
+   */
+  async function startOver() {
+    setConfirmingRestart(false);
+    // The piece now recording is thrown away, not sent.
+    clipStartRef.current = null;
+    void rec.endClip();
+    rec.stop();
+    void wakeLock.release();
+    speech.reset();
+    baseRef.current = 0;
+    savedCountRef.current = 0;
+    try {
+      window.localStorage.removeItem(draftKey(lesson.id));
+    } catch {
+      // nothing to clean
+    }
+    await fetch(`/api/lessons/${lesson.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...(transcribes && { transcript: [] }),
+        interruptions: [],
+        recordedMs: 0,
+      }),
+    }).catch(() => {});
+    setInterrupted(false);
+    // A stopped recorder cannot start again; a fresh one is built here.
+    await rec.arm(rec.deviceId || undefined);
+  }
+
   function pause() {
-    speech.stop();
+    void cutClip();
     rec.pause();
   }
 
   async function resume() {
-    // Recogniser first, inside the tap (see begin), then the screen lock,
-    // which is gone after the screen went off.
-    if (transcribes) speech.resume();
+    // The screen lock is gone after the screen went off.
     await wakeLock.acquire();
     await rec.resume();
+    openClip();
   }
 
   return (
@@ -248,6 +367,9 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
               className="btn btn-quiet"
             >
               End it and record the debrief
+            </button>
+            <button onClick={() => setConfirmingRestart(true)} className="btn btn-quiet">
+              Start over
             </button>
           </div>
         </section>
@@ -389,7 +511,13 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
               onClick={() => setConfirmingEnd(true)}
               className="btn btn-quiet btn-lg"
             >
-              End lesson
+              Finish &amp; review
+            </button>
+            <button
+              onClick={() => setConfirmingRestart(true)}
+              className="btn btn-quiet btn-lg"
+            >
+              Start over
             </button>
           </>
         )}
@@ -403,34 +531,73 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
 
       <ConfirmDialog
         open={confirmingEnd}
-        title="End the lesson?"
+        title="Finish the lesson?"
         body={`${formatMs(rec.elapsedMs)} recorded. This stops the recording and takes you to the debrief - it cannot be resumed afterwards.`}
-        confirmLabel="End lesson"
+        confirmLabel="Finish & review"
         cancelLabel="Keep recording"
         onConfirm={() => void end()}
         onCancel={() => setConfirmingEnd(false)}
       />
 
+      <ConfirmDialog
+        open={confirmingRestart}
+        title="Are you sure you want to start over?"
+        body={
+          transcribes
+            ? "The recording stops, and the transcript so far is deleted - on this device and on the server. You start again from zero. This cannot be undone."
+            : "The recording stops and its timings are deleted. You start again from zero. This cannot be undone."
+        }
+        confirmLabel="Start over"
+        cancelLabel="Keep recording"
+        onConfirm={() => void startOver()}
+        onCancel={() => setConfirmingRestart(false)}
+      />
+
       {saveError && <p className="note note-warn">{saveError}</p>}
+
+      {finishing && (
+        <p className="note note-quiet">Transcribing the last part of the lesson…</p>
+      )}
+
+      {!finishing && !live && speech.failed.length > 0 && (
+        <div className="note note-warn space-y-2">
+          <p>
+            {speech.failed.length === 1 ? "One part" : `${speech.failed.length} parts`} of the
+            lesson could not be transcribed: {speech.failed[0].error} The audio is still on
+            this page, but only until you leave it.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => void retryAndFinish()} className="btn btn-primary">
+              Try again
+            </button>
+            <button
+              onClick={() => void finishSave(speech.segmentsRef.current)}
+              disabled={saving}
+              className="btn btn-quiet"
+            >
+              Finish without them
+            </button>
+          </div>
+        </div>
+      )}
 
       {transcribes && (
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="t-subtitle">
-            {transcribes ? "Live transcript" : "Transcript"}
-          </h2>
+          <h2 className="t-subtitle">Live transcript</h2>
           <span className="t-caption t-muted">
-            {speech.supported
-              ? speech.listening
+            {speech.pending.length > 0
+              ? "transcribing…"
+              : recording
                 ? "listening"
-                : "idle"
-              : "not supported in this browser - use Safari or Chrome"}
+                : "idle"}
           </span>
         </div>
         <div className="max-h-80 space-y-2 overflow-y-auto card p-4 t-small">
-          {speech.segments.length === 0 && !speech.interim && (
+          {speech.segments.length === 0 && (
             <p className="text-muted">
-              Both voices land here as you talk. It is saved as you go.
+              Both voices land here a few seconds after they are said. It is
+              saved as you go.
             </p>
           )}
           {speech.segments.map((s, i) => (
@@ -441,9 +608,13 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
               {s.text}
             </p>
           ))}
-          {speech.interim && <p className="text-muted">{speech.interim}</p>}
         </div>
-        {speech.error && <p className="t-caption">{speech.error}</p>}
+        {live && speech.failed.length > 0 && (
+          <p className="t-caption">
+            {speech.failed.length} {speech.failed.length === 1 ? "part" : "parts"} could not be
+            transcribed yet - you can retry when you finish.
+          </p>
+        )}
       </section>
       )}
     </div>

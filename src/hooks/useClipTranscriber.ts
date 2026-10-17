@@ -31,9 +31,18 @@ export function useClipTranscriber(language: string) {
   );
   /** Tags of clips still on their way back. */
   const [pending, setPending] = useState<(string | undefined)[]>([]);
-  const [failed, setFailed] = useState<Failed[]>([]);
+  const [failed, setFailedState] = useState<Failed[]>([]);
+  /** The same list, readable straight after `settle` without a render. */
+  const failedRef = useRef<Failed[]>([]);
+  const setFailed = useCallback((next: Failed[] | ((prev: Failed[]) => Failed[])) => {
+    const value = typeof next === "function" ? next(failedRef.current) : next;
+    failedRef.current = value;
+    setFailedState(value);
+  }, []);
+  /** Requests still out, so a caller can wait for every one to come back. */
+  const inFlightRef = useRef(new Set<Promise<void>>());
 
-  const send = useCallback(
+  const sendOne = useCallback(
     async (clip: Blob, t: number, tag?: string) => {
       setPending((p) => [...p, tag]);
       try {
@@ -67,15 +76,34 @@ export function useClipTranscriber(language: string) {
         });
       }
     },
-    [language, setSegments],
+    [language, setSegments, setFailed],
   );
+
+  const send = useCallback(
+    (clip: Blob, t: number, tag?: string): Promise<void> => {
+      const job = sendOne(clip, t, tag);
+      inFlightRef.current.add(job);
+      void job.finally(() => inFlightRef.current.delete(job));
+      return job;
+    },
+    [sendOne],
+  );
+
+  /**
+   * Wait for every clip already sent, then hand back the transcript. What
+   * failed is in `failed`, not here - the caller decides whether to retry.
+   */
+  const settle = useCallback(async (): Promise<TranscriptSegment[]> => {
+    while (inFlightRef.current.size) await Promise.all([...inFlightRef.current]);
+    return segmentsRef.current;
+  }, []);
 
   /** Try every failed clip again. */
   const retry = useCallback(() => {
-    const again = failed;
+    const again = failedRef.current;
     setFailed([]);
     for (const f of again) void send(f.clip, f.t, f.tag);
-  }, [failed, send]);
+  }, [send, setFailed]);
 
   /** Put back a transcript saved earlier. */
   const restore = useCallback(
@@ -86,14 +114,16 @@ export function useClipTranscriber(language: string) {
   const reset = useCallback(() => {
     setSegments([]);
     setFailed([]);
-  }, [setSegments]);
+  }, [setSegments, setFailed]);
 
   return {
     segments,
     segmentsRef,
     pending,
     failed,
+    failedRef,
     send,
+    settle,
     retry,
     restore,
     reset,

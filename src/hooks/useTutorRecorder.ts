@@ -276,7 +276,11 @@ export function useTutorRecorder(options: Options = {}) {
     if (ctxRef.current && ctxRef.current.state !== "running") void ctxRef.current.resume();
     const recorder = new MediaRecorder(stream, {
       mimeType: pickMimeType(),
-      audioBitsPerSecond: 24000,
+      // A clip is read by the recogniser, not thrown away like the lesson
+      // recorder's chunks, so it gets the bitrate that keeps consonants
+      // clean. It is converted to WAV before it is sent, so this costs
+      // nothing on the network.
+      audioBitsPerSecond: 128000,
     });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => {
