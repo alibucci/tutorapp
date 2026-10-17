@@ -70,12 +70,12 @@ export function TutorAdmin({ tutors }: { tutors: Row[] }) {
       {issued && (
         <div className="card border-accent bg-accent-soft p-5">
           <p className="t-subtitle">
-            One-time password for {issued.email}
+            Password for {issued.email}
           </p>
           <p className="mt-2 font-mono t-title select-all">{issued.password}</p>
           <p className="hint">
-            This is the only time it is shown. Send it to the tutor; they will be
-            asked to change it when they first sign in.
+            Copy it now - it is shown only this once. It keeps working until the
+            tutor changes it, which they are offered when they first sign in.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button

@@ -3,7 +3,7 @@ import { uiFont } from "@/lib/fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Tutor Signal",
+  title: "aloudli",
   description:
     "Tutor-only lesson audio plus a 60-second debrief, turned into what to teach next.",
 };

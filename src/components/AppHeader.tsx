@@ -21,11 +21,11 @@ export function AppHeader({
             aria-hidden
             className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent text-sm font-bold text-white"
           >
-            T
+            A
           </span>
           <span className="min-w-0">
             <span className="block text-[1.0625rem] font-bold tracking-tight">
-              Tutor Signal
+              aloudli
             </span>
             {context && <span className="t-eyebrow block mt-0.5">{context}</span>}
           </span>

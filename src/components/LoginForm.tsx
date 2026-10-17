@@ -41,9 +41,9 @@ export function LoginForm() {
           aria-hidden
           className="grid h-12 w-12 place-items-center rounded-[var(--radius-lg)] bg-accent text-2xl font-bold text-white"
         >
-          T
+          A
         </span>
-        <h1 className="t-display mt-4">Tutor Signal</h1>
+        <h1 className="t-display mt-4">aloudli</h1>
         <p className="t-body t-muted mt-2">
           Use the sign-in your tutor or school sent you.
         </p>

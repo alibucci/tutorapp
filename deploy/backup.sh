@@ -13,7 +13,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/tutorapp}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/tutorapp}"
 KEEP_DAYS="${KEEP_DAYS:-30}"
-# Optional: an rclone remote, e.g. "b2:tutorsignal-backups". A backup on the
+# Optional: an rclone remote, e.g. "b2:aloudli-backups". A backup on the
 # same machine survives a bad deploy but not a dead disk.
 REMOTE="${BACKUP_REMOTE:-}"
 

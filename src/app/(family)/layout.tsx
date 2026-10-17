@@ -3,7 +3,7 @@ import { SignOut } from "@/components/SignOut";
 import { requireFamily } from "@/lib/auth";
 import { getStudent } from "@/lib/store";
 
-export const metadata = { title: "Tutor Signal" };
+export const metadata = { title: "aloudli" };
 
 /**
  * A family signed in: the child and the parent share the sign-in, so the top

@@ -43,8 +43,8 @@ export function PasswordForm({ first }: { first: boolean }) {
 
       {first && (
         <p className="note note-warn">
-          You are still on the one-time password you were given. Whoever set up
-          your account knows it, so change it now.
+          You are still on the password you were given. Whoever set up your
+          account knows it, so it is worth changing to your own.
         </p>
       )}
 
