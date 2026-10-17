@@ -150,6 +150,8 @@ function nextStep(lesson: Lesson): { text: string; tone: string; href: string } 
   if (lesson.homework?.sentAt) return { text: "Homework sent", tone: "t-muted", href: `${base}/review` };
   if (lesson.summary) return { text: "Send homework", tone: "text-warn", href: `${base}/review#homework` };
   if (lesson.debrief.length) return { text: "Review", tone: "text-warn", href: `${base}/review` };
+  // A note about the child has no lesson to record, only the questions.
+  if (lesson.kind === "intro") return { text: "Record note", tone: "text-warn", href: `${base}/debrief` };
   // Not recorded, or interrupted: back to the recorder. Ended without a
   // debrief: straight to the debrief.
   if (!lesson.endedAt) {

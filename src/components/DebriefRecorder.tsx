@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LevelMeter } from "@/components/LevelMeter";
 import { useClipTranscriber } from "@/hooks/useClipTranscriber";
 import { useTutorRecorder } from "@/hooks/useTutorRecorder";
@@ -54,6 +55,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const [saving, setSaving] = useState(false);
   /** The last clip is still being written after Finish. */
   const [closing, setClosing] = useState(false);
+  const [confirmRestart, setConfirmRestart] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /** Start ms (relative to the debrief) of each prompt, so a tutor can advance early. */
@@ -238,6 +240,28 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     void wakeLock.acquire();
   }
 
+  /** Throw away what was said and typed, and go back to the start. */
+  function startOver() {
+    setConfirmRestart(false);
+    speech.reset();
+    setEdits({});
+    setError(null);
+    try {
+      window.localStorage.removeItem(draftKey(lesson.id));
+    } catch {
+      // nothing to clean
+    }
+    // The server's copy too, or a reload would bring the old answers back.
+    void fetch(`/api/lessons/${lesson.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ debriefTranscript: [] }),
+    }).catch(() => {});
+    setPhase("ready");
+    // The microphone was let go at the end of the last take.
+    void rec.arm();
+  }
+
   async function save() {
     setSaving(true);
     setError(null);
@@ -410,14 +434,39 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
       {error && <p className="note note-warn">{error}</p>}
 
-      <button
-        onClick={() => void save()}
-        // Saving now would drop the answers still on their way back.
-        disabled={saving || transcribing}
-        className="btn btn-primary btn-lg"
-      >
-        {saving ? "Saving..." : transcribing ? "Transcribing…" : "Save debrief"}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => void save()}
+          // Saving now would drop the answers still on their way back.
+          disabled={saving || transcribing}
+          className="btn btn-primary btn-lg"
+        >
+          {saving
+            ? "Saving..."
+            : transcribing
+              ? "Transcribing…"
+              : lesson.kind === "intro"
+                ? "Save note"
+                : "Save debrief"}
+        </button>
+        <button
+          onClick={() => setConfirmRestart(true)}
+          disabled={saving || transcribing}
+          className="btn btn-quiet btn-lg"
+        >
+          Record again
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={confirmRestart}
+        title="Record it again?"
+        body="What was transcribed and anything you typed here are thrown away, and you start again from the first question."
+        confirmLabel="Record again"
+        cancelLabel="Keep these answers"
+        onConfirm={startOver}
+        onCancel={() => setConfirmRestart(false)}
+      />
     </div>
   );
 }

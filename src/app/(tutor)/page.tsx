@@ -33,6 +33,16 @@ type Todo = {
 /** The one thing each recent lesson is still waiting for, if anything. */
 function todoFor(lesson: Lesson, name: string): Todo | null {
   const base = `/lesson/${lesson.id}`;
+  if (lesson.kind === "intro" && lesson.debrief.length === 0) {
+    const begun = lesson.debriefTranscript.length > 0;
+    return {
+      href: `${base}/debrief`,
+      title: `${begun ? "Finish" : "Record"} the note about ${name}`,
+      detail: begun ? "it was interrupted" : "five questions, one minute",
+      kind: "warn",
+      icon: <MicIcon />,
+    };
+  }
   if (lesson.startedAt && !lesson.endedAt) {
     return {
       href: base,
