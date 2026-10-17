@@ -5,17 +5,15 @@ export type LessonMode = "online" | "classroom";
  * on the transcript, so getting this wrong quietly ruins the whole lesson.
  */
 export const LESSON_LANGUAGES = [
-  { tag: "ru-RU", label: "Russian" },
-  { tag: "zh-CN", label: "Chinese (Mandarin)" },
   { tag: "en-US", label: "English" },
-  { tag: "kk-KZ", label: "Kazakh" },
+  { tag: "zh-CN", label: "Chinese (Mandarin)" },
 ] as const;
 
-export const DEFAULT_LANGUAGE = "ru-RU";
+export const DEFAULT_LANGUAGE = "en-US";
 
 /** Name of the language, for telling a model which language to write in. */
 export function languageName(tag: string): string {
-  return LESSON_LANGUAGES.find((l) => l.tag === tag)?.label ?? "Russian";
+  return LESSON_LANGUAGES.find((l) => l.tag === tag)?.label ?? "English";
 }
 
 export type Speaker = "tutor" | "student" | "unknown";

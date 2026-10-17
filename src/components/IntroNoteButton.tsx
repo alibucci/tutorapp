@@ -3,7 +3,7 @@
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { DEFAULT_LANGUAGE, type Lesson } from "@/lib/types";
+import { DEFAULT_LANGUAGE, LESSON_LANGUAGES, type Lesson } from "@/lib/types";
 
 /**
  * Start a child before you have taught them.
@@ -20,6 +20,7 @@ export function IntroNoteButton({
   studentName: string;
 }) {
   const router = useRouter();
+  const [language, setLanguage] = useState<string>(DEFAULT_LANGUAGE);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +32,7 @@ export function IntroNoteButton({
       json: {
         title: "First look",
         mode: "online",
-        language: DEFAULT_LANGUAGE,
+        language,
         studentId,
         kind: "intro",
       },
@@ -54,9 +55,25 @@ export function IntroNoteButton({
           home, without waiting for the first lesson.
         </p>
       </div>
-      <button onClick={() => void start()} disabled={busy} className="btn btn-primary">
-        {busy ? "Starting…" : "Record a note"}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          disabled={busy}
+          aria-label="Language of the note"
+          className="field"
+          style={{ width: "auto" }}
+        >
+          {LESSON_LANGUAGES.map((l) => (
+            <option key={l.tag} value={l.tag}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+        <button onClick={() => void start()} disabled={busy} className="btn btn-primary">
+          {busy ? "Starting…" : "Record a note"}
+        </button>
+      </div>
       {error && <p className="note note-warn">{error}</p>}
     </div>
   );
