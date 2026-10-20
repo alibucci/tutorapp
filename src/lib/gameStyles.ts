@@ -23,6 +23,8 @@ export type GameStyle = {
     submit: string;
     /** The line above "done" when the homework is handed in. */
     cheer: string;
+    /** The heading over a new homework. "New quest!" when not set. */
+    heading?: string;
   };
   /**
    * Colours for the shared skin. `ground` is behind everything, `panel` holds
@@ -84,7 +86,63 @@ export const GAME_STYLES: GameStyle[] = [
       accentInk: "#2a2340",
     },
   },
+  {
+    id: "basketball",
+    name: "Basketball",
+    imageStyle:
+      "bold sporty cartoon illustration: indoor basketball court with a polished wooden floor, orange basketball, hoop and net, bright arena lights, energetic action poses, clean vector shapes, vivid orange and navy colours",
+    words: {
+      start: "Tip off",
+      step: "Round",
+      done: "Game won!",
+      reward: "points",
+      submit: "Take the shot",
+      cheer: "Slam dunk!",
+      heading: "Game day!",
+    },
+    palette: {
+      ground: "#14213d",
+      panel: "#fff7ed",
+      ink: "#1c1917",
+      accent: "#c2410c",
+      accentInk: "#ffffff",
+    },
+  },
+  {
+    id: "zootopia",
+    // The name children ask for. The pictures below describe a city of
+    // animals in general - no film, studio or character - for the reason
+    // given on `imageStyle`.
+    name: "Zootopia",
+    imageStyle:
+      "polished 3D animated film look: a bustling modern city where animals walk upright and wear clothes - rabbits, foxes, sloths, giraffes, elephants - districts of rainforest, desert and snowy streets, warm cinematic lighting, expressive friendly faces, soft rendered fur",
+    words: {
+      start: "Open the case",
+      step: "Clue",
+      done: "Case closed!",
+      reward: "badges",
+      submit: "Crack the case",
+      cheer: "Great detective work!",
+      heading: "New case!",
+    },
+    palette: {
+      ground: "#0f3d3e",
+      panel: "#fdf6e9",
+      ink: "#1f2a2e",
+      accent: "#f2a541",
+      accentInk: "#1f2a2e",
+    },
+  },
 ];
+
+/**
+ * The theme's own class, beside its skin. A palette theme with pictures of its
+ * own - a court, a city - hangs them on this in globals.css, on top of the
+ * shared palette skin.
+ */
+export function themeOf(style: GameStyle): string {
+  return `theme-${style.id}`;
+}
 
 /** The skin class for a theme: its own, or the shared palette one. */
 export function skinOf(style: GameStyle): string {

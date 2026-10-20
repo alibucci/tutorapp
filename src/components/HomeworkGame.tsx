@@ -4,8 +4,8 @@ import { api } from "@/lib/api";
 import Link from "next/link";
 import { useState } from "react";
 import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
-import { pixelFont } from "@/lib/fonts";
-import { type GameStyle, paletteVars, skinOf } from "@/lib/gameStyles";
+import { gameFonts } from "@/lib/fonts";
+import { type GameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
 import { PracticeGame } from "@/components/PracticeGame";
 import {
   ADJECTIVES_TASK,
@@ -246,7 +246,7 @@ export function HomeworkGame({
 
   return (
     <div
-      className={`game game-${skinOf(style)} ${pixelFont.variable}`}
+      className={`game game-${skinOf(style)} ${themeOf(style)} ${gameFonts}`}
       style={paletteVars(style) as React.CSSProperties}
     >
       <div className="game-inner" data-answering={task ? "" : undefined}>
@@ -273,12 +273,12 @@ export function HomeworkGame({
 
         {step === 0 && (
           <div className="game-panel">
-            <p className="game-title">New quest!</p>
+            <p className="game-title">{style.words.heading ?? "New quest!"}</p>
             <p className="game-text mt-3">
               {exercises?.length
-                ? imageSrc
-                  ? `${exercises.length} quick games, then the picture.`
-                  : `${exercises.length} quick games.`
+                ? `${exercises.length} quick ${exercises.length === 1 ? "game" : "games"}${
+                    imageSrc ? ", then the picture." : "."
+                  }`
                 : "Look at the picture."}{" "}
               {steps.length} {steps.length === 1 ? "task" : "tasks"}
               {maxPoints > 0 && `, up to ${maxPoints} ${style.words.reward}`}.

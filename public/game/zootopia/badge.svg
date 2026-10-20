@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- A detective's star: what the child earns for each case. -->
+  <path d="M32 3L39.5 17.5L55.5 14.5L49.5 29.5L60 42L44 44.5L40 60L32 50L24 60L20 44.5L4 42L14.5 29.5L8.5 14.5L24.5 17.5Z" fill="#f2a541" stroke="#8a5a14" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="32" cy="33" r="12" fill="#ffd27a" stroke="#8a5a14" stroke-width="2.5"/>
+  <path d="M26 33.5L30.5 38L38.5 29" fill="none" stroke="#1f2a2e" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -40,7 +40,7 @@ export function StyleTag({ id }: { id?: string }) {
   // Any other theme: a chip in its own accent, with a swatch of its ground.
   return (
     <span
-      className="tag"
+      className={`tag tag-theme-${style.id}`}
       style={{
         background: `color-mix(in oklab, ${style.palette.accent} 18%, white)`,
         color: style.palette.ink,
@@ -48,7 +48,7 @@ export function StyleTag({ id }: { id?: string }) {
     >
       <span
         aria-hidden
-        className="h-2.5 w-2.5 rounded-sm"
+        className="tag-swatch h-2.5 w-2.5 rounded-sm"
         style={{ background: style.palette.ground, border: `2px solid ${style.palette.accent}` }}
       />
       {style.name}

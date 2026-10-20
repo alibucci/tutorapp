@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <!-- Backboard -->
+  <rect x="14" y="6" width="92" height="58" rx="5" fill="#ffffff" stroke="#14213d" stroke-width="4"/>
+  <rect x="42" y="26" width="36" height="28" fill="none" stroke="#e8691f" stroke-width="4"/>
+  <!-- Rim bracket -->
+  <rect x="56" y="54" width="8" height="10" fill="#14213d"/>
+  <!-- Net -->
+  <g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round">
+    <path d="M30 70L38 106H82L90 70"/>
+    <path d="M38 70L46 106M48 70L52 106M60 70V106M72 70L68 106M82 70L74 106"/>
+    <path d="M33 82H87M35 94H85"/>
+  </g>
+  <!-- Rim -->
+  <ellipse cx="60" cy="70" rx="32" ry="7" fill="none" stroke="#e8691f" stroke-width="5"/>
+  <!-- Ball dropping in -->
+  <g transform="translate(64 34) scale(0.42)">
+    <circle cx="32" cy="32" r="29" fill="#e8691f" stroke="#3a1a06" stroke-width="3"/>
+    <g fill="none" stroke="#2a1205" stroke-width="3" stroke-linecap="round">
+      <path d="M32 3V61M3 32H61M12.5 10.5C20 20 20 44 12.5 53.5M51.5 10.5C44 20 44 44 51.5 53.5"/>
+    </g>
+  </g>
+</svg>

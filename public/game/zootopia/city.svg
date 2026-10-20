@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="180" viewBox="0 0 480 180">
+  <!-- A city built for animals of every size: a snowy district, tall slim
+       towers for the tallest, tiny houses for the smallest, a desert with
+       palms and a dome, rainforest at the edge. No one in particular. -->
+  <!-- far layer -->
+  <g fill="#1d5a5a">
+    <path d="M0 120L30 92L52 112L78 80L104 110L120 100V180H0Z"/>
+    <rect x="132" y="40" width="14" height="140" rx="7"/>
+    <rect x="150" y="58" width="22" height="122"/>
+    <rect x="300" y="70" width="26" height="110"/>
+    <rect x="330" y="30" width="12" height="150" rx="6"/>
+    <path d="M360 180V110A40 40 0 0 1 440 110V180Z"/>
+    <rect x="446" y="80" width="34" height="100"/>
+  </g>
+  <!-- snow caps on the far peaks -->
+  <path d="M22 99L30 92L38 99L34 98L30 101L26 98Z M70 87L78 80L86 87L82 86L78 89L74 86Z" fill="#e8f6f6"/>
+  <!-- near layer -->
+  <g fill="#14403f">
+    <rect x="0" y="130" width="40" height="50"/>
+    <rect x="44" y="112" width="30" height="68"/>
+    <rect x="78" y="140" width="10" height="40"/>
+    <rect x="90" y="146" width="8" height="34"/>
+    <rect x="100" y="142" width="9" height="38"/>
+    <rect x="176" y="90" width="34" height="90"/>
+    <rect x="214" y="70" width="18" height="110" rx="4"/>
+    <path d="M236 180V118L262 96L288 118V180Z"/>
+    <rect x="378" y="124" width="40" height="56"/>
+    <rect x="422" y="104" width="24" height="76"/>
+  </g>
+  <!-- tiny-house roofs -->
+  <path d="M77 140L83 134L89 140ZM89 146L94 141L99 146ZM99 142L104.5 136L110 142Z" fill="#14403f"/>
+  <!-- palms -->
+  <g fill="#14403f">
+    <rect x="352" y="120" width="4" height="60" rx="2"/>
+    <path d="M354 120C344 112 336 114 330 120C338 116 346 118 354 122C352 112 346 106 340 104C348 106 354 112 356 120C360 110 368 106 376 108C368 110 362 114 358 121C366 116 374 116 380 122C372 118 362 120 356 124Z"/>
+    <rect x="300" y="132" width="3" height="48" rx="1.5"/>
+    <path d="M301 132C294 126 288 127 284 132C290 129 296 130 301 134C306 128 312 127 318 130C312 130 306 132 302 135Z"/>
+  </g>
+  <!-- rainforest leaves at the right edge -->
+  <g fill="#1f6b4f">
+    <path d="M480 180V120C468 124 458 136 456 150C462 142 470 138 480 136Z"/>
+    <path d="M480 150C470 150 460 158 456 170C464 164 472 162 480 162Z"/>
+  </g>
+  <!-- lit windows -->
+  <g fill="#f2c46d" opacity="0.9">
+    <rect x="182" y="100" width="5" height="6"/><rect x="194" y="100" width="5" height="6"/>
+    <rect x="182" y="116" width="5" height="6"/><rect x="200" y="132" width="5" height="6"/>
+    <rect x="188" y="148" width="5" height="6"/><rect x="219" y="84" width="4" height="6"/>
+    <rect x="224" y="104" width="4" height="6"/><rect x="219" y="124" width="4" height="6"/>
+    <rect x="50" y="122" width="5" height="6"/><rect x="62" y="138" width="5" height="6"/>
+    <rect x="6" y="140" width="5" height="6"/><rect x="22" y="152" width="5" height="6"/>
+    <rect x="386" y="134" width="5" height="6"/><rect x="400" y="150" width="5" height="6"/>
+    <rect x="428" y="116" width="4" height="6"/><rect x="436" y="136" width="4" height="6"/>
+    <rect x="256" y="126" width="5" height="6"/><rect x="268" y="142" width="5" height="6"/>
+    <rect x="81" y="150" width="3" height="4"/><rect x="92" y="154" width="3" height="4"/><rect x="103" y="150" width="3" height="4"/>
+  </g>
+</svg>

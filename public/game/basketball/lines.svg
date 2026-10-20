@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="260" viewBox="0 0 480 260" preserveAspectRatio="xMidYMax meet">
+  <!-- The paint and the three-point arc, seen from the baseline at the bottom. -->
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.75" stroke-width="5">
+    <path d="M30 260V150A210 150 0 0 1 450 150V260"/>
+    <rect x="175" y="110" width="130" height="150"/>
+    <path d="M175 110A65 65 0 0 1 305 110"/>
+  </g>
+  <rect x="175" y="110" width="130" height="150" fill="#e8691f" fill-opacity="0.35"/>
+</svg>

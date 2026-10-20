@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <!-- Hardwood court: staggered maple planks with a little grain. -->
+  <rect width="160" height="160" fill="#c98a4b"/>
+  <g>
+    <rect x="0" y="0" width="20" height="96" fill="#d29457"/>
+    <rect x="0" y="96" width="20" height="64" fill="#c4834a"/>
+    <rect x="20" y="0" width="20" height="40" fill="#bf7d43"/>
+    <rect x="20" y="40" width="20" height="120" fill="#cf9054"/>
+    <rect x="40" y="0" width="20" height="120" fill="#c88849"/>
+    <rect x="40" y="120" width="20" height="40" fill="#d69a5d"/>
+    <rect x="60" y="0" width="20" height="64" fill="#d59b5e"/>
+    <rect x="60" y="64" width="20" height="96" fill="#c07f45"/>
+    <rect x="80" y="0" width="20" height="24" fill="#c4854a"/>
+    <rect x="80" y="24" width="20" height="136" fill="#cc8d51"/>
+    <rect x="100" y="0" width="20" height="104" fill="#bd7c42"/>
+    <rect x="100" y="104" width="20" height="56" fill="#d3975a"/>
+    <rect x="120" y="0" width="20" height="56" fill="#d09156"/>
+    <rect x="120" y="56" width="20" height="104" fill="#c58648"/>
+    <rect x="140" y="0" width="20" height="136" fill="#cb8b4f"/>
+    <rect x="140" y="136" width="20" height="24" fill="#bf7e44"/>
+  </g>
+  <g stroke="#8a5528" stroke-opacity="0.55" stroke-width="1">
+    <path d="M20 0V160M40 0V160M60 0V160M80 0V160M100 0V160M120 0V160M140 0V160M160 0V160"/>
+    <path d="M0 96H20M20 40H40M40 120H60M60 64H80M80 24H100M100 104H120M120 56H140M140 136H160"/>
+  </g>
+  <g stroke="#a86a35" stroke-opacity="0.35" stroke-width="0.8" fill="none">
+    <path d="M6 10q3 20 0 40M13 60q-2 18 1 30M27 50q3 30-1 60M33 130q2 12 0 24M47 14q-3 30 1 60M53 128q2 10-1 26M67 8q3 22 0 40M73 80q-3 30 1 70M87 40q3 40-1 80M93 130q2 12 0 24M107 12q-3 36 1 80M113 118q2 18 0 36M127 70q3 30 0 70M133 6q-2 20 1 40M147 20q3 40-1 90M153 140q1 10 0 16"/>
+  </g>
+</svg>

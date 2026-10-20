@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { pixelFont } from "@/lib/fonts";
-import { gameStyle, paletteVars, skinOf } from "@/lib/gameStyles";
+import { gameFonts } from "@/lib/fonts";
+import { gameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
 import { gameScore, homeworkDone, homeworkImageUrl } from "@/lib/homework";
 import { listLessons } from "@/lib/store";
 import type { Lesson, Skill, Student } from "@/lib/types";
@@ -68,7 +68,7 @@ export async function StudentHome({
             <Link
               key={lesson.id}
               href={questHref(lesson.id)}
-              className={`game-entry game-entry-${skinOf(style)} ${pixelFont.variable}`}
+              className={`game-entry game-entry-${skinOf(style)} ${themeOf(style)} ${gameFonts}`}
               style={paletteVars(style) as React.CSSProperties}
             >
               <span>
@@ -88,7 +88,7 @@ export async function StudentHome({
         // What they have actually won. Same frame the level bar used, because
         // that is the spot on the screen a child looks at first.
         <section
-          className={`game-stats game-stats-${skinOf(style)} ${pixelFont.variable}`}
+          className={`game-stats game-stats-${skinOf(style)} ${themeOf(style)} ${gameFonts}`}
           style={paletteVars(style) as React.CSSProperties}
         >
           <div className="flex items-baseline justify-between gap-3">
@@ -135,14 +135,14 @@ export async function StudentHome({
                 <li key={lesson.id}>
                   <Link href={questHref(lesson.id)} className="quest-row card card-press">
                     <span
-                      className={`quest-row-face quest-row-face-${skinOf(style)}`}
+                      className={`quest-row-face quest-row-face-${skinOf(style)} ${themeOf(style)} ${gameFonts}`}
                       style={paletteVars(style) as React.CSSProperties}
                     >
                       {src ? (
                         // eslint-disable-next-line @next/next/no-img-element -- private upload
                         <img src={src} alt="" className="quest-row-img" />
                       ) : (
-                        <span className={`quest-row-games ${pixelFont.variable}`}>
+                        <span className="quest-row-games">
                           {lesson.homework?.exercises?.length ?? 0}
                         </span>
                       )}

@@ -1526,3 +1526,329 @@ textarea.field { line-height: var(--leading-normal); }
   text-shadow: 2px 2px 0 #000;
 }
 .quest-row-face-palette .quest-row-games { color: var(--g-panel); }
+
+/* ---------------------------------------------------------------------------
+   Themes with pictures of their own, on top of the shared palette skin.
+   `.theme-<id>` sits beside `.game-palette` on the game, and on the child
+   page's doorway, progress block and quest thumbnails. Art is hand-drawn SVG
+   in public/game/<id>/ - no characters or logos from anyone's film or game.
+   --------------------------------------------------------------------------- */
+
+/* The chip on the tutor's screens: the theme's own little picture. */
+.tag-theme-basketball .tag-swatch,
+.tag-theme-zootopia .tag-swatch {
+  width: 0.9rem !important;
+  height: 0.9rem !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url("/game/basketball/ball.svg") center / contain no-repeat !important;
+}
+.tag-theme-zootopia .tag-swatch {
+  background-image: url("/game/zootopia/paw-ink.svg") !important;
+}
+
+/* --- Basketball: the court under the lights ------------------------------
+   Hardwood floor, the paint and the arc drawn on it, a scoreboard over the
+   first card, a shot clock for the step, balls for progress, the hoop when
+   it is done. Scoreboard capitals for short words; questions stay readable. */
+.game-palette.theme-basketball {
+  background:
+    radial-gradient(90% 45% at 50% 0%, rgb(255 230 190 / 0.32), transparent 70%),
+    url("/game/basketball/lines.svg") center bottom / min(100%, 34rem) auto no-repeat,
+    linear-gradient(rgb(20 33 61 / 0.62), rgb(20 33 61 / 0.78)),
+    url("/game/basketball/court.svg") 0 0 / 160px 160px;
+}
+.theme-basketball .game-small,
+.theme-basketball .game-title,
+.theme-basketball .game-button,
+.theme-basketball .game-step,
+.theme-basketball .game-level,
+.theme-basketball .game-toast-title,
+.theme-basketball .game-toast-text,
+.theme-basketball .game-entry-kicker,
+.theme-basketball .game-entry-title,
+.theme-basketball .game-stats-level,
+.theme-basketball .game-stats-xp {
+  font-family: var(--font-sport), var(--font-figtree), sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+.theme-basketball .game-small { font-size: 1.0625rem; color: #fff7ed; }
+.theme-basketball .game-title { font-size: 1.625rem; line-height: 1.15; }
+.theme-basketball .game-panel {
+  border-radius: 18px;
+  border: 3px solid #14213d;
+  box-shadow: 0 0 0 3px #e8691f, 0 14px 30px -12px rgb(0 0 0 / 0.6);
+}
+/* The scoreboard over the opening card. */
+.theme-basketball .game-panel > .game-title:first-child {
+  margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  font-size: 2.25rem;
+  text-align: center;
+  color: #ffb347;
+  text-shadow: 0 0 12px rgb(255 140 40 / 0.55);
+  background:
+    radial-gradient(circle, rgb(255 179 71 / 0.18) 1px, transparent 1.5px) 0 0 / 6px 6px,
+    #0b1224;
+  border-radius: 14px 14px 0 0;
+}
+/* The shot clock. */
+.theme-basketball .game-panel .game-step {
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 1.125rem;
+  color: #ff5a3c;
+  background: #0b1224;
+  box-shadow: inset 0 0 0 2px #2a3555;
+  text-shadow: 0 0 8px rgb(255 90 60 / 0.6);
+}
+.theme-basketball .game-button {
+  font-size: 1.5rem;
+  padding: 0.8rem var(--space-4);
+  border-radius: 999px;
+}
+/* Two side by side: smaller, so "Play it all again" stays on one line. */
+.theme-basketball .game-button:not(:only-child) {
+  font-size: 1.25rem;
+  padding-inline: 0.5rem;
+  white-space: nowrap;
+}
+.theme-zootopia .game-button:not(:only-child) { font-size: 1.0625rem; }
+/* Links on the cream card: the amber accent is too light to read there. */
+.theme-zootopia .game-score-again { color: #7a4a0c; }
+.theme-basketball .game-button:only-child:not(.game-button-small)::before {
+  content: "";
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  margin-right: 0.45em;
+  vertical-align: -0.2em;
+  background: url("/game/basketball/ball.svg") center / contain no-repeat;
+}
+.theme-basketball .game-option,
+.theme-basketball .game-tile {
+  background: #fff;
+  border: 2px solid #f0c9a6;
+}
+.theme-basketball .game-frame {
+  background: #14213d;
+  border: 4px solid #e8691f;
+  border-radius: 18px;
+}
+.theme-basketball .game-tip { background: #fde3cc; }
+.theme-basketball .game-level { font-size: 1.375rem; color: #fff7ed; }
+.theme-basketball .game-xp { background: rgb(255 247 237 / 0.2); }
+.theme-basketball .game-xp-fill {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 8px, rgb(0 0 0 / 0.12) 8px 16px),
+    #e8691f;
+}
+/* Progress: a ball for every task, filled in as it is made. */
+.theme-basketball .game-slot {
+  border: 2px dashed rgb(255 247 237 / 0.45);
+  color: #fff7ed;
+}
+.theme-basketball .game-slot-done {
+  color: transparent;
+  border-color: transparent;
+  background: url("/game/basketball/ball.svg") center / 100% no-repeat;
+}
+.theme-basketball .game-slot-on { border: 3px solid #ffb347; box-shadow: 0 0 14px rgb(255 179 71 / 0.6); }
+.theme-basketball .game-toast {
+  color: #fff7ed;
+  background: #14213d;
+  border: 3px solid #e8691f;
+}
+.theme-basketball .game-toast-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 0;
+  box-shadow: none;
+  background: url("/game/basketball/hoop.svg") center / contain no-repeat;
+}
+.theme-basketball .game-toast-title { font-size: 1.125rem; color: #ffb347; opacity: 1; }
+.theme-basketball .game-toast-text { font-size: 1.625rem; }
+
+.game-entry-palette.theme-basketball {
+  color: #fff7ed;
+  padding-right: 6.5rem;
+  background:
+    url("/game/basketball/hoop.svg") right 14px center / 80px no-repeat,
+    linear-gradient(90deg, rgb(20 33 61 / 0.92), rgb(20 33 61 / 0.6)),
+    url("/game/basketball/court.svg") 0 0 / 120px 120px;
+}
+.game-entry-palette.theme-basketball .game-entry-kicker { font-size: 1rem; color: #ffb347; }
+.game-entry-palette.theme-basketball .game-entry-title { font-size: 1.875rem; }
+.game-stats-palette.theme-basketball {
+  color: #fff7ed;
+  background:
+    linear-gradient(rgb(20 33 61 / 0.86), rgb(20 33 61 / 0.86)),
+    url("/game/basketball/court.svg") 0 0 / 120px 120px;
+}
+.game-stats-palette.theme-basketball .game-stats-level { font-size: 1.5rem; }
+.game-stats-palette.theme-basketball .game-stats-xp { font-size: 1.75rem; color: #ffb347; }
+.quest-row-face-palette.theme-basketball {
+  background:
+    url("/game/basketball/ball.svg") center / 58% no-repeat,
+    url("/game/basketball/court.svg") 0 0 / 80px 80px;
+}
+.quest-row-face-palette.theme-basketball .quest-row-games {
+  font-family: var(--font-sport), sans-serif;
+  font-size: 1.75rem;
+  color: #fff;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 0.7);
+}
+
+/* --- The animal city: a detective's casebook ------------------------------
+   A skyline of districts for every size of animal along the bottom, paw
+   prints underfoot, each card a case file with its tab, the picture pinned
+   up as evidence, paws for progress and a detective's star at the end. */
+.game-palette.theme-zootopia {
+  background:
+    url("/game/zootopia/city.svg") center bottom / auto 190px repeat-x,
+    url("/game/zootopia/paws.svg") 0 0 / 200px 200px,
+    radial-gradient(110% 55% at 50% 0%, rgb(255 210 122 / 0.32), transparent 70%),
+    linear-gradient(#2b6f6b, #0f3d3e 75%);
+}
+.theme-zootopia .game-inner { padding-bottom: 12rem; }
+.theme-zootopia .game-small,
+.theme-zootopia .game-title,
+.theme-zootopia .game-text,
+.theme-zootopia .game-button,
+.theme-zootopia .game-option,
+.theme-zootopia .game-tile,
+.theme-zootopia .game-float,
+.theme-zootopia .game-step,
+.theme-zootopia .game-level,
+.theme-zootopia .game-slot,
+.theme-zootopia .game-toast-title,
+.theme-zootopia .game-toast-text,
+.theme-zootopia .game-entry-kicker,
+.theme-zootopia .game-entry-title,
+.theme-zootopia .game-stats-level,
+.theme-zootopia .game-stats-xp {
+  font-family: var(--font-round), var(--font-figtree), sans-serif;
+}
+.theme-zootopia .game-small { color: #fdf6e9; }
+/* Each card is a case file, with its tab sticking up. */
+.theme-zootopia .game-panel {
+  position: relative;
+  border-radius: 4px 20px 20px 20px;
+  box-shadow: 0 12px 28px -12px rgb(0 0 0 / 0.6);
+}
+.theme-zootopia .game-panel::before {
+  content: "CASE FILE";
+  position: absolute;
+  top: -15px;
+  left: 0;
+  height: 16px;
+  padding: 0 14px;
+  font: 600 0.6875rem/16px var(--font-round), sans-serif;
+  letter-spacing: 0.14em;
+  color: #1f2a2e;
+  background: #f2a541;
+  border-radius: 8px 8px 0 0;
+}
+.theme-zootopia .game-panel > .game-title:first-child {
+  font-size: 1.875rem;
+  font-weight: 600;
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 2px dashed #e8c88f;
+}
+.theme-zootopia .game-panel .game-step {
+  padding: 4px 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fdf6e9;
+  background: #1f2a2e;
+}
+.theme-zootopia .game-panel .game-step::before { content: "Clue "; }
+.theme-zootopia .game-button { border-radius: 999px; font-weight: 600; font-size: 1.1875rem; }
+.theme-zootopia .game-button:only-child:not(.game-button-small)::before {
+  content: "";
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.4em;
+  vertical-align: -0.15em;
+  background: url("/game/zootopia/paw-ink.svg") center / contain no-repeat;
+}
+.theme-zootopia .game-option,
+.theme-zootopia .game-tile { background: #fff; border-color: #e8c88f; }
+/* The picture, pinned up as evidence. */
+.theme-zootopia .game-frame {
+  position: relative;
+  padding: 10px 10px 26px;
+  border-radius: 4px;
+  background: #fff;
+  transform: rotate(-1.2deg);
+}
+.theme-zootopia .game-frame::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 84px;
+  height: 22px;
+  margin-left: -42px;
+  background: rgb(242 165 65 / 0.75);
+  transform: rotate(2deg);
+}
+.theme-zootopia .game-picture { border-radius: 2px; }
+.theme-zootopia .game-tip { background: #fbe8c4; }
+.theme-zootopia .game-level { color: #fdf6e9; font-weight: 600; font-size: 1rem; }
+/* Progress: a trail of paw prints. */
+.theme-zootopia .game-slot {
+  color: transparent;
+  border: 0;
+  background: url("/game/zootopia/paw.svg") center / 80% no-repeat;
+  opacity: 0.35;
+}
+.theme-zootopia .game-slot-done { opacity: 1; background-color: transparent; }
+.theme-zootopia .game-slot-on {
+  opacity: 1;
+  border: 0;
+  box-shadow: 0 0 0 3px #fdf6e9;
+  background-color: rgb(253 246 233 / 0.15);
+}
+.theme-zootopia .game-toast {
+  color: #fdf6e9;
+  background: #1f2a2e;
+  border: 3px solid #f2a541;
+}
+.theme-zootopia .game-toast-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 0;
+  box-shadow: none;
+  background: url("/game/zootopia/badge.svg") center / contain no-repeat;
+}
+.theme-zootopia .game-toast-title { color: #f2a541; opacity: 1; font-size: 1rem; }
+.theme-zootopia .game-toast-text { font-size: 1.375rem; font-weight: 600; }
+
+.game-entry-palette.theme-zootopia {
+  color: #fdf6e9;
+  padding-bottom: calc(var(--space-5) + 54px);
+  background:
+    url("/game/zootopia/city.svg") left bottom / auto 70px repeat-x,
+    radial-gradient(120% 120% at 100% 0%, rgb(242 165 65 / 0.45), transparent 60%),
+    linear-gradient(#2b6f6b, #0f3d3e);
+}
+.game-entry-palette.theme-zootopia .game-entry-kicker { color: #f2a541; font-weight: 600; }
+.game-entry-palette.theme-zootopia .game-entry-title { font-size: 1.5rem; font-weight: 600; }
+.game-stats-palette.theme-zootopia {
+  color: #fdf6e9;
+  background:
+    url("/game/zootopia/paws.svg") 0 0 / 160px 160px,
+    #0f3d3e;
+}
+.game-stats-palette.theme-zootopia .game-stats-xp { color: #f2a541; }
+.quest-row-face-palette.theme-zootopia {
+  background:
+    url("/game/zootopia/badge.svg") center 38% / 46% no-repeat,
+    url("/game/zootopia/city.svg") left bottom / auto 30px repeat-x,
+    #2b6f6b;
+}
+.quest-row-face-palette.theme-zootopia .quest-row-games { visibility: hidden; }
