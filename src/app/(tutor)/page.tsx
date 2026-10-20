@@ -38,7 +38,7 @@ function todoFor(lesson: Lesson, name: string): Todo | null {
     return {
       href: `${base}/debrief`,
       title: `${begun ? "Finish" : "Record"} the note about ${name}`,
-      detail: begun ? "it was interrupted" : "five questions, one minute",
+      detail: begun ? "it was interrupted" : "five short questions",
       kind: "warn",
       icon: <MicIcon />,
     };
@@ -57,7 +57,7 @@ function todoFor(lesson: Lesson, name: string): Todo | null {
     return {
       href: `${base}/debrief`,
       title: `${begun ? "Finish" : "Record"} the debrief for ${name}`,
-      detail: `${lesson.title} · ${begun ? "it was interrupted" : "sixty seconds"}`,
+      detail: `${lesson.title} · ${begun ? "it was interrupted" : "five short prompts"}`,
       kind: "warn",
       icon: <MicIcon />,
     };

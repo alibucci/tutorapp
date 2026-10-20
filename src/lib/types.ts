@@ -388,11 +388,11 @@ export type ParentReport = {
 };
 
 export const DEBRIEF_PROMPTS = [
-  { id: "covered", label: "What did you cover?", seconds: 12 },
-  { id: "struggled", label: "What did they struggle with?", seconds: 15 },
-  { id: "improved", label: "What improved, and how could you tell?", seconds: 12 },
-  { id: "matters", label: "What matters most here?", seconds: 11 },
-  { id: "next", label: "What should happen next lesson?", seconds: 10 },
+  { id: "covered", label: "What did you cover?" },
+  { id: "struggled", label: "What did they struggle with?" },
+  { id: "improved", label: "What improved, and how could you tell?" },
+  { id: "matters", label: "What matters most here?" },
+  { id: "next", label: "What should happen next lesson?" },
 ] as const;
 
 /**
@@ -403,11 +403,11 @@ export const DEBRIEF_PROMPTS = [
  * new child gets the same machine with the questions changed.
  */
 export const INTRO_PROMPTS = [
-  { id: "level", label: "Where are they now, roughly?", seconds: 12 },
-  { id: "hard", label: "What do they find hard?", seconds: 15 },
-  { id: "likes", label: "What are they into?", seconds: 10 },
-  { id: "goal", label: "What do they need to get to?", seconds: 12 },
-  { id: "start", label: "Where will you start?", seconds: 11 },
+  { id: "level", label: "Where are they now, roughly?" },
+  { id: "hard", label: "What do they find hard?" },
+  { id: "likes", label: "What are they into?" },
+  { id: "goal", label: "What do they need to get to?" },
+  { id: "start", label: "Where will you start?" },
 ] as const;
 
 /** Every prompt the app asks, whichever set it came from. */
@@ -415,8 +415,3 @@ export function promptLabel(id: string): string {
   const all = [...DEBRIEF_PROMPTS, ...INTRO_PROMPTS] as { id: string; label: string }[];
   return all.find((p) => p.id === id)?.label ?? id;
 }
-
-export const DEBRIEF_TOTAL_SECONDS = DEBRIEF_PROMPTS.reduce(
-  (n, p) => n + p.seconds,
-  0,
-);

@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "aloudli",
   description:
-    "Tutor-only lesson audio plus a 60-second debrief, turned into what to teach next.",
+    "Lesson audio plus a short spoken debrief, turned into what to teach next.",
 };
 
 export default function RootLayout({

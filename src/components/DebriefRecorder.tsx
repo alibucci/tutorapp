@@ -20,6 +20,9 @@ type Phase = "ready" | "running" | "review";
 /** How often a running debrief is copied to the server. */
 const AUTOSAVE_MS = 5_000;
 
+/** An answer longer than this goes to the recogniser in more than one piece. */
+const LONG_ANSWER_MS = 60_000;
+
 type Draft = { segments: TranscriptSegment[]; edits: Record<string, string> };
 
 function draftKey(id: string) {
@@ -37,9 +40,8 @@ function readDraft(id: string): Draft | null {
 
 export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   // An intro note asks about the child; a debrief asks about the lesson.
-  const PROMPTS: readonly { id: string; label: string; seconds: number }[] =
+  const PROMPTS: readonly { id: string; label: string }[] =
     lesson.kind === "intro" ? INTRO_PROMPTS : DEBRIEF_PROMPTS;
-  const totalSeconds = PROMPTS.reduce((n, p) => n + p.seconds, 0);
   const router = useRouter();
   const rec = useTutorRecorder();
   const speech = useClipTranscriber(lesson.language);
@@ -50,7 +52,6 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const unfinished = lesson.debrief.length === 0 && lesson.debriefTranscript.length > 0;
   const [phase, setPhase] = useState<Phase>(unfinished ? "review" : "ready");
   const [index, setIndex] = useState(0);
-  const [remaining, setRemaining] = useState<number>(PROMPTS[0].seconds);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   /** The last clip is still being written after Finish. */
@@ -62,8 +63,6 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const boundariesRef = useRef<number[]>([]);
   const startedAtRef = useRef(0);
   const indexRef = useRef(0);
-  /** Wall-clock deadline for the current prompt, not a tick count. */
-  const deadlineRef = useRef(0);
   /** When the clip now recording began, ms into the debrief. */
   const clipStartRef = useRef(0);
 
@@ -122,9 +121,19 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     clipStartRef.current = performance.now() - startedAtRef.current;
     rec.startClip();
     boundariesRef.current.push(clipStartRef.current);
-    deadlineRef.current = performance.now() + PROMPTS[next].seconds * 1000;
     setIndex(next);
-    setRemaining(PROMPTS[next].seconds);
+  }
+
+  /**
+   * There is no time limit, so a long answer is sent in pieces under the same
+   * prompt rather than as one recording too big for a single request.
+   */
+  function splitLongAnswer() {
+    const now = performance.now() - startedAtRef.current;
+    if (now - clipStartRef.current < LONG_ANSWER_MS) return;
+    void cutClip();
+    clipStartRef.current = now;
+    rec.startClip();
   }
 
   /** Copy what has been said so far to the server, without marking it done. */
@@ -140,36 +149,20 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   }
 
   // The interval and the listeners below outlive any one render, so they call
-  // through refs. Depending on the functions themselves tore the timer down on
-  // every render - and the level meter re-renders ~24 times a second, so the
-  // 250 ms tick never fired and the prompts never advanced on their own.
-  const advanceRef = useRef(advance);
-  const finishRef = useRef(finish);
+  // through refs. Depending on the functions themselves tore the interval down
+  // on every render - the level meter re-renders ~24 times a second.
+  const splitRef = useRef(splitLongAnswer);
   const saveRef = useRef(saveProgress);
   useEffect(() => {
-    advanceRef.current = advance;
-    finishRef.current = finish;
+    splitRef.current = splitLongAnswer;
     saveRef.current = saveProgress;
   });
 
-  // Driven off a wall-clock deadline rather than counted ticks: a backgrounded
-  // tab has its timers throttled to about one call a minute, and a decremented
-  // counter would simply be wrong on return. This catches up instead.
+  // The tutor moves on when they are done; nothing advances on its own.
   useEffect(() => {
     if (phase !== "running") return;
 
-    const id = window.setInterval(() => {
-      let left = deadlineRef.current - performance.now();
-      while (left <= 0 && indexRef.current < PROMPTS.length - 1) {
-        advanceRef.current();
-        left = deadlineRef.current - performance.now();
-      }
-      if (left <= 0) {
-        finishRef.current();
-        return;
-      }
-      setRemaining(Math.ceil(left / 1000));
-    }, 250);
+    const id = window.setInterval(() => splitRef.current(), 1000);
 
     const autosave = window.setInterval(() => saveRef.current(false), AUTOSAVE_MS);
     const onHide = () => {
@@ -232,10 +225,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     indexRef.current = 0;
     clipStartRef.current = 0;
     startedAtRef.current = performance.now();
-    deadlineRef.current =
-      performance.now() + PROMPTS[0].seconds * 1000;
     setIndex(0);
-    setRemaining(PROMPTS[0].seconds);
     setPhase("running");
     void wakeLock.acquire();
   }
@@ -293,20 +283,18 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     return (
       <div className="space-y-6">
         <ol className="space-y-2 card p-5 t-small">
-          {PROMPTS.map((p) => (
-            <li key={p.id} className="flex justify-between gap-4">
+          {PROMPTS.map((p, i) => (
+            <li key={p.id} className="flex gap-3">
+              <span className="shrink-0 font-mono t-caption t-muted">{i + 1}</span>
               <span>{p.label}</span>
-              <span className="shrink-0 font-mono t-caption t-muted">
-                {p.seconds}s
-              </span>
             </li>
           ))}
         </ol>
         <div className="space-y-2">
           <LevelMeter level={rec.level} gateOpen />
           <p className="t-caption t-muted">
-            Check the bar moves when you speak, then start. Prompts advance on
-            their own; you can skip ahead at any time.
+            Check the bar moves when you speak, then start. Take as long as you
+            need on each prompt, and tap Next when you are done with it.
           </p>
         </div>
         {(rec.error || error) && (
@@ -320,7 +308,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
             disabled={rec.state === "idle"}
             className="btn btn-primary btn-lg"
           >
-            {lesson.kind === "intro" ? "Start" : "Start debrief"} ({totalSeconds}s)
+            {lesson.kind === "intro" ? "Start" : "Start debrief"}
           </button>
           <button onClick={() => setPhase("review")} className="btn btn-quiet btn-lg">
             Type it instead
@@ -341,9 +329,6 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
           <p className="mt-3 t-title">
             {prompt.label}
           </p>
-          <p className="t-num mt-6 text-[3.5rem] leading-none" style={{ color: "var(--accent)" }}>
-            {remaining}
-          </p>
         </div>
 
         <div className="space-y-2">
@@ -355,22 +340,14 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
               ? `${speech.failed[speech.failed.length - 1].error} Keep talking - it can be retried at the end.`
               : speech.segments.length > 0
                 ? `Heard: “${speech.segments[speech.segments.length - 1].text}”`
-                : "Recording. Each answer is transcribed when its prompt ends."}
+                : "Recording. Each answer is transcribed when you move on."}
           </p>
         </div>
 
-        <div className="flex justify-center gap-3">
-          <button
-            onClick={() => advance()}
-            className="btn btn-quiet"
-          >
-            Next prompt
-          </button>
-          <button
-            onClick={() => finish()}
-            className="btn btn-quiet"
-          >
-            Finish early
+        <div className="flex justify-center">
+          {/* On the last prompt the same button finishes. */}
+          <button onClick={() => advance()} className="btn btn-primary btn-lg">
+            {index === PROMPTS.length - 1 ? "Finish" : "Next prompt"}
           </button>
         </div>
       </div>

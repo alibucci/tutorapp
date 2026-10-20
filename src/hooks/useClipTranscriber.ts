@@ -46,13 +46,29 @@ export function useClipTranscriber(language: string) {
     async (clip: Blob, t: number, tag?: string) => {
       setPending((p) => [...p, tag]);
       try {
-        const wav = await toSpeechWav(clip);
+        let wav: Blob | null;
+        try {
+          wav = await toSpeechWav(clip);
+        } catch {
+          // Not the network: the browser could not read back its own recording.
+          throw new Error("This recording could not be read on this device.");
+        }
         if (!wav) return;
-        const res = await fetch(`/api/transcribe?lang=${encodeURIComponent(language)}`, {
-          method: "POST",
-          headers: { "Content-Type": "audio/wav" },
-          body: wav,
-        });
+        const post = () =>
+          fetch(`/api/transcribe?lang=${encodeURIComponent(language)}`, {
+            method: "POST",
+            headers: { "Content-Type": "audio/wav" },
+            body: wav,
+          });
+        let res: Response;
+        try {
+          res = await post();
+        } catch {
+          // A phone drops an upload now and then - one did mid-debrief on a
+          // pilot. Once more after a breath, before bothering the tutor.
+          await new Promise((resolve) => window.setTimeout(resolve, 1500));
+          res = await post();
+        }
         const body = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
         if (!res.ok) throw new Error(body.error ?? `Transcription failed (${res.status}).`);
         const text = (body.text ?? "").trim();

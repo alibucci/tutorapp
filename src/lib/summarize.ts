@@ -37,7 +37,7 @@ const SummarySchema = z.object({
     ),
 });
 
-const COMMON = `The debrief is the tutor's own 60-second reflection recorded
+const COMMON = `The debrief is the tutor's own short spoken reflection, recorded
 straight after the lesson. It carries judgement the transcript cannot: where the
 two disagree about what mattered, follow the debrief.
 
