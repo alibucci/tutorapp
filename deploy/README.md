@@ -81,11 +81,26 @@ URL redirect** — that is a parking feature and it conflicts with pointing the
 domain at a real server — then add two A records:
 
 ```
-A   @     47.242.7.151
-A   www   47.242.7.151
+A   @     47.238.158.217
+A   www   47.238.158.217
 ```
 
 Then open `/check` on a real device and confirm **Secure context: OK**.
+
+**Check the address from mainland China before pointing the domain at it.**
+The first server, 47.242.7.151, was unreachable from most of mainland China -
+every port, while other Hong Kong sites answered the same probes - and nothing
+on the server showed it: the requests simply never arrived. A Simple
+Application Server cannot change its IP, so the fix was a new server from an
+image of the old one. Globalping's probes in China tell you in a minute:
+
+```bash
+curl -s -X POST https://api.globalping.io/v1/measurements \
+  -H "Content-Type: application/json" \
+  -d '{"type":"ping","target":"<IP>","locations":[{"country":"CN","limit":10}],
+       "measurementOptions":{"protocol":"TCP","port":443}}'
+# then GET https://api.globalping.io/v1/measurements/<id>
+```
 
 ## Releasing
 
@@ -100,7 +115,7 @@ root over SSH. Set up a key first or it will ask for the password on every
 step:
 
 ```bash
-ssh-copy-id admin@47.242.7.151
+ssh-copy-id admin@47.238.158.217
 ```
 
 Typecheck, lint, build, package, upload, switch the `current` symlink, restart,

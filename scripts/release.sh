@@ -17,7 +17,7 @@ set -euo pipefail
 
 # Alibaba's images disable root over SSH, so log in as the ordinary user and
 # raise privilege on the far side. sudo is NOPASSWD there by default.
-HOST="${DEPLOY_HOST:-admin@47.242.7.151}"
+HOST="${DEPLOY_HOST:-admin@47.238.158.217}"
 APP_DIR="${DEPLOY_DIR:-/opt/tutorapp}"
 APP_USER="${DEPLOY_USER:-tutorapp}"
 

@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-HOST="${DEPLOY_HOST:-admin@47.242.7.151}"
+HOST="${DEPLOY_HOST:-admin@47.238.158.217}"
 REMOTE_DIR="${BACKUP_DIR:-/var/backups/tutorapp}"
 LOCAL_DIR="${LOCAL_BACKUP_DIR:-./backups}"
 
