@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { GameStylePicker } from "@/components/GameStylePicker";
 import { ImageIcon } from "@/components/ui";
 import { homeworkDone } from "@/lib/homework";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type Lesson } from "@/lib/types";
@@ -45,12 +46,17 @@ async function toJpeg(file: File): Promise<Blob> {
 
 export function HomeworkPanel({
   lesson,
+  studentId,
   studentName,
   studentKey,
+  styleId,
   styleName,
   canDraw,
 }: {
   lesson: Lesson;
+  studentId: string;
+  /** The student's game style, picked here as well as on their page. */
+  styleId?: string;
   studentName: string;
   /** The child's private link key, for previewing their screen. */
   studentKey: string;
@@ -388,23 +394,37 @@ export function HomeworkPanel({
               }
             }}
             disabled={finished}
-            placeholder="e.g. Use the past tense: ate, swam, went."
+            placeholder="e.g. Tell me what you did yesterday: ate, swam, went."
             className="field"
           />
           {!finished && (
-            <span className="hint">Suggested from this lesson. Change it freely.</span>
+            <span className="hint">
+              {studentName} reads this alone, so keep it in their words - no
+              grammar terms. Suggested from this lesson; change it freely.
+            </span>
           )}
         </label>
 
-        {sent && (
-          <a
-            href={`/s/${studentKey}/quest/${lesson.id}`}
-            target="_blank"
-            rel="noopener"
-            className="btn btn-ghost btn-sm"
-          >
-            See it as {studentName} sees it
-          </a>
+        {/* Before anything goes out: the look, and the screen it makes. */}
+        {(homework?.imageFile || exercises.length > 0) && (
+          <div className="space-y-2 border-t border-line pt-4">
+            <p className="t-eyebrow">How {studentName} will see it</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <GameStylePicker studentId={studentId} value={styleId} />
+              <a
+                href={`/s/${studentKey}/quest/${lesson.id}`}
+                target="_blank"
+                rel="noopener"
+                className="btn btn-ghost btn-sm"
+              >
+                Preview
+              </a>
+            </div>
+            <p className="hint">
+              Opens {studentName}&rsquo;s screen in this theme. Nothing you tap
+              there is saved, and they cannot see it until you send it.
+            </p>
+          </div>
         )}
 
         {finished && (

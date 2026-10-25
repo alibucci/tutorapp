@@ -121,8 +121,10 @@ export default async function ReviewPage({
       {lesson.summary && (
         <HomeworkPanel
           lesson={lesson}
+          studentId={student?.id ?? ""}
           studentName={student?.name ?? "the student"}
           studentKey={student?.studentKey ?? ""}
+          styleId={student?.gameStyle}
           styleName={gameStyle(student?.gameStyle).name}
           canDraw={canDrawPictures()}
         />
