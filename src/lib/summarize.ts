@@ -33,7 +33,7 @@ const SummarySchema = z.object({
   homeworkFocus: z
     .string()
     .describe(
-      "One short sentence to the child, in simple English, saying what to practise while describing a picture for homework - taken from what they struggled with. E.g. 'Use the past tense: ate, swam, stabbed.' Empty string if nothing fits.",
+      "One short sentence to the child, who reads it alone, in the words a nine-year-old uses - taken from what they struggled with. No grammar words at all (no 'tense', 'verb', 'plural', 'past simple'). E.g. 'Tell me what you did yesterday: ate, swam, went.' Empty string if nothing fits.",
     ),
 });
 

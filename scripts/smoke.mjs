@@ -403,6 +403,12 @@ function picture(bytes) {
   check("the child's page shows no quest before it is sent",
     !(await anon(`/s/${childKey}`)).text.includes("Describe the picture"));
 
+  // The tutor previews the child's screen before sending; nobody else can.
+  check("the tutor can preview the homework before sending it",
+    (await a(`/s/${childKey}/quest/${lessonA.id}`)).status === 200);
+  check("the child's link cannot open unsent homework",
+    (await anon(`/s/${childKey}/quest/${lessonA.id}`)).status === 404);
+
   await a(`/api/lessons/${lessonA.id}/homework`, patch({ focus: "Use the past tense.", send: true }));
   check("once sent, the child's page shows the quest",
     (await anon(`/s/${childKey}`)).text.includes("Describe the picture"));
@@ -422,6 +428,14 @@ function picture(bytes) {
   check("practice games are built from the lesson", built.length > 0, games.json?.error);
   check("every game says which mistake it practises",
     built.every((e) => e.topic && e.rounds?.length >= 2));
+  // A child playing alone stops at "past tense". Everything they read must
+  // say it in their words; only `topic`, which the tutor reads, may not.
+  const childText = built.flatMap((e) => [
+    e.title, e.rule ?? "",
+    ...e.rounds.flatMap((r) => [r.sentence ?? "", r.why ?? "", ...(r.options ?? [])]),
+  ]).join(" | ");
+  const jargon = childText.match(/\b(tense|past simple|present simple|verbs?|nouns?|plurals?|adjectives?|irregular)\b/i);
+  check("the games speak to the child without grammar words", !jargon, jargon?.[0]);
   check("the choose game has a gap and three options",
     built.filter((e) => e.kind === "choose").every((e) =>
       e.rounds.every((r) => r.sentence.includes("___") && r.options.length === 3

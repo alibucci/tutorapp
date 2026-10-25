@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MODEL, complete } from "./llm";
+import { listLessons } from "./store";
 import type { Exercise, Lesson, Student } from "./types";
 
 /**
@@ -48,7 +49,7 @@ const ExercisesSchema = z.object({
     .min(3)
     .max(160)
     .describe(
-      "The one mistake all three games practise, in plain words - under 60 characters",
+      "For the tutor, not the child: the one mistake all three games practise, under 60 characters. Grammar words are fine here.",
     ),
   chooseTitle: z.string().min(3).max(120),
   choose: z.array(Choose).min(4).max(6),
@@ -60,13 +61,15 @@ const ExercisesSchema = z.object({
     .min(5)
     .max(160)
     .describe(
-      'An instruction to the child, e.g. "Keep the past tense words" - a whole short sentence',
+      'An instruction to the child with no grammar words, e.g. "Catch the things Iron Man already did" - a whole short sentence',
     ),
   catchWords: z.array(Catch).min(6).max(10),
 });
 
 const SYSTEM = `You build three small practice games for one child, from the
-mistakes they made in today's English lesson.
+mistakes they made in today's English lesson. The child plays them alone, at
+home, with no adult to explain anything - so every word on the screen has to
+make sense to them on its own.
 
 Pick ONE mistake - the one that cost them most - and build all three games
 around it. Three games on one mistake beats three games on three mistakes: the
@@ -82,14 +85,37 @@ The three games, always these:
    uses the thing being practised. Three to eight words, no longer: a child
    taps these on a phone.
    The mistake this game catches is WORD ORDER, so "why" must be about order:
-   "Who did it, then what, then where: I had pizza for dinner." Writing "use
-   'had' for the past" here explains a mistake the child did not make, and a
-   child who reads it learns nothing.
+   "Who did it, then what, then where: I had pizza for dinner." Writing about
+   the form of the word here explains a mistake the child did not make.
 3. CATCH. Single words drifting past. The child keeps the ones that follow one
-   simple rule and waves the rest away. Write the rule as one short
-   instruction a nine-year-old can read at a glance: "Keep the past tense
-   words." Mix roughly half and half, and make the wrong ones tempting - the
-   forms this child confuses.
+   simple idea and waves the rest away. Mix roughly half and half, and make the
+   wrong ones tempting - the forms this child confuses.
+
+THE CHILD NEVER SEES A GRAMMAR WORD. Not in a title, a rule, a sentence or a
+"why": no "tense", "past simple", "present", "verb", "noun", "plural",
+"adjective", "article", "-ed form", "irregular". A child who understands
+go/went has no idea what "the past tense" is, and the word stops them cold.
+Say the idea in a child's own words instead:
+- not "Choose the past tense" but "What did Iron Man do yesterday?"
+- not "Keep the past tense words" but "Catch the things that already happened"
+- not "Use the past tense" but "Yesterday is over, so: went."
+Titles are short and fun - a question or a bit of the story - never a lesson
+heading.
+
+ONE ADVENTURE, NEVER THE SAME ROUND TWICE. This child gets bored fast when
+rounds repeat and loves exploring something new. So:
+- Tell one small adventure across all three games, with a hero the child likes
+  (use their interests below; a made-up explorer if there are none). Every
+  round is the next step of that story - a new place, a new discovery, a new
+  problem - so the child wants to see what happens next.
+- Practise the one idea through MANY different words, not one word over and
+  over. If the mistake is "go" for "went", the rounds use went, saw, ate, had,
+  swam, found, ran - the same idea each time, a different word each time. No
+  answer word is right in more than one CHOOSE round.
+- In CATCH every word appears once. Never the same word twice.
+- Never repeat a sentence or a scene within a game, and do not reuse CHOOSE
+  sentences in BUILD. Vary the people, places and actions from round to round.
+- Fewer, fresher rounds beat more of the same.
 
 Rules for everything you write:
 - Real, ordinary English a child would say. No invented words, no exam English.
@@ -97,13 +123,28 @@ Rules for everything you write:
 - Every sentence must be unambiguously right or wrong. If two options could
   both be correct in some context, rewrite it. This is the one thing that
   matters most: a child who is marked wrong for a right answer loses trust.
-- "why" is one short line to the child, after they answer: what the rule is,
-  not whether they are clever. "We add -ed for things that already happened."
-- No names of real people. Use the child's own name at most once.
+- "why" is one short line to the child, after they answer, in their words:
+  what makes it right, not whether they are clever. "Yesterday is over, so:
+  went."
+- Heroes from films, games and books the child likes are welcome by name. No
+  real people. Use the child's own name at most once.
 - British or American spelling, consistently, matching the lesson.`;
 
+/**
+ * What the child is into, from the note the tutor recorded about them, so the
+ * games can star a hero they actually like.
+ */
+async function interestsOf(student: Student): Promise<string> {
+  const lessons = await listLessons(student.id);
+  return lessons
+    .filter((l) => l.kind === "intro")
+    .flatMap((l) => l.debrief.filter((a) => a.promptId === "likes").map((a) => a.text.trim()))
+    .filter(Boolean)
+    .join(" ");
+}
+
 /** Everything the model needs about this lesson, and nothing else. */
-function describeLesson(lesson: Lesson, student: Student): string {
+function describeLesson(lesson: Lesson, student: Student, interests: string): string {
   const s = lesson.summary;
   const weak = student.skills
     .filter((k) => k.status !== "solid")
@@ -112,6 +153,7 @@ function describeLesson(lesson: Lesson, student: Student): string {
 
   return [
     `Child: ${student.name}`,
+    interests ? `What they are into: ${interests}` : "What they are into: not recorded",
     `Lesson: ${lesson.title}`,
     "",
     "What they got wrong today:",
@@ -130,6 +172,20 @@ function describeLesson(lesson: Lesson, student: Student): string {
     .join("\n");
 }
 
+/**
+ * The model tends to put the right answer first. Shuffled once here, when the
+ * homework is made, and stored that way - the server marks against the stored
+ * order, so the browser and the server always agree.
+ */
+function shuffleOptions(r: z.infer<typeof Choose>): z.infer<typeof Choose> {
+  const order = r.options.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return { ...r, options: order.map((i) => r.options[i]), answer: order.indexOf(r.answer) };
+}
+
 /** A round is only usable if its three options really are three options. */
 function usableChoose(r: z.infer<typeof Choose>): boolean {
   const seen = new Set(r.options.map((o) => o.trim().toLowerCase()));
@@ -142,7 +198,7 @@ export async function buildExercises(
 ): Promise<Exercise[]> {
   const parsed = await complete({
     system: SYSTEM,
-    user: describeLesson(lesson, student),
+    user: describeLesson(lesson, student, await interestsOf(student)),
     schema: ExercisesSchema,
     schemaName: "PracticeGames",
     maxTokens: 8000,
@@ -156,8 +212,16 @@ export async function buildExercises(
     text.trim().length <= limit ? text.trim() : `${text.trim().slice(0, limit - 1)}…`;
   const topic = short(parsed.topic);
 
-  const choose = parsed.choose.filter(usableChoose);
+  const choose = parsed.choose.filter(usableChoose).map(shuffleOptions);
   // Half of each is worth playing; less than that is not a game.
+  // A word twice in a row is the repetition children notice first.
+  const seenWord = new Set<string>();
+  parsed.catchWords = parsed.catchWords.filter((w) => {
+    const k = w.word.trim().toLowerCase();
+    if (seenWord.has(k)) return false;
+    seenWord.add(k);
+    return true;
+  });
   const keeps = parsed.catchWords.filter((w) => w.keep).length;
   const drops = parsed.catchWords.length - keeps;
 
