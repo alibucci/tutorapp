@@ -20,8 +20,17 @@ type Phase = "ready" | "running" | "review";
 /** How often a running debrief is copied to the server. */
 const AUTOSAVE_MS = 5_000;
 
-/** An answer longer than this goes to the recogniser in more than one piece. */
-const LONG_ANSWER_MS = 60_000;
+/**
+ * An answer goes to the recogniser in pieces as it is spoken, so its words
+ * appear while the tutor is still talking. A piece ends at a pause once it is
+ * a few seconds long, and at MAX whatever is happening.
+ */
+const MIN_PIECE_MS = 3_000;
+const MAX_PIECE_MS = 20_000;
+/** Quiet this long is a pause between phrases. */
+const PAUSE_MS = 700;
+/** Input level above which someone is speaking (0..1 RMS). */
+const SPEAKING_LEVEL = 0.02;
 
 type Draft = { segments: TranscriptSegment[]; edits: Record<string, string> };
 
@@ -65,6 +74,15 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const indexRef = useRef(0);
   /** When the clip now recording began, ms into the debrief. */
   const clipStartRef = useRef(0);
+  /** When the voice was last above SPEAKING_LEVEL, and whether this piece has any. */
+  const lastLoudRef = useRef(0);
+  const heardRef = useRef(false);
+  useEffect(() => {
+    if (rec.level > SPEAKING_LEVEL) {
+      lastLoudRef.current = performance.now();
+      heardRef.current = true;
+    }
+  }, [rec.level]);
 
   useEffect(() => {
     void rec.arm();
@@ -119,20 +137,28 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     void cutClip();
     indexRef.current = next;
     clipStartRef.current = performance.now() - startedAtRef.current;
+    heardRef.current = false;
     rec.startClip();
     boundariesRef.current.push(clipStartRef.current);
     setIndex(next);
   }
 
   /**
-   * There is no time limit, so a long answer is sent in pieces under the same
-   * prompt rather than as one recording too big for a single request.
+   * Send what has been said so far for this prompt once the tutor pauses, so
+   * the text shows up as they go rather than only after "Next". Every piece
+   * keeps the prompt's tag, so the answer is still one answer.
    */
-  function splitLongAnswer() {
+  function splitAtPause() {
     const now = performance.now() - startedAtRef.current;
-    if (now - clipStartRef.current < LONG_ANSWER_MS) return;
-    void cutClip();
+    const length = now - clipStartRef.current;
+    const paused = performance.now() - lastLoudRef.current >= PAUSE_MS;
+    const ready = heardRef.current && length >= MIN_PIECE_MS && paused;
+    if (!ready && length < MAX_PIECE_MS) return;
+    // Twenty seconds of silence is nothing to read, and every call is paid for.
+    if (heardRef.current) void cutClip();
+    else void rec.endClip();
     clipStartRef.current = now;
+    heardRef.current = false;
     rec.startClip();
   }
 
@@ -151,10 +177,10 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   // The interval and the listeners below outlive any one render, so they call
   // through refs. Depending on the functions themselves tore the interval down
   // on every render - the level meter re-renders ~24 times a second.
-  const splitRef = useRef(splitLongAnswer);
+  const splitRef = useRef(splitAtPause);
   const saveRef = useRef(saveProgress);
   useEffect(() => {
-    splitRef.current = splitLongAnswer;
+    splitRef.current = splitAtPause;
     saveRef.current = saveProgress;
   });
 
@@ -162,7 +188,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   useEffect(() => {
     if (phase !== "running") return;
 
-    const id = window.setInterval(() => splitRef.current(), 1000);
+    const id = window.setInterval(() => splitRef.current(), 200);
 
     const autosave = window.setInterval(() => saveRef.current(false), AUTOSAVE_MS);
     const onHide = () => {
@@ -320,6 +346,11 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
 
   if (phase === "running") {
     const prompt = PROMPTS[index];
+    // This prompt's answer so far, piece by piece as it comes back.
+    const heardNow = speech.segments
+      .filter((seg) => seg.tag === prompt.id)
+      .map((seg) => seg.text)
+      .join(" ");
     return (
       <div className="stack-lg">
         <div className="card p-8 text-center">
@@ -338,9 +369,11 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
           <p className="text-center t-small t-muted min-h-[2.5rem]">
             {speech.failed.length > 0
               ? `${speech.failed[speech.failed.length - 1].error} Keep talking - it can be retried at the end.`
-              : speech.segments.length > 0
-                ? `Heard: “${speech.segments[speech.segments.length - 1].text}”`
-                : "Recording. Each answer is transcribed when you move on."}
+              : heardNow
+                ? `Heard: “${heardNow}”`
+                : speech.pending.length > 0
+                  ? "Transcribing…"
+                  : "Recording - your words show up here as you pause."}
           </p>
         </div>
 
