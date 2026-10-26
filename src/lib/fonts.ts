@@ -1,4 +1,4 @@
-import { Bebas_Neue, Figtree, Fredoka, Press_Start_2P } from "next/font/google";
+import { Bangers, Bebas_Neue, Figtree, Fredoka, Press_Start_2P } from "next/font/google";
 
 /**
  * The blocky game font. Self-hosted at build time - the browser fetches
@@ -38,5 +38,14 @@ export const roundFont = Fredoka({
   preload: false,
 });
 
+/** Superheroes: comic-book lettering, for headings and buttons only. */
+export const comicFont = Bangers({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-comic",
+  display: "swap",
+  preload: false,
+});
+
 /** Every game font, on the elements a theme can restyle. */
-export const gameFonts = [pixelFont.variable, sportFont.variable, roundFont.variable].join(" ");
+export const gameFonts = [pixelFont.variable, sportFont.variable, roundFont.variable, comicFont.variable].join(" ");

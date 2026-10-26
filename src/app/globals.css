@@ -1852,3 +1852,233 @@ textarea.field { line-height: var(--leading-normal); }
     #2b6f6b;
 }
 .quest-row-face-palette.theme-zootopia .quest-row-games { visibility: hidden; }
+
+/* --- Minecraft, in more detail --------------------------------------------
+   What a child who plays it looks for: hearts over the XP bar, items in the
+   hotbar, stone and diamond ore underground, a diamond for the achievement.
+   Pixel art from public/game/minecraft/ - game items, no logo or mobs. */
+.game-minecraft {
+  background-image:
+    linear-gradient(rgb(0 0 0 / 0.5), rgb(0 0 0 / 0.5)),
+    url("/game/minecraft/diamond-ore.svg"),
+    url("/game/minecraft/stone.svg"),
+    url("/game/minecraft/dirt.svg");
+  background-size: auto, 64px 64px, 64px 64px, 64px 64px;
+  background-position: 0 0, 0 100%, 0 calc(100% - 64px), 0 0;
+  background-repeat: no-repeat, repeat-x, repeat-x, repeat;
+}
+.game-minecraft .game-inner { padding-bottom: 9rem; }
+/* Ten hearts, the first thing anyone reads on the game's screen. */
+.game-minecraft .game-hud::before {
+  content: "";
+  display: block;
+  width: 200px;
+  height: 18px;
+  margin: 0 auto 8px;
+  background: url("/game/minecraft/heart.svg") 0 0 / 20px 18px repeat-x;
+  image-rendering: pixelated;
+}
+/* The hotbar holds items, with the slot number small in the corner. */
+.game-minecraft .game-slot {
+  position: relative;
+  place-items: end;
+  padding: 0 4px 2px 0;
+  font-size: 0.5rem;
+}
+.game-minecraft .game-slot::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  background: var(--mc-item) center / contain no-repeat;
+  image-rendering: pixelated;
+  opacity: 0.4;
+}
+.game-minecraft .game-slot-done::before,
+.game-minecraft .game-slot-on::before { opacity: 1; }
+.game-minecraft .game-slot:nth-child(5n + 1) { --mc-item: url("/game/minecraft/pickaxe.svg"); }
+.game-minecraft .game-slot:nth-child(5n + 2) { --mc-item: url("/game/minecraft/sword.svg"); }
+.game-minecraft .game-slot:nth-child(5n + 3) { --mc-item: url("/game/minecraft/apple.svg"); }
+.game-minecraft .game-slot:nth-child(5n + 4) { --mc-item: url("/game/minecraft/diamond.svg"); }
+.game-minecraft .game-slot:nth-child(5n + 5) { --mc-item: url("/game/minecraft/torch.svg"); }
+.game-minecraft .game-toast-icon {
+  background: #000 url("/game/minecraft/diamond.svg") center / 26px no-repeat;
+  border-color: #555;
+}
+.game-entry-minecraft {
+  padding-right: 6rem;
+  background:
+    url("/game/minecraft/pickaxe.svg") right 18px center / 56px no-repeat,
+    url("/game/minecraft/grass.svg") 0 0 / 64px 16px repeat-x,
+    linear-gradient(rgb(0 0 0 / 0.35), rgb(0 0 0 / 0.35)),
+    url("/game/minecraft/dirt.svg") 0 0 / 64px 64px;
+}
+.game-stats-minecraft {
+  background:
+    linear-gradient(rgb(0 0 0 / 0.5), rgb(0 0 0 / 0.5)),
+    url("/game/minecraft/stone.svg") 0 0 / 64px 64px;
+}
+.quest-row-face-minecraft {
+  background:
+    url("/game/minecraft/diamond.svg") center / 60% no-repeat,
+    url("/game/minecraft/diamond-ore.svg") 0 0 / 48px 48px;
+}
+.quest-row-face-minecraft .quest-row-games {
+  align-self: end;
+  justify-self: end;
+  margin: 0 6px 4px 0;
+  font-size: 0.75rem;
+}
+
+/* --- Avengers: a comic book ----------------------------------------------
+   A city at night with its tower and searchlights, printed-dot halftone,
+   every card a comic panel with a thick ink border and a hard shadow, a
+   yellow caption box for the mission, stars for progress and a POW! burst at
+   the end. Our own art: no team logo, no characters. */
+.game-palette.theme-avengers {
+  background:
+    url("/game/avengers/city.svg") center bottom / auto 200px repeat-x,
+    url("/game/avengers/halftone.svg") 0 0 / 24px 24px,
+    radial-gradient(90% 50% at 50% 0%, rgb(193 18 31 / 0.35), transparent 70%),
+    linear-gradient(#1d2147, #14162b 70%);
+}
+.theme-avengers .game-inner { padding-bottom: 12rem; }
+.theme-avengers .game-small,
+.theme-avengers .game-title,
+.theme-avengers .game-button,
+.theme-avengers .game-step,
+.theme-avengers .game-level,
+.theme-avengers .game-toast-title,
+.theme-avengers .game-toast-text,
+.theme-avengers .game-entry-kicker,
+.theme-avengers .game-entry-title,
+.theme-avengers .game-stats-level,
+.theme-avengers .game-stats-xp {
+  font-family: var(--font-comic), var(--font-figtree), sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+}
+.theme-avengers .game-small { font-size: 1.0625rem; color: #fff8e7; }
+.theme-avengers .game-title { font-size: 1.625rem; line-height: 1.1; }
+/* Every card is a comic panel. */
+.theme-avengers .game-panel {
+  border: 4px solid #111;
+  border-radius: 6px;
+  box-shadow: 7px 7px 0 #111;
+}
+.theme-avengers .game-panel > .game-title:first-child {
+  font-size: 2.5rem;
+  color: #f4c430;
+  -webkit-text-stroke: 1.5px #111;
+  text-shadow: 3px 3px 0 #111;
+}
+/* The yellow caption box comics use for "meanwhile...". */
+.theme-avengers .game-panel .game-step {
+  padding: 2px 10px;
+  border-radius: 0;
+  font-size: 1.125rem;
+  color: #111;
+  background: #f4c430;
+  border: 3px solid #111;
+}
+.theme-avengers .game-panel .game-step::before { content: "Mission "; }
+.theme-avengers .game-button {
+  font-size: 1.5rem;
+  border-radius: 6px;
+  border: 3px solid #111;
+  box-shadow: 4px 4px 0 #111;
+}
+.theme-avengers .game-button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #111; }
+.theme-avengers .game-button:not(:only-child) { font-size: 1.25rem; padding-inline: 0.5rem; white-space: nowrap; }
+.theme-avengers .game-button:only-child:not(.game-button-small)::before {
+  content: "";
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  margin-right: 0.4em;
+  vertical-align: -0.2em;
+  background: url("/game/avengers/emblem.svg") center / contain no-repeat;
+}
+.theme-avengers .game-option,
+.theme-avengers .game-tile {
+  background: #fff;
+  border: 3px solid #111;
+  border-radius: 6px;
+}
+.theme-avengers .game-option-yes { background: #cdebd4; border-color: #111; }
+.theme-avengers .game-option-no { background: #f6d6d6; border-color: #111; }
+.theme-avengers .game-frame { background: #111; border-radius: 6px; box-shadow: 7px 7px 0 #000; }
+.theme-avengers .game-picture { border-radius: 2px; }
+.theme-avengers .game-tip { background: #fde7a8; border: 2px solid #111; border-radius: 4px; }
+.theme-avengers .game-score-again { color: #a10f1a; }
+.theme-avengers .game-level { font-size: 1.375rem; color: #fff8e7; }
+.theme-avengers .game-xp { background: rgb(255 248 231 / 0.2); border: 2px solid #111; }
+.theme-avengers .game-xp-fill { background: #f4c430; }
+/* Progress: a star for every mission, lit when it is done. */
+.theme-avengers .game-slot {
+  color: transparent;
+  border: 0;
+  background: url("/game/avengers/star.svg") center / 85% no-repeat;
+  opacity: 0.3;
+}
+.theme-avengers .game-slot-done { opacity: 1; background-color: transparent; }
+.theme-avengers .game-slot-on {
+  opacity: 1;
+  border: 0;
+  box-shadow: 0 0 0 3px #f4c430;
+  border-radius: 999px;
+}
+.theme-avengers .game-toast {
+  color: #111;
+  background: #fff8e7;
+  border: 4px solid #111;
+  border-radius: 6px;
+  box-shadow: 7px 7px 0 #111;
+}
+.theme-avengers .game-toast-icon {
+  width: 72px;
+  height: 60px;
+  border-radius: 0;
+  box-shadow: none;
+  background: url("/game/avengers/pow.svg") center / contain no-repeat;
+}
+.theme-avengers .game-toast-title { font-size: 1.5rem; color: #c1121f; opacity: 1; }
+.theme-avengers .game-toast-text { font-size: 1.75rem; }
+
+.game-entry-palette.theme-avengers {
+  color: #fff8e7;
+  border: 4px solid #111;
+  border-radius: 8px;
+  padding-right: 6rem;
+  box-shadow: 6px 6px 0 #111;
+  background:
+    url("/game/avengers/emblem.svg") right 16px center / 64px no-repeat,
+    url("/game/avengers/halftone.svg") 0 0 / 24px 24px,
+    linear-gradient(135deg, #c1121f, #14162b 70%);
+}
+.game-entry-palette.theme-avengers .game-entry-kicker { font-size: 1.125rem; color: #f4c430; }
+.game-entry-palette.theme-avengers .game-entry-title { font-size: 1.875rem; text-shadow: 2px 2px 0 #111; }
+.game-stats-palette.theme-avengers {
+  color: #fff8e7;
+  border: 4px solid #111;
+  border-radius: 8px;
+  background:
+    url("/game/avengers/halftone.svg") 0 0 / 24px 24px,
+    #14162b;
+}
+.game-stats-palette.theme-avengers .game-stats-level { font-size: 1.5rem; }
+.game-stats-palette.theme-avengers .game-stats-xp { font-size: 1.75rem; color: #f4c430; }
+.quest-row-face-palette.theme-avengers {
+  border: 3px solid #111;
+  background:
+    url("/game/avengers/emblem.svg") center / 62% no-repeat,
+    url("/game/avengers/halftone.svg") 0 0 / 16px 16px,
+    #14162b;
+}
+.quest-row-face-palette.theme-avengers .quest-row-games { visibility: hidden; }
+.tag-theme-avengers .tag-swatch {
+  width: 0.9rem !important;
+  height: 0.9rem !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url("/game/avengers/emblem.svg") center / contain no-repeat !important;
+}

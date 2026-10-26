@@ -133,6 +133,31 @@ export const GAME_STYLES: GameStyle[] = [
       accentInk: "#1f2a2e",
     },
   },
+  {
+    id: "avengers",
+    // The team children ask for. Pictures and art describe superheroes in
+    // general - no studio, team logo or character - for the reason given on
+    // `imageStyle`. The games' text may name heroes the child loves.
+    name: "Avengers",
+    imageStyle:
+      "bold comic-book illustration: thick black ink outlines, halftone dots, superheroes in capes and armour in dynamic action poses over a modern city at night, glowing energy blasts, searchlights, red, gold and navy colours, dramatic angles",
+    words: {
+      start: "Assemble the team!",
+      step: "Mission",
+      done: "Mission complete!",
+      reward: "stars",
+      submit: "Save the day",
+      cheer: "POW!",
+      heading: "Hero alert!",
+    },
+    palette: {
+      ground: "#14162b",
+      panel: "#fff8e7",
+      ink: "#1a1a2e",
+      accent: "#c1121f",
+      accentInk: "#ffffff",
+    },
+  },
 ];
 
 /**

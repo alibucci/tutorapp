@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- A hero's badge: a lightning bolt in a gold ring. Our own design. -->
+  <circle cx="32" cy="32" r="29" fill="#d62828" stroke="#111" stroke-width="4"/>
+  <circle cx="32" cy="32" r="21" fill="none" stroke="#f4c430" stroke-width="5"/>
+  <path d="M36 12L20 36H31L27 52L44 26H33Z" fill="#ffffff" stroke="#111" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>

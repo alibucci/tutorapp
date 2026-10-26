@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="100" viewBox="0 0 120 100">
+  <!-- The comic "POW!" burst. -->
+  <path d="M60 2L70 26L96 8L88 36L118 40L92 56L112 82L82 74L76 98L60 78L44 98L38 74L8 82L28 56L2 40L32 36L24 8L50 26Z" fill="#f4c430" stroke="#111" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M60 20L66 36L82 28L76 44L94 48L78 56L88 70L70 66L66 80L60 68L54 80L50 66L32 70L42 56L26 48L44 44L38 28L54 36Z" fill="#d62828"/>
+</svg>
