@@ -20,7 +20,7 @@ const Choose = z.object({
     .describe('One sentence with exactly one gap written as "___"'),
   options: z.array(z.string().min(1).max(24)).length(3),
   answer: z.number().int().min(0).max(2),
-  why: z.string().min(3).max(90),
+  why: z.string().min(3).max(200),
 });
 
 const Build = z.object({
@@ -32,7 +32,7 @@ const Build = z.object({
   why: z
     .string()
     .min(3)
-    .max(90)
+    .max(200)
     .describe(
       "Why the words go in THIS order - the shape of the sentence, not the tense",
     ),
@@ -212,7 +212,12 @@ export async function buildExercises(
     text.trim().length <= limit ? text.trim() : `${text.trim().slice(0, limit - 1)}…`;
   const topic = short(parsed.topic);
 
-  const choose = parsed.choose.filter(usableChoose).map(shuffleOptions);
+  // A "why" a little long is a worse reason to lose every game than a line
+  // that ends early; the prompt asks for one short line anyway.
+  const choose = parsed.choose
+    .filter(usableChoose)
+    .map((r) => shuffleOptions({ ...r, why: short(r.why, 120) }));
+  parsed.build = parsed.build.map((r) => ({ ...r, why: short(r.why, 120) }));
   // Half of each is worth playing; less than that is not a game.
   // A word twice in a row is the repetition children notice first.
   const seenWord = new Set<string>();
