@@ -32,7 +32,12 @@ const PAUSE_MS = 700;
 /** Input level above which someone is speaking (0..1 RMS). */
 const SPEAKING_LEVEL = 0.02;
 
-type Draft = { segments: TranscriptSegment[]; edits: Record<string, string> };
+type Draft = {
+  segments: TranscriptSegment[];
+  edits: Record<string, string>;
+  /** What was typed while recording, by prompt. */
+  typed?: Record<string, string>;
+};
 
 function draftKey(id: string) {
   return `tutor-signal:debrief:${id}`;
@@ -62,6 +67,8 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   const [phase, setPhase] = useState<Phase>(unfinished ? "review" : "ready");
   const [index, setIndex] = useState(0);
   const [edits, setEdits] = useState<Record<string, string>>({});
+  /** Typed during recording, alongside what is said. */
+  const [typed, setTyped] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   /** The last clip is still being written after Finish. */
   const [closing, setClosing] = useState(false);
@@ -96,6 +103,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
       // during render; restoring it here is a one-time sync from outside React.
       /* eslint-disable react-hooks/set-state-in-effect */
       if (local?.edits) setEdits(local.edits);
+      if (local?.typed) setTyped(local.typed);
       if (local && local.segments.length) setPhase("review");
       /* eslint-enable react-hooks/set-state-in-effect */
     }
@@ -212,12 +220,12 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     try {
       window.localStorage.setItem(
         draftKey(lesson.id),
-        JSON.stringify({ segments: speech.segments, edits }),
+        JSON.stringify({ segments: speech.segments, edits, typed }),
       );
     } catch {
       // Private mode or full storage: the server copy still runs.
     }
-  }, [phase, speech.segments, edits, lesson.id]);
+  }, [phase, speech.segments, edits, typed, lesson.id]);
 
   /**
    * What the tutor typed over the top, keyed by prompt. Everything else is
@@ -227,12 +235,19 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
    */
   const answers: DebriefAnswer[] = PROMPTS.map((prompt) => ({
     promptId: prompt.id,
+    // Said and typed both count: a tutor may speak one answer and paste
+    // another, or start by voice and add a line by hand.
     text:
       edits[prompt.id] ??
-      speech.segments
-        .filter((s) => s.tag === prompt.id)
-        .map((s) => s.text)
-        .join(" "),
+      [
+        speech.segments
+          .filter((s) => s.tag === prompt.id)
+          .map((s) => s.text)
+          .join(" "),
+        typed[prompt.id]?.trim() ?? "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
   }));
 
   /**
@@ -261,6 +276,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
     setConfirmRestart(false);
     speech.reset();
     setEdits({});
+    setTyped({});
     setError(null);
     try {
       window.localStorage.removeItem(draftKey(lesson.id));
@@ -281,28 +297,40 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
   async function save() {
     setSaving(true);
     setError(null);
+    // Only well-formed lines go out: a page restored from the phone's memory
+    // can carry one that is not, and that used to sink the whole save.
+    const debriefTranscript = speech.segments
+      .filter((seg) => Number.isFinite(seg.t) && typeof seg.text === "string")
+      .map((seg) => ({ t: Math.max(0, seg.t), text: seg.text.slice(0, 4000), tag: seg.tag }));
+    const debrief = answers.map((a) => ({ promptId: a.promptId, text: a.text.slice(0, 4000) }));
+    let res: Response;
     try {
-      const res = await fetch(`/api/lessons/${lesson.id}`, {
+      res = await fetch(`/api/lessons/${lesson.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          debrief: answers,
-          debriefTranscript: speech.segments,
-        }),
+        body: JSON.stringify({ debrief, debriefTranscript }),
       });
-      if (!res.ok) throw new Error("Could not save the debrief.");
-      try {
-        window.localStorage.removeItem(draftKey(lesson.id));
-      } catch {
-        // nothing to clean
-      }
-      router.push(`/lesson/${lesson.id}/review`);
     } catch {
       setError(
-        "Could not save - probably the connection. Nothing is lost: it is kept on this phone. Try again when you have signal.",
+        "Could not reach the server - probably the connection. Nothing is lost: it is kept on this phone. Try again when you have signal.",
       );
       setSaving(false);
+      return;
     }
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setError(
+        `The server did not accept it${body.error ? `: ${body.error}` : "."} Your answers are still here and on this phone.`,
+      );
+      setSaving(false);
+      return;
+    }
+    try {
+      window.localStorage.removeItem(draftKey(lesson.id));
+    } catch {
+      // nothing to clean
+    }
+    router.push(`/lesson/${lesson.id}/review`);
   }
 
   if (phase === "ready") {
@@ -377,6 +405,18 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
           </p>
         </div>
 
+        {/* Say it, type it, or both: some answers are easier to paste in. */}
+        <label className="block">
+          <span className="label">Or type it here</span>
+          <textarea
+            value={typed[prompt.id] ?? ""}
+            onChange={(e) => setTyped((prev) => ({ ...prev, [prompt.id]: e.target.value }))}
+            rows={3}
+            className="field"
+            placeholder="Type or paste - it goes in with what you say."
+          />
+        </label>
+
         <div className="flex justify-center">
           {/* On the last prompt the same button finishes. */}
           <button onClick={() => advance()} className="btn btn-primary btn-lg">
@@ -412,6 +452,7 @@ export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
         speech.failed.length === 0 &&
         speech.segments.length === 0 &&
         Object.keys(edits).length === 0 &&
+        Object.keys(typed).length === 0 &&
         !unfinished && (
           <p className="note note-warn">
             Nothing was transcribed - no speech was heard. Type your answers below;

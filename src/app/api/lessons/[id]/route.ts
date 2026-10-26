@@ -67,9 +67,29 @@ export async function PATCH(request: Request, { params }: Params) {
   const parsed = await readJson<Record<string, unknown>>(request, LIMIT.transcript);
   if (parsed instanceof Response) return parsed;
   const body = parsed;
+  // A transcript is a record of what was heard, kept alongside the answers.
+  // One malformed line in it - a page restored from the phone's memory after
+  // a trip to WeChat produced one - used to refuse the whole save, answers
+  // and all. Drop the lines that do not fit instead, and keep the rest.
+  for (const key of ["transcript", "debriefTranscript"] as const) {
+    const list = body[key];
+    if (Array.isArray(list)) {
+      const kept = list.filter((item) => Segment.safeParse(item).success);
+      if (kept.length !== list.length) {
+        console.error(`lesson ${id}: dropped ${list.length - kept.length} malformed ${key} line(s)`);
+      }
+      body[key] = kept;
+    }
+  }
   const result = Patch.safeParse(body);
   if (!result.success) {
-    return NextResponse.json({ error: "That lesson data is not valid." }, { status: 400 });
+    // Which fields, not what was in them: answers are about a child.
+    const where = result.error.issues.map((i) => `${i.path.join(".")} (${i.code})`).slice(0, 5);
+    console.error(`lesson ${id}: refused patch -`, where.join(", "));
+    return NextResponse.json(
+      { error: `That lesson data is not valid: ${where.join(", ")}.` },
+      { status: 400 },
+    );
   }
   const patch = result.data;
 
