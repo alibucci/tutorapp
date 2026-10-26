@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { GameStylePicker } from "@/components/GameStylePicker";
-import { ImageIcon } from "@/components/ui";
 import { homeworkDone } from "@/lib/homework";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type Lesson } from "@/lib/types";
 
@@ -345,33 +344,9 @@ export function HomeworkPanel({
               </div>
             )}
           </div>
-        ) : canDraw ? (
-          <div className="space-y-2">
-            <button
-              onClick={() => void draw()}
-              disabled={busy !== null}
-              className="flex h-44 w-full flex-col items-center justify-center gap-2 rounded-[var(--radius)] border-[1.5px] border-dashed border-accent bg-accent-soft font-semibold text-accent"
-            >
-              <SparkIcon />
-              Draw {styleName} pictures
-              <span className="t-small font-normal t-muted">
-                Three options from this lesson - you pick one
-              </span>
-            </button>
-            <label htmlFor={`hw-file-${lesson.id}`} className="btn btn-ghost btn-sm cursor-pointer">
-              {busy === "upload" ? "Uploading…" : "or upload my own picture"}
-            </label>
-          </div>
-        ) : (
-          <label
-            htmlFor={`hw-file-${lesson.id}`}
-            className="flex h-44 cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--radius)] border-[1.5px] border-dashed border-line-strong bg-[#fafbfc] font-semibold t-muted"
-          >
-            <ImageIcon size={28} />
-            {busy === "upload" ? "Uploading…" : "Add a picture"}
-            <span className="t-small font-normal">A scene with something going on</span>
-          </label>
-        )}
+        ) : // Homework is the games now; a picture stays only where one was
+          // already chosen, so nothing sent before is lost.
+          null}
 
         <div className={homework?.imageFile ? "" : "hidden"}>
           <p className="t-eyebrow mb-2">With the picture</p>
@@ -411,15 +386,16 @@ export function HomeworkPanel({
             <p className="t-eyebrow">How {studentName} will see it</p>
             <div className="flex flex-wrap items-center gap-2">
               <GameStylePicker studentId={studentId} value={styleId} />
-              <a
-                href={`/s/${studentKey}/quest/${lesson.id}`}
-                target="_blank"
-                rel="noopener"
-                className="btn btn-ghost btn-sm"
-              >
-                Preview
-              </a>
             </div>
+            <a
+              href={`/s/${studentKey}/quest/${lesson.id}`}
+              target="_blank"
+              rel="noopener"
+              className="btn btn-soft btn-lg btn-block"
+            >
+              <EyeIcon />
+              Preview what {studentName} will see
+            </a>
             <p className="hint">
               Opens {studentName}&rsquo;s screen in this theme. Nothing you tap
               there is saved, and they cannot see it until you send it.
@@ -498,6 +474,15 @@ function Answer({ label, text }: { label: string; text: string }) {
       <p className="t-small t-muted">{label}</p>
       <p className="mt-0.5 whitespace-pre-wrap">{text}</p>
     </div>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   );
 }
 

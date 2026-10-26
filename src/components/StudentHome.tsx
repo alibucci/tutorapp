@@ -73,7 +73,13 @@ export async function StudentHome({
             >
               <span>
                 <span className="game-entry-kicker">{style.name} homework</span>
-                <span className="game-entry-title">Describe the picture</span>
+                <span className="game-entry-title">
+                  {lesson.homework?.imageFile
+                    ? "Describe the picture"
+                    : `${lesson.homework?.exercises?.length ?? 0} quick ${
+                        lesson.homework?.exercises?.length === 1 ? "game" : "games"
+                      }`}
+                </span>
                 <span className="game-entry-meta">
                   From {lesson.title} · {taskCount(lesson)}
                 </span>
