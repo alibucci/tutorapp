@@ -27,10 +27,13 @@ export async function POST(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "No such lesson." }, { status: 404 });
   }
 
-  let job = running.get(id);
+  // By student too: a lesson just moved must not wait for, and be handed, the
+  // summary still being written about the child it was moved away from.
+  const key = `${id}:${found.student.id}`;
+  let job = running.get(key);
   if (!job) {
-    job = generate(id, found.lesson, found.student).finally(() => running.delete(id));
-    running.set(id, job);
+    job = generate(id, found.lesson, found.student).finally(() => running.delete(key));
+    running.set(key, job);
   }
   // A Response body can be read once; every waiter gets its own copy.
   return (await job).clone();
@@ -71,11 +74,17 @@ async function generate(id: string, lesson: Lesson, student: Student): Promise<R
     // meanwhile. Their edit wins over what was generated - decided against the
     // record as it is now, under its lock.
     return NextResponse.json(
-      await updateLesson(id, (current) => ({
-        ...(working.transcript !== lesson.transcript && { transcript: working.transcript }),
-        summary,
-        parentMessage: current.parentMessage?.editedAt ? current.parentMessage : parentMessage,
-      })),
+      await updateLesson(id, (current) =>
+        // Moved to another child while the model was writing: this is about the
+        // wrong one, and its transcript may be one that has since been deleted.
+        current.studentId !== student.id
+          ? null
+          : {
+              ...(working.transcript !== lesson.transcript && { transcript: working.transcript }),
+              summary,
+              parentMessage: current.parentMessage?.editedAt ? current.parentMessage : parentMessage,
+            },
+      ),
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Summary failed.";

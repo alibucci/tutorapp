@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChangeStudent } from "@/components/ChangeStudent";
 import { HomeworkPanel } from "@/components/HomeworkPanel";
 import { ParentMessagePanel } from "@/components/ParentMessagePanel";
 import { SkillReview } from "@/components/SkillReview";
 import { SummaryPanel } from "@/components/SummaryPanel";
 import { ChevronLeft } from "@/components/ui";
 import { lessonFor } from "@/lib/access";
+import { moveOptions } from "@/lib/moveLesson";
 import { gameStyle } from "@/lib/gameStyles";
 import { canDrawPictures } from "@/lib/imageGen";
 import { INTERRUPTION_LABEL, promptLabel } from "@/lib/types";
@@ -59,6 +61,8 @@ export default async function ReviewPage({
         </span>
       </header>
 
+      <ChangeStudent {...await moveOptions(lesson, student)} />
+
       <nav
         aria-label="Steps"
         className="steps sticky top-0 z-[5] -mx-4 border-b border-line bg-background px-4 py-3"
@@ -111,15 +115,17 @@ export default async function ReviewPage({
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-start">
       <div className="stack-lg min-w-0">
       <div id="summary" className="scroll-mt-20">
-        <SummaryPanel lesson={lesson} />
+        {/* Keyed by student: after a move, each starts again from nothing. */}
+        <SummaryPanel key={student.id} lesson={lesson} />
       </div>
 
-      <SkillReview lesson={lesson} studentName={student?.name} />
+      <SkillReview key={student.id} lesson={lesson} studentName={student?.name} />
       </div>
 
       <div className="stack-lg min-w-0">
       {lesson.summary && (
         <HomeworkPanel
+          key={student.id}
           lesson={lesson}
           studentId={student?.id ?? ""}
           studentName={student?.name ?? "the student"}
@@ -131,7 +137,7 @@ export default async function ReviewPage({
       )}
 
       <div id="parent" className="scroll-mt-20">
-        <ParentMessagePanel lesson={lesson} />
+        <ParentMessagePanel key={student.id} lesson={lesson} />
       </div>
       </div>
       </div>

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { ChangeStudent } from "@/components/ChangeStudent";
 import { DebriefRecorder } from "@/components/DebriefRecorder";
 import { lessonFor } from "@/lib/access";
+import { moveOptions } from "@/lib/moveLesson";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,7 @@ export default async function DebriefPage({
   const { id } = await params;
   const found = await lessonFor(id);
   if (!found) notFound();
-  const { lesson } = found;
+  const { lesson, student } = found;
 
   return (
     <div className="stack-lg">
@@ -26,6 +28,9 @@ export default async function DebriefPage({
             : `${lesson.title} · five short prompts, then you're done.`}
         </p>
       </header>
+
+      {/* The moment a tutor notices: the recording has just ended. */}
+      <ChangeStudent {...await moveOptions(lesson, student)} />
 
       <DebriefRecorder lesson={lesson} />
     </div>

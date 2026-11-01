@@ -289,6 +289,11 @@ export async function getReport(id: string): Promise<ParentReport | null> {
   return readJson<ParentReport>(recordPath(REPORT_DIR, id));
 }
 
+export async function deleteReport(id: string): Promise<void> {
+  const file = recordPath(REPORT_DIR, id);
+  if (file) await fs.rm(file, { force: true });
+}
+
 export async function listReports(studentId?: string): Promise<ParentReport[]> {
   const reports = await readAll<ParentReport>(REPORT_DIR);
   return reports

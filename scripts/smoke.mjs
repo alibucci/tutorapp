@@ -596,6 +596,58 @@ function picture(bytes) {
     (await actor()("/api/auth", post({ email: otherFamily.username, password: otherFamily.password }))).status === 200);
 }
 
+// --- the wrong child ---------------------------------------------------------
+const sC = (await a("/api/students", post({ name: "Smoke Student C", consentFrom: "Parent C" }))).json;
+const sD = (await a("/api/students", post({ name: "Smoke Student D" }))).json;
+{
+  const move = (lesson, studentId, as = a) =>
+    as(`/api/lessons/${lesson}/student`, { method: "PUT", body: JSON.stringify({ studentId }) });
+  const segment = { t: 0, text: "Yesterday I go to the park." };
+  const lesson = (await a("/api/lessons", post({
+    title: "Smoke wrong child", mode: "online", language: "en-US", studentId: sC.id,
+  }))).json;
+  const at = new Date().toISOString();
+  await a(`/api/lessons/${lesson.id}`, patch({ startedAt: at, transcript: [segment] }));
+
+  check("a lesson still recording cannot be moved",
+    (await move(lesson.id, sD.id)).status === 409);
+  await a(`/api/lessons/${lesson.id}`, patch({
+    endedAt: at, debrief: [{ promptId: "covered", text: "The past." }],
+  }));
+
+  check("another tutor cannot move a lesson",
+    (await move(lesson.id, sD.id, b)).status === 404);
+  check("a lesson cannot move to another tutor's student",
+    (await move(lesson.id, sB.id)).status === 404);
+  check("homework already sent stops the move",
+    (await move(lessonA.id, sC.id)).status === 409);
+
+  const moved = await move(lesson.id, sD.id);
+  check("the tutor moves a lesson to the right student",
+    moved.status === 200 && moved.json?.studentId === sD.id, moved.text.slice(0, 120));
+  check("the old student no longer has it",
+    !(await a(`/api/lessons?studentId=${sC.id}`)).json.some?.((l) => l.id === lesson.id
+      && l.studentId === sC.id));
+  check("without the new child's consent the transcript goes",
+    moved.json?.transcript?.length === 0 && moved.json?.capture === "tutor");
+  check("the debrief moves with the lesson", moved.json?.debrief?.length === 1);
+
+  const back = await move(lesson.id, sC.id);
+  check("consent cannot bring back a voice that is gone",
+    back.json?.capture === "tutor" && back.json?.transcript?.length === 0);
+
+  const unstarted = (await a("/api/lessons", post({
+    title: "Smoke not started", mode: "online", language: "en-US", studentId: sD.id,
+  }))).json;
+  check("a lesson not yet recorded takes the new child's consent",
+    (await move(unstarted.id, sC.id)).json?.capture === "both");
+
+  await a(`/api/students/${sD.id}`, patch({ archived: true }));
+  check("a lesson cannot move to an archived student",
+    (await move(lesson.id, sD.id)).status === 409);
+  await a(`/api/students/${sD.id}`, patch({ archived: false }));
+}
+
 // --- leakage --------------------------------------------------------------
 const reason = proposed.json.changes[0]?.reason ?? "";
 check("the tutor's private reasoning never reaches the student",
@@ -626,8 +678,8 @@ let removed = 0;
 for (const [dir, matches] of [
   ["data/tutors", (r) => r.email?.endsWith("@smoke.test")],
   ["data/students", (r) => r.name?.startsWith("Smoke Student")],
-  ["data/lessons", (r) => [sA.id, sB.id].includes(r.studentId)],
-  ["data/reports", (r) => [sA.id, sB.id].includes(r.studentId)],
+  ["data/lessons", (r) => [sA.id, sB.id, sC.id, sD.id].includes(r.studentId)],
+  ["data/reports", (r) => [sA.id, sB.id, sC.id, sD.id].includes(r.studentId)],
 ]) {
   let files = [];
   try { files = readdirSync(dir); } catch { continue; }

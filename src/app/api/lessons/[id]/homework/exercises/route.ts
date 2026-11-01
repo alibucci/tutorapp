@@ -34,10 +34,12 @@ export async function POST(_request: Request, { params }: Params) {
     );
   }
 
-  let job = running.get(id);
+  // By student too, as for the summary: a moved lesson gets its own games.
+  const key = `${id}:${found.student.id}`;
+  let job = running.get(key);
   if (!job) {
-    job = build(id, found.lesson, found.student).finally(() => running.delete(id));
-    running.set(id, job);
+    job = build(id, found.lesson, found.student).finally(() => running.delete(key));
+    running.set(key, job);
   }
   return (await job).clone();
 }
@@ -52,7 +54,7 @@ async function build(id: string, lesson: Lesson, student: Student): Promise<Resp
       );
     }
     const updated = await updateLesson(id, (current) => {
-      if (current.homework?.answers) return null;
+      if (current.homework?.answers || current.studentId !== student.id) return null;
       const homework = current.homework ?? { focus: current.summary?.homeworkFocus ?? "" };
       return { homework: { ...homework, exercises } };
     });
