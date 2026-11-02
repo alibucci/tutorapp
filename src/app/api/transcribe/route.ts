@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { readBytes } from "@/lib/http";
-import { MAX_CLIP_BYTES, TranscribeError, canTranscribe, transcribe } from "@/lib/speech";
+import {
+  MAX_CLIP_BYTES,
+  TranscribeError,
+  canTranscribe,
+  transcribe,
+  transcribeLines,
+} from "@/lib/speech";
 import { DEFAULT_LANGUAGE, LESSON_LANGUAGES } from "@/lib/types";
 
 /**
@@ -26,7 +32,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const tag = new URL(request.url).searchParams.get("lang") ?? "";
+  const query = new URL(request.url).searchParams;
+  const tag = query.get("lang") ?? "";
   const language = LESSON_LANGUAGES.some((l) => l.tag === tag) ? tag : DEFAULT_LANGUAGE;
   const mimeType = request.headers.get("content-type") ?? "";
   if (!mimeType.startsWith("audio/")) {
@@ -38,6 +45,12 @@ export async function POST(request: Request) {
   if (audio.byteLength === 0) return NextResponse.json({ text: "" });
 
   try {
+    // A group lesson wants each sentence separately, to credit it to someone.
+    if (query.get("lines")) {
+      return NextResponse.json({
+        lines: await transcribeLines(audio, mimeType.split(";")[0], language),
+      });
+    }
     const text = await transcribe(audio, mimeType.split(";")[0], language);
     return NextResponse.json({ text });
   } catch (e) {

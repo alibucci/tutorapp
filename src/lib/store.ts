@@ -238,7 +238,19 @@ export async function getStudentByKey(
 
 export async function createLesson(
   input: Pick<Lesson, "title" | "mode" | "studentId" | "capture" | "language"> &
-    Partial<Pick<Lesson, "kind">>,
+    Partial<
+      Pick<
+        Lesson,
+        | "kind"
+        | "groupStudentIds"
+        | "groupId"
+        | "startedAt"
+        | "endedAt"
+        | "recordedMs"
+        | "transcript"
+        | "debrief"
+      >
+    >,
 ): Promise<Lesson> {
   await ensureDirs();
   const lesson: Lesson = {
@@ -249,10 +261,15 @@ export async function createLesson(
     capture: input.capture,
     language: input.language,
     ...(input.kind && { kind: input.kind }),
+    ...(input.groupStudentIds && { groupStudentIds: input.groupStudentIds }),
+    ...(input.groupId && { groupId: input.groupId }),
+    ...(input.startedAt && { startedAt: input.startedAt }),
+    ...(input.endedAt && { endedAt: input.endedAt }),
+    ...(input.recordedMs !== undefined && { recordedMs: input.recordedMs }),
     createdAt: new Date().toISOString(),
     interruptions: [],
-    transcript: [],
-    debrief: [],
+    transcript: input.transcript ?? [],
+    debrief: input.debrief ?? [],
     debriefTranscript: [],
   };
   await writeJson(path.join(LESSON_DIR, `${lesson.id}.json`), lesson);
@@ -270,10 +287,23 @@ export async function updateLesson(
   return updateRecord<Lesson>(LESSON_DIR, id, change);
 }
 
+/**
+ * One child's lessons, or everyone's. A group lesson is not among them: it is
+ * filed under its first child only so that access checks have an owner, and
+ * belongs on nobody's page. What reaches a child is the lesson split from it.
+ */
 export async function listLessons(studentId?: string): Promise<Lesson[]> {
   const lessons = await readAll<Lesson>(LESSON_DIR);
   return lessons
-    .filter((l) => !studentId || l.studentId === studentId)
+    .filter((l) => l.kind !== "group" && (!studentId || l.studentId === studentId))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Group lessons, for the tutor's own to-do list. */
+export async function listGroupLessons(): Promise<Lesson[]> {
+  const lessons = await readAll<Lesson>(LESSON_DIR);
+  return lessons
+    .filter((l) => l.kind === "group")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 

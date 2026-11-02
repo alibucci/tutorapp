@@ -52,10 +52,17 @@ function readDraft(id: string): Draft | null {
   }
 }
 
-export function DebriefRecorder({ lesson }: { lesson: Lesson }) {
+export function DebriefRecorder({
+  lesson,
+  prompts,
+}: {
+  lesson: Lesson;
+  /** Questions of its own: a group lesson asks about each child by name. */
+  prompts?: readonly { id: string; label: string }[];
+}) {
   // An intro note asks about the child; a debrief asks about the lesson.
   const PROMPTS: readonly { id: string; label: string }[] =
-    lesson.kind === "intro" ? INTRO_PROMPTS : DEBRIEF_PROMPTS;
+    prompts ?? (lesson.kind === "intro" ? INTRO_PROMPTS : DEBRIEF_PROMPTS);
   const router = useRouter();
   const rec = useTutorRecorder();
   const speech = useClipTranscriber(lesson.language);

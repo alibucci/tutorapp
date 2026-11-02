@@ -19,6 +19,7 @@ const Segment = z.object({
   text: z.string().max(4000),
   confidence: z.number().optional(),
   speaker: z.enum(["tutor", "student", "unknown"]).optional(),
+  who: z.string().max(40).optional(),
   tag: z.string().max(40).optional(),
 });
 

@@ -17,6 +17,9 @@ export function whyCannotMove(
   studentName: string,
   reports: ParentReport[],
 ): string | null {
+  if (lesson.kind === "group" || lesson.groupId) {
+    return "This came from a group lesson, so it stays with the child it was made for.";
+  }
   // A recorder still running would go on writing a transcript under consent
   // it no longer has.
   if (lesson.kind !== "intro" && lesson.startedAt && !lesson.endedAt) {

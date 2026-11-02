@@ -125,6 +125,11 @@ export function renderLesson(lesson: Lesson, student: Student): string {
     `Lesson: ${lesson.title}`,
     `Student: ${student.name}`,
     `Mode: ${lesson.mode}`,
+    ...(lesson.groupId
+      ? [
+          `This was a group lesson. Only ${student.name}'s lines and the tutor's around them are shown; other children's are left out. Write only about ${student.name}, and never name another child.`,
+        ]
+      : []),
     "",
     both
       ? "=== LESSON TRANSCRIPT (both voices) ==="

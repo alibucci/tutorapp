@@ -3,6 +3,8 @@ import { ChangeStudent } from "@/components/ChangeStudent";
 import { DebriefRecorder } from "@/components/DebriefRecorder";
 import { lessonFor } from "@/lib/access";
 import { moveOptions } from "@/lib/moveLesson";
+import { getStudent } from "@/lib/store";
+import { groupPrompts, type Student } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,12 @@ export default async function DebriefPage({
   const found = await lessonFor(id);
   if (!found) notFound();
   const { lesson, student } = found;
+  const isGroup = lesson.kind === "group";
+  const students = isGroup
+    ? (await Promise.all((lesson.groupStudentIds ?? []).map((id) => getStudent(id)))).filter(
+        (s): s is Student => Boolean(s),
+      )
+    : [];
 
   return (
     <div className="stack-lg">
@@ -25,14 +33,16 @@ export default async function DebriefPage({
         <p className="t-body t-muted mt-2">
           {lesson.kind === "intro"
             ? "Five short questions. Everything else is built from this."
-            : `${lesson.title} · five short prompts, then you're done.`}
+            : isGroup
+              ? `${lesson.title} · a few words on each child, then you're done.`
+              : `${lesson.title} · five short prompts, then you're done.`}
         </p>
       </header>
 
       {/* The moment a tutor notices: the recording has just ended. */}
-      <ChangeStudent {...await moveOptions(lesson, student)} />
+      {!isGroup && <ChangeStudent {...await moveOptions(lesson, student)} />}
 
-      <DebriefRecorder lesson={lesson} />
+      <DebriefRecorder lesson={lesson} prompts={isGroup ? groupPrompts(students) : undefined} />
     </div>
   );
 }

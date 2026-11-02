@@ -52,7 +52,9 @@ async function generate(id: string, lesson: Lesson, student: Student): Promise<R
     // as the microphone. Online, their voice comes out of a speaker and the
     // browser's echo cancellation removes most of it, so the labels would be
     // noise. Skipping it there also saves a whole model call.
-    const inRoom = lesson.capture === "both" && lesson.mode === "classroom";
+    // A child's lesson from a group already says who spoke: the tutor checked it.
+    const inRoom =
+      lesson.capture === "both" && lesson.mode === "classroom" && !lesson.groupId;
     let working = lesson;
     if (inRoom && lesson.transcript.length) {
       const transcript = await labelSpeakers(lesson.transcript);

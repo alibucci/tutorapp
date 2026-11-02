@@ -648,6 +648,90 @@ const sD = (await a("/api/students", post({ name: "Smoke Student D" }))).json;
   await a(`/api/students/${sD.id}`, patch({ archived: false }));
 }
 
+// --- a group lesson ----------------------------------------------------------
+const sE = (await a("/api/students", post({ name: "Smoke Student E", consentFrom: "Parent E" }))).json;
+{
+  const newGroup = (studentIds) => a("/api/lessons", post({
+    title: "Smoke group", language: "en-US", studentIds,
+  }));
+  check("a group lesson cannot include another tutor's student",
+    (await newGroup([sC.id, sB.id])).status === 404);
+
+  const group = (await newGroup([sC.id, sE.id])).json;
+  check("a group of children with consent records everyone",
+    group?.kind === "group" && group?.capture === "both" && group?.mode === "classroom");
+  check("the group lesson is on no child's list",
+    !(await a(`/api/lessons?studentId=${sC.id}`)).json.some((l) => l.id === group.id));
+
+  const noConsent = (await newGroup([sC.id, sD.id])).json;
+  check("one parent without consent means no transcript for the group",
+    noConsent?.capture === "tutor");
+  await a(`/api/lessons/${noConsent.id}`, patch({ transcript: [{ t: 0, text: "Should not be kept." }] }));
+  check("and a transcript sent anyway is not kept",
+    (await a(`/api/lessons/${noConsent.id}`)).json?.transcript?.length === 0);
+
+  const at = new Date().toISOString();
+  const lines = [
+    "Okay, Smoke Student C, what did you do yesterday?",
+    "I go to the park.",
+    "You went to the park. Good. Smoke Student E, and you?",
+    "I eated a big pizza.",
+    "You ate a pizza. Nice.",
+  ];
+  await a(`/api/lessons/${group.id}`, patch({
+    startedAt: at,
+    transcript: lines.map((text, i) => ({ t: i * 3000, text })),
+  }));
+  const splitWith = (who) => a(`/api/lessons/${group.id}/group/split`, post({ who }));
+  check("a group lesson still recording cannot be split",
+    (await splitWith([])).status === 409);
+  await a(`/api/lessons/${group.id}`, patch({
+    endedAt: at,
+    debrief: [
+      { promptId: "covered", text: "Yesterday's news." },
+      { promptId: `c:${sC.id}`, text: "Says go for went." },
+      { promptId: `c:${sE.id}`, text: "Says eated for ate." },
+      { promptId: "next", text: "More past forms." },
+    ],
+  }));
+
+  const labelled = (await a(`/api/lessons/${group.id}/group/labels`, { method: "POST" })).json;
+  const who = labelled?.transcript?.map((l) => l.who) ?? [];
+  check("the child called by name is credited with the answer",
+    who[1] === sC.id && who[3] === sE.id, JSON.stringify(who));
+  check("the tutor's lines are the tutor's", who[0] === "tutor" && who[2] === "tutor");
+
+  check("another tutor cannot split it",
+    (await b(`/api/lessons/${group.id}/group/split`, post({ who }))).status === 404);
+  check("labels that do not fit the lesson are refused",
+    (await splitWith(who.slice(1))).status === 400);
+  check("a name that is not in the group is refused",
+    (await splitWith(who.map(() => sD.id))).status === 400);
+
+  // What the tutor checked, not what the model suggested.
+  const checked = ["tutor", sC.id, "tutor", sE.id, "tutor"];
+  const split = await splitWith(checked);
+  check("the tutor makes each child's own lesson",
+    split.status === 200 && split.json?.lessons?.length === 2, split.text.slice(0, 120));
+  const forChild = (id) => split.json.lessons.find((l) => l.studentId === id);
+  const textOf = (l) => l.transcript.map((x) => x.text).join(" | ");
+  check("a child's lesson has their own words",
+    textOf(forChild(sC.id)).includes("I go to the park"));
+  check("and not another child's",
+    !textOf(forChild(sC.id)).includes("eated") && !textOf(forChild(sE.id)).includes("I go to the park"));
+  check("the tutor's debrief about each child goes to that child",
+    forChild(sE.id).debrief.find((d) => d.promptId === "struggled")?.text === "Says eated for ate."
+      && !JSON.stringify(forChild(sE.id).debrief).includes("go for went"));
+  check("a child's lesson is on their list",
+    (await a(`/api/lessons?studentId=${sE.id}`)).json.some((l) => l.id === forChild(sE.id).id));
+  check("a group lesson cannot be split twice", (await splitWith(checked)).status === 409);
+  check("a child's lesson from a group stays with them",
+    (await a(`/api/lessons/${forChild(sC.id).id}/student`, {
+      method: "PUT", body: JSON.stringify({ studentId: sD.id }),
+    })).status === 409);
+  check("the group's page opens", (await a(`/lesson/${group.id}/group`)).status === 200);
+}
+
 // --- leakage --------------------------------------------------------------
 const reason = proposed.json.changes[0]?.reason ?? "";
 check("the tutor's private reasoning never reaches the student",
@@ -678,8 +762,8 @@ let removed = 0;
 for (const [dir, matches] of [
   ["data/tutors", (r) => r.email?.endsWith("@smoke.test")],
   ["data/students", (r) => r.name?.startsWith("Smoke Student")],
-  ["data/lessons", (r) => [sA.id, sB.id, sC.id, sD.id].includes(r.studentId)],
-  ["data/reports", (r) => [sA.id, sB.id, sC.id, sD.id].includes(r.studentId)],
+  ["data/lessons", (r) => [sA.id, sB.id, sC.id, sD.id, sE.id].includes(r.studentId)],
+  ["data/reports", (r) => [sA.id, sB.id, sC.id, sD.id, sE.id].includes(r.studentId)],
 ]) {
   let files = [];
   try { files = readdirSync(dir); } catch { continue; }

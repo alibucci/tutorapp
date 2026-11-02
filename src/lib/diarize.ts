@@ -65,3 +65,59 @@ export async function labelSpeakers(
     speaker: byIndex.get(i) ?? "unknown",
   }));
 }
+
+const GROUP_SYSTEM = `You label who said each line of a small group English lesson: one
+tutor and a few children around one microphone. The transcript does not say who
+is speaking, and a line may be misheard.
+
+What settles it:
+- The tutor calls a child by name, often just a first name or a nickname. The
+  lines straight after that usually belong to that child, until the tutor speaks
+  again.
+- The tutor asks, explains, corrects and praises. "Okay, good" after an answer is
+  the tutor. Children answer, usually more briefly.
+- With nobody called, a child's answer could be anyone's: say "unknown".
+
+Label every line with one of the ids you are given, "tutor" or "unknown".
+"unknown" is much better than a guess: a wrong name puts one child's mistake on
+another child's report to their parents.
+
+Return one entry per line, using the index given.`;
+
+/**
+ * Who said each line of a group lesson, from the names the tutor calls. Only a
+ * suggestion: the tutor checks it before anything is made from it.
+ */
+export async function labelGroupLines(
+  segments: TranscriptSegment[],
+  students: { id: string; name: string }[],
+): Promise<TranscriptSegment[]> {
+  if (!segments.length) return segments;
+  // Short ids, so a name the recogniser misheard cannot turn into a new person.
+  const ids = students.map((s, i) => ({ short: `c${i + 1}`, ...s }));
+  const schema = z.object({
+    labels: z.array(z.object({ index: z.number(), who: z.string() })),
+  });
+
+  const parsed = await complete({
+    system: GROUP_SYSTEM,
+    user: [
+      "The children:",
+      ...ids.map((s) => `${s.short} = ${s.name}`),
+      "",
+      "The lines:",
+      ...segments.map((seg, i) => `${i}: ${seg.text}`),
+    ].join("\n"),
+    schema,
+    schemaName: "GroupSpeakerLabels",
+    model: MODEL_FAST,
+    effort: "low",
+    // One short entry per line, and an hour of a lesson is many lines.
+    maxTokens: 24000,
+  });
+
+  const byShort = new Map<string, string>(ids.map((s) => [s.short, s.id]));
+  byShort.set("tutor", "tutor");
+  const byIndex = new Map(parsed.labels.map((l) => [l.index, byShort.get(l.who) ?? "unknown"]));
+  return segments.map((seg, i) => ({ ...seg, who: byIndex.get(i) ?? "unknown" }));
+}

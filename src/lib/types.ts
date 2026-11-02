@@ -28,6 +28,11 @@ export type TranscriptSegment = {
   /** Filled in after the lesson, only when both voices were recorded. */
   speaker?: Speaker;
   /**
+   * Group lessons only: who said this line - "tutor", a student's id, or
+   * "unknown". Suggested from the names the tutor calls, checked by the tutor.
+   */
+  who?: string;
+  /**
    * Which debrief prompt was on screen when this utterance began. Set by the
    * caller rather than derived from `t`, because `t` is when the recogniser
    * handed the text over, which can be most of a minute after it was said.
@@ -91,7 +96,8 @@ export type Lesson = {
   id: string;
   title: string;
   /** One student per lesson: attribution from tutor-only audio is only
-   *  trustworthy one-to-one. */
+   *  trustworthy one-to-one. Several children are a "group" lesson, split into
+   *  one of these for each of them after the tutor checks who said what. */
   studentId: string;
   mode: LessonMode;
   /** Language spoken in the lesson, for the recogniser. */
@@ -101,8 +107,19 @@ export type Lesson = {
   /**
    * "intro" is a spoken note about a child nobody has taught yet: no
    *  recording, different questions, and the summary knows it is not a lesson.
+   *
+   * "group" is a lesson with several children. It holds the shared recording
+   * and debrief, only the tutor ever sees it, and it is split into one ordinary
+   * lesson per child - so a child's page, homework and parents' notes work as
+   * they always have, and nobody sees another child's answers.
    */
-  kind?: "intro";
+  kind?: "intro" | "group";
+  /** The children in a group lesson. `studentId` is the first of them. */
+  groupStudentIds?: string[];
+  /** On a group lesson, once split: the lesson made for each child. */
+  groupLessonIds?: string[];
+  /** On a child's lesson: the group lesson it was split from. */
+  groupId?: string;
   createdAt: string;
   startedAt?: string;
   endedAt?: string;
@@ -409,6 +426,26 @@ export const INTRO_PROMPTS = [
   { id: "goal", label: "What do they need to get to?" },
   { id: "start", label: "Where will you start?" },
 ] as const;
+
+/**
+ * The questions after a group lesson: what everyone did, then a line about each
+ * child. Each answer becomes "what did they struggle with" on that child's own
+ * lesson. The id must fit a transcript tag (40 characters).
+ */
+export function groupPrompts(students: { id: string; name: string }[]) {
+  return [
+    { id: "covered", label: "What did you cover?" },
+    ...students.map((s) => ({
+      id: childPromptId(s.id),
+      label: `How did ${s.name} do? What was hard for them?`,
+    })),
+    { id: "next", label: "What should happen next lesson?" },
+  ];
+}
+
+export function childPromptId(studentId: string): string {
+  return `c:${studentId}`;
+}
 
 /** Every prompt the app asks, whichever set it came from. */
 export function promptLabel(id: string): string {

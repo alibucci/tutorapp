@@ -12,7 +12,7 @@ import {
 import { requireSession } from "@/lib/auth";
 import { recentActivity, timeAgo } from "@/lib/feed";
 import { homeworkDone } from "@/lib/homework";
-import { listLessons, listStudents } from "@/lib/store";
+import { listGroupLessons, listLessons, listStudents } from "@/lib/store";
 import type { Lesson } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +93,29 @@ function todoFor(lesson: Lesson, name: string): Todo | null {
 }
 
 /** Loose ends from the last two weeks, newest first. */
+/** A group lesson still on its way to becoming each child's own lesson. */
+function groupTodo(lesson: Lesson): Todo | null {
+  if (lesson.groupLessonIds) return null;
+  const base = `/lesson/${lesson.id}`;
+  const todo = (href: string, title: string, detail: string): Todo => ({
+    href,
+    title,
+    detail,
+    kind: "warn",
+    icon: <MicIcon />,
+  });
+  if (lesson.startedAt && !lesson.endedAt) {
+    return todo(base, "Finish the group lesson", `${lesson.title} · it was interrupted`);
+  }
+  if (lesson.endedAt && lesson.debrief.length === 0) {
+    return todo(`${base}/debrief`, "Record the group debrief", `${lesson.title} · a few words on each child`);
+  }
+  if (lesson.debrief.length > 0) {
+    return todo(`${base}/group`, "Check who said what", `${lesson.title} · group lesson`);
+  }
+  return null;
+}
+
 function recentTodos(lessons: Lesson[], names: Map<string, string>): Todo[] {
   const cutoff = Date.now() - TODO_WINDOW_MS;
   return lessons
@@ -120,7 +143,11 @@ export default async function Home() {
   const names = new Map(students.map((s) => [s.id, s.name]));
   const lessons = (await listLessons()).filter((l) => names.has(l.studentId));
 
-  const todos = recentTodos(lessons, names);
+  const groups = (await listGroupLessons()).filter((l) => names.has(l.studentId));
+  const todos = [
+    ...groups.map(groupTodo).filter((t): t is Todo => t !== null),
+    ...recentTodos(lessons, names),
+  ];
   const activity = recentActivity(lessons, students);
 
   const latest = new Map<string, Lesson>();

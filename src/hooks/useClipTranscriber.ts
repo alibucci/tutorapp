@@ -17,7 +17,11 @@ type Failed = { tag?: string; t: number; clip: Blob; error: string };
  * A clip that fails to transcribe is kept in memory, not dropped, so the tutor
  * can retry it once the connection is back. Nothing is stored anywhere else.
  */
-export function useClipTranscriber(language: string) {
+export function useClipTranscriber(
+  language: string,
+  /** Ask for each sentence separately: a group lesson credits them one by one. */
+  { lines = false }: { lines?: boolean } = {},
+) {
   const [segments, setSegmentsState] = useState<TranscriptSegment[]>([]);
   /** The same list, readable from callbacks without waiting for a render. */
   const segmentsRef = useRef<TranscriptSegment[]>([]);
@@ -55,7 +59,7 @@ export function useClipTranscriber(language: string) {
         }
         if (!wav) return;
         const post = () =>
-          fetch(`/api/transcribe?lang=${encodeURIComponent(language)}`, {
+          fetch(`/api/transcribe?lang=${encodeURIComponent(language)}${lines ? "&lines=1" : ""}`, {
             method: "POST",
             headers: { "Content-Type": "audio/wav" },
             body: wav,
@@ -69,8 +73,17 @@ export function useClipTranscriber(language: string) {
           await new Promise((resolve) => window.setTimeout(resolve, 1500));
           res = await post();
         }
-        const body = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+        const body = (await res.json().catch(() => ({}))) as {
+          text?: string;
+          lines?: { at: number; text: string }[];
+          error?: string;
+        };
         if (!res.ok) throw new Error(body.error ?? `Transcription failed (${res.status}).`);
+        if (body.lines) {
+          const added = body.lines.map((line) => ({ t: t + line.at, text: line.text, tag }));
+          setSegments((prev) => [...prev, ...added].sort((a, b) => a.t - b.t));
+          return;
+        }
         const text = (body.text ?? "").trim();
         if (!text) return;
         setSegments((prev) =>
@@ -92,7 +105,7 @@ export function useClipTranscriber(language: string) {
         });
       }
     },
-    [language, setSegments, setFailed],
+    [language, lines, setSegments, setFailed],
   );
 
   const send = useCallback(

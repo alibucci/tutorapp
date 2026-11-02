@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ChangeStudent } from "@/components/ChangeStudent";
 import { HomeworkPanel } from "@/components/HomeworkPanel";
 import { ParentMessagePanel } from "@/components/ParentMessagePanel";
@@ -25,6 +25,8 @@ export default async function ReviewPage({
   const found = await lessonFor(id);
   if (!found) notFound();
   const { lesson, student } = found;
+  // The shared recording has no summary of its own: each child's lesson does.
+  if (lesson.kind === "group") redirect(`/lesson/${id}/group`);
 
   const homeworkSent = Boolean(lesson.homework?.sentAt);
   const messageSent = Boolean(lesson.parentMessage?.copiedAt);

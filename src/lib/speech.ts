@@ -60,9 +60,38 @@ export async function transcribe(
 }
 
 type DeepgramResponse = {
-  results?: { channels?: { alternatives?: { transcript?: string }[] }[] };
+  results?: {
+    channels?: { alternatives?: { transcript?: string }[] }[];
+    utterances?: { start?: number; transcript?: string }[];
+  };
   err_msg?: string;
 };
+
+export type SpokenLine = {
+  /** ms from the start of the recording. */
+  at: number;
+  text: string;
+};
+
+/**
+ * One recording as separate lines, split at the pauses. In a group lesson a
+ * single clip can hold a question and two children answering; a line per
+ * sentence is what lets each one be credited to someone.
+ */
+export async function transcribeLines(
+  audio: Uint8Array,
+  mimeType: string,
+  languageTag: string,
+): Promise<SpokenLine[]> {
+  if (DEEPGRAM_KEY()) {
+    const body = await askDeepgram(audio, mimeType, languageTag, { utterances: "true" });
+    return (body.results?.utterances ?? [])
+      .map((u) => ({ at: Math.round((u.start ?? 0) * 1000), text: (u.transcript ?? "").trim() }))
+      .filter((line) => line.text);
+  }
+  const text = await transcribeQwen(audio, mimeType, languageTag);
+  return text ? [{ at: 0, text }] : [];
+}
 
 /** Deepgram's pre-recorded API: the audio as the body, the text back. */
 async function transcribeDeepgram(
@@ -70,7 +99,17 @@ async function transcribeDeepgram(
   mimeType: string,
   languageTag: string,
 ): Promise<string> {
-  const params = new URLSearchParams({ model: "nova-3", language: languageTag });
+  const body = await askDeepgram(audio, mimeType, languageTag);
+  return (body.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? "").trim();
+}
+
+async function askDeepgram(
+  audio: Uint8Array,
+  mimeType: string,
+  languageTag: string,
+  extra: Record<string, string> = {},
+): Promise<DeepgramResponse> {
+  const params = new URLSearchParams({ model: "nova-3", language: languageTag, ...extra });
   // Smart formatting writes numbers as digits, which reads well in English
   // but turns 四分之一 into 4分之一 in Chinese. There, punctuation only.
   if (languageTag.startsWith("zh")) params.set("punctuate", "true");
@@ -88,7 +127,7 @@ async function transcribeDeepgram(
       `Speech service error (${res.status}): ${body.err_msg ?? "request failed"}`,
     );
   }
-  return (body.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? "").trim();
+  return body;
 }
 
 async function transcribeQwen(

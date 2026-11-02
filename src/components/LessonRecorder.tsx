@@ -69,7 +69,8 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
 
   /** Time from before an interruption, so a carried-on lesson stays in order. */
   const baseRef = useRef(0);
-  const speech = useClipTranscriber(lesson.language);
+  const isGroup = lesson.kind === "group";
+  const speech = useClipTranscriber(lesson.language, { lines: isGroup });
   const rec = useTutorRecorder({
     gate,
     // The screen went off: what was said up to now goes off to be read.
@@ -338,9 +339,13 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   return (
     <div className="stack-lg">
       <p className={`note ${capturesStudent ? "note-accent" : "note-quiet"}`}>
-        {capturesStudent
-          ? "Both voices, with a live transcript. The parent has consented."
-          : "Your voice only, and no live transcript - without the parent's consent the transcript could pick up the student. Your debrief straight after the lesson is what the summary is built from."}
+        {isGroup
+          ? capturesStudent
+            ? "Everyone's voices, with a live transcript. All the parents have consented. Call each child by name when you ask them something - that is how the app tells who answered."
+            : "No live transcript: not every parent has consented, and the transcript would hold every child's words. Your debrief straight after the lesson, with a line on each child, is what their summaries are built from."
+          : capturesStudent
+            ? "Both voices, with a live transcript. The parent has consented."
+            : "Your voice only, and no live transcript - without the parent's consent the transcript could pick up the student. Your debrief straight after the lesson is what the summary is built from."}
       </p>
 
       {interrupted && (
@@ -417,7 +422,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
             />
             <span className="hint">
               {capturesStudent
-                ? "Keep this low - it only cuts room noise. Both of you must stay above the line."
+                ? `Keep this low - it only cuts room noise. ${isGroup ? "Everyone" : "Both of you"} must stay above the line.`
                 : "Speak normally and raise this until the bar only turns green for you. Below the line, nothing is written to disk or sent anywhere."}
             </span>
           </label>
@@ -596,8 +601,8 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         <div className="max-h-80 space-y-2 overflow-y-auto card p-4 t-small">
           {speech.segments.length === 0 && (
             <p className="text-muted">
-              Both voices land here a few seconds after they are said. It is
-              saved as you go.
+              {isGroup ? "Everyone's words land" : "Both voices land"} here a few
+              seconds after they are said. It is saved as you go.
             </p>
           )}
           {speech.segments.map((s, i) => (

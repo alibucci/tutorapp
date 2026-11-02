@@ -14,6 +14,9 @@ export function NewLessonForm({ students }: { students: Student[] }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [studentId, setStudentId] = useState(students[0]?.id ?? "");
+  /** The other children, when it is a group lesson. */
+  const [others, setOthers] = useState<string[]>([]);
+  const [isGroup, setIsGroup] = useState(false);
   const [newName, setNewName] = useState("");
   const [consentFrom, setConsentFrom] = useState("");
   const [mode, setMode] = useState<LessonMode>("online");
@@ -23,6 +26,10 @@ export function NewLessonForm({ students }: { students: Student[] }) {
 
   const addingStudent = studentId === "" || students.length === 0;
   const selected = students.find((s) => s.id === studentId);
+  const groupIds = isGroup ? [studentId, ...others.filter((id) => id !== studentId)] : [];
+  const inGroup = students.filter((s) => groupIds.includes(s.id));
+  const groupReady = groupIds.length > 1;
+  const noConsent = inGroup.filter((s) => !s.recordingConsent);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,7 +52,11 @@ export function NewLessonForm({ students }: { students: Student[] }) {
       const res = await fetch("/api/lessons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, mode, language, studentId: id }),
+        body: JSON.stringify(
+          groupReady
+            ? { title, language, studentIds: groupIds }
+            : { title, mode, language, studentId: id },
+        ),
       });
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
@@ -83,11 +94,48 @@ export function NewLessonForm({ students }: { students: Student[] }) {
           ))}
           <option value="">+ New student</option>
         </select>
-        <span className="hint">
-          One student per lesson. Attribution from tutor-only audio is only
-          trustworthy one-to-one.
-        </span>
       </label>
+
+      {!addingStudent && students.length > 1 && (
+        <div className="space-y-2">
+          <label className="choice">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={isGroup}
+              onChange={(e) => setIsGroup(e.target.checked)}
+            />
+            <span>
+              <span className="block t-small font-medium">Group lesson</span>
+              <span className="block t-caption t-muted">
+                Several children in the room, one microphone. Each gets their own
+                summary and homework.
+              </span>
+            </span>
+          </label>
+          {isGroup && (
+            <fieldset className="space-y-1.5">
+              <legend className="label">Who else is in the lesson?</legend>
+              {students
+                .filter((s) => s.id !== studentId)
+                .map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 t-small">
+                    <input
+                      type="checkbox"
+                      checked={others.includes(s.id)}
+                      onChange={(e) =>
+                        setOthers((prev) =>
+                          e.target.checked ? [...prev, s.id] : prev.filter((id) => id !== s.id),
+                        )
+                      }
+                    />
+                    {s.name}
+                  </label>
+                ))}
+            </fieldset>
+          )}
+        </div>
+      )}
 
       {addingStudent ? (
         <>
@@ -118,6 +166,12 @@ export function NewLessonForm({ students }: { students: Student[] }) {
             </span>
           </label>
         </>
+      ) : groupReady ? (
+        <p className={`note ${noConsent.length ? "note-quiet" : "note-accent"}`}>
+          {noConsent.length
+            ? `No consent on file for ${noConsent.map((s) => s.name).join(", ")}, so there will be no transcript. Each child's summary comes from your debrief.`
+            : "Everyone's voices will be recorded - consent on file for all of them."}
+        </p>
       ) : (
         selected && (
           <p
@@ -165,6 +219,8 @@ export function NewLessonForm({ students }: { students: Student[] }) {
         </span>
       </label>
 
+      {/* A group is always in the room: online, their voices are not heard. */}
+      {!groupReady && (
       <fieldset className="space-y-2">
         <legend className="label">Setting</legend>
         {[
@@ -197,12 +253,13 @@ export function NewLessonForm({ students }: { students: Student[] }) {
           </label>
         ))}
       </fieldset>
+      )}
 
       {error && <p className="note note-warn">{error}</p>}
 
       <button
         type="submit"
-        disabled={busy}
+        disabled={busy || (isGroup && !groupReady)}
         className="btn btn-primary"
       >
         {busy ? "Creating..." : "Set up the mic"}
