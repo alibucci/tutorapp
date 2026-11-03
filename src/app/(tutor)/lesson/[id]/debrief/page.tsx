@@ -34,7 +34,7 @@ export default async function DebriefPage({
           {lesson.kind === "intro"
             ? "Five short questions. Everything else is built from this."
             : isGroup
-              ? `${lesson.title} · a few words on each child, then you're done.`
+              ? `${lesson.title} · three short questions on each child, then you're done.`
               : `${lesson.title} · five short prompts, then you're done.`}
         </p>
       </header>

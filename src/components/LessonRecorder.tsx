@@ -342,7 +342,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         {isGroup
           ? capturesStudent
             ? "Everyone's voices, with a live transcript. All the parents have consented. Call each child by name when you ask them something - that is how the app tells who answered."
-            : "No live transcript: not every parent has consented, and the transcript would hold every child's words. Your debrief straight after the lesson, with a line on each child, is what their summaries are built from."
+            : "No live transcript: not every parent has consented, and the transcript would hold every child's words. Your debrief straight after the lesson, with three questions on each child, is what their summaries are built from."
           : capturesStudent
             ? "Both voices, with a live transcript. The parent has consented."
             : "Your voice only, and no live transcript - without the parent's consent the transcript could pick up the student. Your debrief straight after the lesson is what the summary is built from."}

@@ -1,4 +1,4 @@
-import { childPromptId, type DebriefAnswer, type Lesson, type TranscriptSegment } from "./types";
+import { childPromptIds, type DebriefAnswer, type Lesson, type TranscriptSegment } from "./types";
 
 /**
  * What one child's own lesson gets from a group lesson: their lines, with the
@@ -22,12 +22,21 @@ export function linesForChild(
   return out;
 }
 
-/** The group's debrief, as the ordinary questions on one child's lesson. */
+/**
+ * This child's answers, as the ordinary questions on their own lesson.
+ *
+ * The second id of each pair is the earlier debrief, with shared questions and
+ * one about each child: one saved before the change must not lose its answers.
+ */
 export function debriefForChild(lesson: Lesson, studentId: string): DebriefAnswer[] {
-  const answer = (id: string) => lesson.debrief.find((a) => a.promptId === id)?.text ?? "";
+  const answer = (id: string, earlier: string) => {
+    const find = (key: string) => lesson.debrief.find((a) => a.promptId === key)?.text;
+    return find(id) ?? find(earlier) ?? "";
+  };
+  const ids = childPromptIds(studentId);
   return [
-    { promptId: "covered", text: answer("covered") },
-    { promptId: "struggled", text: answer(childPromptId(studentId)) },
-    { promptId: "next", text: answer("next") },
+    { promptId: "covered", text: answer(ids.worked, "covered") },
+    { promptId: "struggled", text: answer(ids.hard, `c:${studentId}`) },
+    { promptId: "next", text: answer(ids.next, "next") },
   ];
 }

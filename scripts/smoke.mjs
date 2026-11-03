@@ -688,10 +688,12 @@ const sE = (await a("/api/students", post({ name: "Smoke Student E", consentFrom
   await a(`/api/lessons/${group.id}`, patch({
     endedAt: at,
     debrief: [
-      { promptId: "covered", text: "Yesterday's news." },
-      { promptId: `c:${sC.id}`, text: "Says go for went." },
-      { promptId: `c:${sE.id}`, text: "Says eated for ate." },
-      { promptId: "next", text: "More past forms." },
+      { promptId: `w:${sC.id}`, text: "C talked about the park." },
+      { promptId: `h:${sC.id}`, text: "Says go for went." },
+      { promptId: `n:${sC.id}`, text: "C needs more past forms." },
+      { promptId: `w:${sE.id}`, text: "E talked about pizza." },
+      { promptId: `h:${sE.id}`, text: "Says eated for ate." },
+      { promptId: `n:${sE.id}`, text: "E needs irregular forms." },
     ],
   }));
 
@@ -722,6 +724,32 @@ const sE = (await a("/api/students", post({ name: "Smoke Student E", consentFrom
   check("the tutor's debrief about each child goes to that child",
     forChild(sE.id).debrief.find((d) => d.promptId === "struggled")?.text === "Says eated for ate."
       && !JSON.stringify(forChild(sE.id).debrief).includes("go for went"));
+  const answerOf = (id, prompt) => forChild(id).debrief.find((d) => d.promptId === prompt)?.text;
+  check("every answer in the debrief belongs to one child",
+    answerOf(sC.id, "covered") === "C talked about the park."
+      && answerOf(sE.id, "covered") === "E talked about pizza."
+      && answerOf(sC.id, "next") === "C needs more past forms."
+      && answerOf(sE.id, "next") === "E needs irregular forms."
+      && !JSON.stringify(forChild(sC.id).debrief).includes("E needs")
+      && !JSON.stringify(forChild(sC.id).debrief).includes("pizza"));
+
+  // A debrief saved with the earlier questions keeps its answers.
+  await a(`/api/lessons/${noConsent.id}`, patch({
+    startedAt: at,
+    endedAt: at,
+    debrief: [
+      { promptId: "covered", text: "Shared cover." },
+      { promptId: `c:${sC.id}`, text: "About C." },
+      { promptId: "next", text: "Shared next." },
+    ],
+  }));
+  const earlier = await a(`/api/lessons/${noConsent.id}/group/split`, post({ who: [] }));
+  const earlierC = earlier.json?.lessons?.find((l) => l.studentId === sC.id);
+  check("a debrief saved with the earlier questions keeps its answers",
+    earlierC?.debrief?.find((d) => d.promptId === "struggled")?.text === "About C."
+      && earlierC?.debrief?.find((d) => d.promptId === "covered")?.text === "Shared cover.");
+  check("a group without consent still makes each child's lesson, with no transcript",
+    earlier.json?.lessons?.length === 2 && earlierC?.transcript?.length === 0);
   check("a child's lesson is on their list",
     (await a(`/api/lessons?studentId=${sE.id}`)).json.some((l) => l.id === forChild(sE.id).id));
   check("a group lesson cannot be split twice", (await splitWith(checked)).status === 409);

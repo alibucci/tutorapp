@@ -99,25 +99,43 @@ export async function labelGroupLines(
     labels: z.array(z.object({ index: z.number(), who: z.string() })),
   });
 
-  const parsed = await complete({
-    system: GROUP_SYSTEM,
-    user: [
-      "The children:",
-      ...ids.map((s) => `${s.short} = ${s.name}`),
-      "",
-      "The lines:",
-      ...segments.map((seg, i) => `${i}: ${seg.text}`),
-    ].join("\n"),
-    schema,
-    schemaName: "GroupSpeakerLabels",
-    model: MODEL_FAST,
-    effort: "low",
-    // One short entry per line, and an hour of a lesson is many lines.
-    maxTokens: 24000,
-  });
-
   const byShort = new Map<string, string>(ids.map((s) => [s.short, s.id]));
   byShort.set("tutor", "tutor");
-  const byIndex = new Map(parsed.labels.map((l) => [l.index, byShort.get(l.who) ?? "unknown"]));
+
+  const ask = async () => {
+    const parsed = await complete({
+      system: GROUP_SYSTEM,
+      user: [
+        "The children:",
+        ...ids.map((s) => `${s.short} = ${s.name}`),
+        "",
+        "The lines:",
+        ...segments.map((seg, i) => `${i}: ${seg.text}`),
+      ].join("\n"),
+      schema,
+      schemaName: "GroupSpeakerLabels",
+      model: MODEL_FAST,
+      effort: "low",
+      // One short entry per line, and an hour of a lesson is many lines.
+      maxTokens: 24000,
+    });
+    const byIndex = new Map(parsed.labels.map((l) => [l.index, byShort.get(l.who) ?? "unknown"]));
+    const unknown = segments.filter((_, i) => (byIndex.get(i) ?? "unknown") === "unknown").length;
+    return { byIndex, unknown, returned: parsed.labels.length };
+  };
+
+  // Now and then a whole answer comes back mostly unlabelled from a lesson it
+  // reads perfectly the next time, leaving a child with no lines. Worth one more
+  // go; the numbers go to the log so the cause can be seen. No lesson text.
+  let result = await ask();
+  if (result.unknown > segments.length / 3) {
+    const first = result;
+    console.warn(
+      `[group labels] ${first.unknown}/${segments.length} unknown, ${first.returned} labels returned; asking again`,
+    );
+    const second = await ask();
+    result = second.unknown < first.unknown ? second : first;
+  }
+  const { byIndex } = result;
   return segments.map((seg, i) => ({ ...seg, who: byIndex.get(i) ?? "unknown" }));
 }

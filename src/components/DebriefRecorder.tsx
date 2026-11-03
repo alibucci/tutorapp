@@ -17,6 +17,9 @@ import {
 
 type Phase = "ready" | "running" | "review";
 
+/** One question. In a group lesson it also says which child it is about. */
+type Prompt = { id: string; label: string; child?: string; childName?: string };
+
 /** How often a running debrief is copied to the server. */
 const AUTOSAVE_MS = 5_000;
 
@@ -58,11 +61,15 @@ export function DebriefRecorder({
 }: {
   lesson: Lesson;
   /** Questions of its own: a group lesson asks about each child by name. */
-  prompts?: readonly { id: string; label: string }[];
+  prompts?: readonly Prompt[];
 }) {
   // An intro note asks about the child; a debrief asks about the lesson.
-  const PROMPTS: readonly { id: string; label: string }[] =
+  const PROMPTS: readonly Prompt[] =
     prompts ?? (lesson.kind === "intro" ? INTRO_PROMPTS : DEBRIEF_PROMPTS);
+  // A group's questions are shown one child at a time, under a bar per child:
+  // three questions about someone is easy to face; nine in a list is not.
+  const children = [...new Map(PROMPTS.filter((p) => p.child).map((p) => [p.child, p])).values()];
+  const [activeChild, setActiveChild] = useState(children[0]?.child);
   const router = useRouter();
   const rec = useTutorRecorder();
   const speech = useClipTranscriber(lesson.language);
@@ -149,7 +156,13 @@ export function DebriefRecorder({
       finish();
       return;
     }
+    goTo(next);
+  }
+
+  function goTo(next: number) {
+    if (next === indexRef.current) return;
     void cutClip();
+    setActiveChild(PROMPTS[next].child);
     indexRef.current = next;
     clipStartRef.current = performance.now() - startedAtRef.current;
     heardRef.current = false;
@@ -270,10 +283,12 @@ export function DebriefRecorder({
     setError(null);
     speech.reset();
     boundariesRef.current = [];
-    indexRef.current = 0;
+    // A group starts with whichever child's bar is selected.
+    const first = Math.max(0, PROMPTS.findIndex((p) => p.child === activeChild));
+    indexRef.current = first;
     clipStartRef.current = 0;
     startedAtRef.current = performance.now();
-    setIndex(0);
+    setIndex(first);
     setPhase("running");
     void wakeLock.acquire();
   }
@@ -340,11 +355,33 @@ export function DebriefRecorder({
     router.push(`/lesson/${lesson.id}/review`);
   }
 
+  /** A child's questions are answered once each one has some text. */
+  const childDone = (child: string | undefined) =>
+    PROMPTS.every((p, i) => p.child !== child || Boolean(answers[i]?.text.trim()));
+
+  function pickChild(child: string | undefined) {
+    setActiveChild(child);
+    if (phase !== "running") return;
+    // Back to where this child's answers stop, or their first question.
+    const theirs = PROMPTS.flatMap((p, i) => (p.child === child ? [i] : []));
+    goTo(theirs.find((i) => !answers[i]?.text.trim()) ?? theirs[0]);
+  }
+
+  const childBars = (
+    <ChildBars
+      childPrompts={children}
+      active={activeChild}
+      isDone={childDone}
+      onPick={pickChild}
+    />
+  );
+
   if (phase === "ready") {
     return (
       <div className="space-y-6">
+        {childBars}
         <ol className="space-y-2 card p-5 t-small">
-          {PROMPTS.map((p, i) => (
+          {PROMPTS.filter((p) => !p.child || p.child === activeChild).map((p, i) => (
             <li key={p.id} className="flex gap-3">
               <span className="shrink-0 font-mono t-caption t-muted">{i + 1}</span>
               <span>{p.label}</span>
@@ -386,11 +423,14 @@ export function DebriefRecorder({
       .filter((seg) => seg.tag === prompt.id)
       .map((seg) => seg.text)
       .join(" ");
+    const theirs = PROMPTS.filter((p) => p.child === prompt.child);
+    const upNext = PROMPTS[index + 1];
     return (
       <div className="stack-lg">
+        {childBars}
         <div className="card p-8 text-center">
           <p className="t-eyebrow">
-            {index + 1} of {PROMPTS.length}
+            {theirs.indexOf(prompt) + 1} of {theirs.length}
           </p>
           <p className="mt-3 t-title">
             {prompt.label}
@@ -427,7 +467,11 @@ export function DebriefRecorder({
         <div className="flex justify-center">
           {/* On the last prompt the same button finishes. */}
           <button onClick={() => advance()} className="btn btn-primary btn-lg">
-            {index === PROMPTS.length - 1 ? "Finish" : "Next prompt"}
+            {!upNext
+              ? "Finish"
+              : upNext.child !== prompt.child
+                ? `Next: ${upNext.childName}`
+                : "Next prompt"}
           </button>
         </div>
       </div>
@@ -473,7 +517,9 @@ export function DebriefRecorder({
           : "Transcribed from what you said. Fix anything the recogniser got wrong - it goes straight into the summary."}
       </p>
 
-      {PROMPTS.map((prompt, i) => (
+      {childBars}
+
+      {PROMPTS.map((prompt, i) => prompt.child && prompt.child !== activeChild ? null : (
         <label key={prompt.id} className="block">
           <span className="label">{prompt.label}</span>
           <textarea
@@ -491,6 +537,17 @@ export function DebriefRecorder({
       ))}
 
       {error && <p className="note note-warn">{error}</p>}
+
+      {children.some((c) => !childDone(c.child)) && !transcribing && (
+        <p className="note note-quiet">
+          Still empty for{" "}
+          {children
+            .filter((c) => !childDone(c.child))
+            .map((c) => c.childName)
+            .join(", ")}
+          . You can save anyway: their summary will have less to go on.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -526,5 +583,41 @@ export function DebriefRecorder({
         onCancel={() => setConfirmRestart(false)}
       />
     </div>
+  );
+}
+
+/** One bar per child: green once answered, amber for the one on screen. */
+function ChildBars({
+  childPrompts,
+  active,
+  isDone,
+  onPick,
+}: {
+  childPrompts: Prompt[];
+  active: string | undefined;
+  isDone: (child: string | undefined) => boolean;
+  onPick: (child: string | undefined) => void;
+}) {
+  if (childPrompts.length === 0) return null;
+  return (
+    <nav
+      aria-label="Children"
+      className="steps"
+      style={{ gridTemplateColumns: `repeat(${childPrompts.length}, minmax(0, 1fr))` }}
+    >
+      {childPrompts.map((c) => (
+        <button
+          key={c.child}
+          type="button"
+          aria-current={c.child === active ? "step" : undefined}
+          onClick={() => onPick(c.child)}
+          className={`step cursor-pointer text-left ${
+            c.child === active ? "step-next" : isDone(c.child) ? "step-done" : ""
+          }`}
+        >
+          <span className="truncate">{c.childName}</span>
+        </button>
+      ))}
+    </nav>
   );
 }

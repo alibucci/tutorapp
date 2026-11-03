@@ -108,7 +108,7 @@ function groupTodo(lesson: Lesson): Todo | null {
     return todo(base, "Finish the group lesson", `${lesson.title} · it was interrupted`);
   }
   if (lesson.endedAt && lesson.debrief.length === 0) {
-    return todo(`${base}/debrief`, "Record the group debrief", `${lesson.title} · a few words on each child`);
+    return todo(`${base}/debrief`, "Record the group debrief", `${lesson.title} · three questions on each child`);
   }
   if (lesson.debrief.length > 0) {
     return todo(`${base}/group`, "Check who said what", `${lesson.title} · group lesson`);

@@ -428,23 +428,24 @@ export const INTRO_PROMPTS = [
 ] as const;
 
 /**
- * The questions after a group lesson: what everyone did, then a line about each
- * child. Each answer becomes "what did they struggle with" on that child's own
- * lesson. The id must fit a transcript tag (40 characters).
+ * The questions after a group lesson: three about each child, none shared. An
+ * answer belongs to one child from the moment it is given, so what is said about
+ * one cannot reach another's summary or parents. Ids must fit a transcript tag
+ * (40 characters).
  */
 export function groupPrompts(students: { id: string; name: string }[]) {
-  return [
-    { id: "covered", label: "What did you cover?" },
-    ...students.map((s) => ({
-      id: childPromptId(s.id),
-      label: `How did ${s.name} do? What was hard for them?`,
-    })),
-    { id: "next", label: "What should happen next lesson?" },
-  ];
+  return students.flatMap((s) => {
+    const ids = childPromptIds(s.id);
+    return [
+      { id: ids.worked, label: `What did ${s.name} work on?`, child: s.id, childName: s.name },
+      { id: ids.hard, label: `What was hard for ${s.name}?`, child: s.id, childName: s.name },
+      { id: ids.next, label: `What should ${s.name} do next?`, child: s.id, childName: s.name },
+    ];
+  });
 }
 
-export function childPromptId(studentId: string): string {
-  return `c:${studentId}`;
+export function childPromptIds(studentId: string) {
+  return { worked: `w:${studentId}`, hard: `h:${studentId}`, next: `n:${studentId}` };
 }
 
 /** Every prompt the app asks, whichever set it came from. */
