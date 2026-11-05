@@ -137,8 +137,17 @@ for (const [label, path, init] of [
 ]) {
   check(`tutor B cannot reach tutor A's ${label}`, (await b(path, init)).status === 404);
 }
-check("tutor B cannot open the admin API",
-  (await b("/api/tutors", post({ name: "X", email: "x@y.z" }))).status === 403);
+{
+  const refused = await b("/api/tutors", post({ name: "X", email: "x@y.z" }));
+  check("tutor B cannot open the admin API", refused.status === 403);
+  check("the refusal says who this browser is signed in as",
+    refused.json?.error?.includes("Smoketwo") && refused.json.error.includes("administrator"),
+    refused.json?.error);
+  const signedOut = await anon("/api/tutors", post({ name: "X", email: "x@y.z" }));
+  check("signed out, the refusal says to sign in",
+    signedOut.status === 403 && signedOut.json?.error?.includes("no longer signed in"),
+    signedOut.json?.error);
+}
 
 // --- hardening ----------------------------------------------------------------
 check("a huge body is refused before it is read",

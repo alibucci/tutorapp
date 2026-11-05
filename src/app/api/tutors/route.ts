@@ -1,16 +1,12 @@
 import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
-import { getSession, hashPassword, temporaryPassword } from "@/lib/auth";
+import { getSession, hashPassword, notAdminMessage, temporaryPassword } from "@/lib/auth";
 import { createTutor, getTutorByEmail, listTutors } from "@/lib/store";
 
-async function guard() {
-  const session = await getSession();
-  return session?.role === "admin" ? session : null;
-}
-
 export async function GET() {
-  if (!(await guard())) {
-    return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+  const session = await getSession();
+  if (session?.role !== "admin") {
+    return NextResponse.json({ error: notAdminMessage(session) }, { status: 403 });
   }
   const tutors = await listTutors();
   // Never let a hash off the server.
@@ -27,8 +23,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await guard())) {
-    return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+  const session = await getSession();
+  if (session?.role !== "admin") {
+    return NextResponse.json({ error: notAdminMessage(session) }, { status: 403 });
   }
 
   const parsed = await readJson<{

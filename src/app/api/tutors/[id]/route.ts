@@ -1,6 +1,6 @@
 import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
-import { getSession, hashPassword, temporaryPassword } from "@/lib/auth";
+import { getSession, hashPassword, notAdminMessage, temporaryPassword } from "@/lib/auth";
 import { getTutor, updateTutor } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -8,7 +8,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(request: Request, { params }: Params) {
   const session = await getSession();
   if (session?.role !== "admin") {
-    return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+    return NextResponse.json({ error: notAdminMessage(session) }, { status: 403 });
   }
 
   const { id } = await params;

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useIssuePassword } from "@/components/IssuedPasswords";
 
 type Row = {
   id: string;
@@ -19,90 +20,71 @@ export function TutorAdmin({ tutors }: { tutors: Row[] }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Shown once and never again - the superadmin has to pass it on now. */
-  const [issued, setIssued] = useState<{ email: string; password: string } | null>(
-    null,
-  );
-  const [copiedIssued, setCopiedIssued] = useState(false);
+  /** A reset or suspension that was refused: it has no form to show it in. */
+  const [listError, setListError] = useState<string | null>(null);
+  const issuePassword = useIssuePassword();
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
 
-    const res = await fetch("/api/tutors", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email }),
-    });
-
-    if (!res.ok) {
-      const body = (await res.json()) as { error?: string };
-      setError(body.error ?? "Could not create the account.");
+    try {
+      const res = await fetch("/api/tutors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        email?: string;
+        password?: string;
+        error?: string;
+      };
+      if (!res.ok || !body.email || !body.password) {
+        // No refresh here: if this browser has since signed in as someone
+        // else, a refresh would leave the page and take the reason with it.
+        setError(body.error ?? "Could not create the account.");
+        return;
+      }
+      issuePassword({ email: body.email, password: body.password });
+      setName("");
+      setEmail("");
+      router.refresh();
+    } catch {
+      setError("Could not reach the server. Check the connection and try again.");
+    } finally {
       setBusy(false);
-      return;
     }
-
-    const body = (await res.json()) as { email: string; password: string };
-    setIssued(body);
-    setName("");
-    setEmail("");
-    setBusy(false);
-    router.refresh();
   }
 
   async function patch(id: string, payload: Record<string, unknown>) {
-    const res = await fetch(`/api/tutors/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = (await res.json()) as { password?: string };
-    if (body.password) {
-      const row = tutors.find((t) => t.id === id);
-      setIssued({ email: row?.email ?? "", password: body.password });
+    setListError(null);
+    try {
+      const res = await fetch(`/api/tutors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        password?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setListError(body.error ?? "That did not work. Try again.");
+        return;
+      }
+      if (body.password) {
+        const row = tutors.find((t) => t.id === id);
+        issuePassword({ email: row?.email ?? "", password: body.password });
+      }
+      router.refresh();
+    } catch {
+      setListError("Could not reach the server. Check the connection and try again.");
     }
-    router.refresh();
   }
 
   return (
     <div className="stack-lg">
-      {issued && (
-        <div className="card border-accent bg-accent-soft p-5">
-          <p className="t-subtitle">
-            Password for {issued.email}
-          </p>
-          <p className="mt-2 font-mono t-title select-all">{issued.password}</p>
-          <p className="hint">
-            Copy it now - it is shown only this once. It keeps working until the
-            tutor changes it, which they are offered when they first sign in.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              onClick={() =>
-                void navigator.clipboard
-                  .writeText(
-                    `Sign in at ${window.location.origin}/login\nEmail: ${issued.email}\nPassword: ${issued.password}`,
-                  )
-                  .then(() => setCopiedIssued(true))
-              }
-              className="btn btn-primary"
-            >
-              {copiedIssued ? "Copied" : "Copy sign-in message"}
-            </button>
-            <button
-              onClick={() => {
-                setIssued(null);
-                setCopiedIssued(false);
-              }}
-              className="btn btn-quiet"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-
       <form onSubmit={create} className="card space-y-4 p-5">
         <p className="t-subtitle">Add a tutor</p>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -131,6 +113,8 @@ export function TutorAdmin({ tutors }: { tutors: Row[] }) {
           {busy ? "Creating…" : "Create account"}
         </button>
       </form>
+
+      {listError && <p className="note note-warn">{listError}</p>}
 
       {tutors.length === 0 ? (
         <p className="card border-dashed p-8 text-center t-small t-muted">

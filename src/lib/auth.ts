@@ -169,6 +169,17 @@ export async function requireAdmin(): Promise<Session> {
   return session;
 }
 
+/**
+ * Why the admin API said no, in words the admin can act on. The session cookie
+ * is shared by every tab, so signing in as a tutor in one tab quietly turns an
+ * admin page open in another into a tutor's: it still looks like the admin's.
+ */
+export function notAdminMessage(session: Session | null): string {
+  return session
+    ? `This browser is now signed in as ${session.name}, not as the administrator. Sign out, sign in as the administrator, and try again.`
+    : "This browser is no longer signed in. Sign in as the administrator and try again.";
+}
+
 // --- the superadmin lives in the environment, not in the store -------------
 
 export function adminCredentials(): { email: string; password: string } | null {

@@ -7,16 +7,18 @@ export function AppHeader({
   context,
   action,
   accountHref,
+  homeHref = "/",
 }: {
   name: string;
   context?: string;
   action?: { href: string; label: string };
   accountHref?: string;
+  homeHref?: string;
 }) {
   return (
     <header className="border-b border-line bg-surface">
       <div className="page page-wide flex items-center justify-between gap-4 py-3">
-        <Link href="/" className="flex min-w-0 items-center gap-2.5">
+        <Link href={homeHref} className="flex min-w-0 items-center gap-2.5">
           <span
             aria-hidden
             className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent text-sm font-bold text-white"
