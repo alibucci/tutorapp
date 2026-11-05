@@ -2,6 +2,7 @@ import Link from "next/link";
 import { gameFonts } from "@/lib/fonts";
 import { gameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
 import { gameScore, homeworkDone, homeworkImageUrl } from "@/lib/homework";
+import { SUMS_PER_GAME } from "@/lib/math";
 import { listLessons } from "@/lib/store";
 import type { Lesson, Skill, Student } from "@/lib/types";
 
@@ -24,11 +25,14 @@ import type { Lesson, Skill, Student } from "@/lib/types";
 export async function StudentHome({
   student,
   questHref,
+  mathHref,
   linkKey,
 }: {
   student: Student;
   /** Where one lesson's homework opens, for this way of getting in. */
   questHref: (lessonId: string) => string;
+  /** Where math practice opens, for this way of getting in. */
+  mathHref: string;
   /** The private link's key, when the child came in by link. */
   linkKey?: string;
 }) {
@@ -58,7 +62,9 @@ export async function StudentHome({
                 : "All quests done. Nice work!"
               : first
                 ? "Here's what to work on."
-                : "Nothing to do right now."}
+                : student.math?.on
+                  ? "Ready for some math?"
+                  : "Nothing to do right now."}
         </h1>
       </header>
 
@@ -90,6 +96,27 @@ export async function StudentHome({
         </section>
       )}
 
+      {student.math?.on && (
+        // Below any homework: that comes from the lesson and has a tutor
+        // waiting on it. Sums are there whenever the child wants them.
+        <section>
+          <Link
+            href={mathHref}
+            className={`game-entry game-entry-${skinOf(style)} ${themeOf(style)} ${gameFonts}`}
+            style={paletteVars(style) as React.CSSProperties}
+          >
+            <span>
+              <span className="game-entry-kicker">{style.name} math</span>
+              <span className="game-entry-title">Math practice</span>
+              <span className="game-entry-meta">
+                {SUMS_PER_GAME} sums · Level {student.math.level}
+              </span>
+            </span>
+            <span aria-hidden className="game-entry-title">→</span>
+          </Link>
+        </section>
+      )}
+
       {done.length > 0 && (
         // What they have actually won. Same frame the level bar used, because
         // that is the spot on the screen a child looks at first.
@@ -111,7 +138,7 @@ export async function StudentHome({
         </section>
       )}
 
-      {!first && done.length === 0 && quests.length === 0 && (
+      {!first && done.length === 0 && quests.length === 0 && !student.math?.on && (
         <p className="empty">
           Nothing here yet. It fills in after your next lesson.
         </p>

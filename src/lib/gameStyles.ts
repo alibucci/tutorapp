@@ -38,6 +38,12 @@ export type GameStyle = {
     accent: string;
     accentInk: string;
   };
+  /**
+   * The two things a child counts in math practice, one for each side of a
+   * sum. They have to look different at a glance, and from each other in a
+   * row of ten, so 8 + 5 shows where one number stops.
+   */
+  mathItems: [string, string];
   /** A hand-made skin in globals.css. Without one, the palette skin is used. */
   skin?: "minecraft";
 };
@@ -56,6 +62,7 @@ export const GAME_STYLES: GameStyle[] = [
       submit: "Craft it",
       cheer: "Achievement get!",
     },
+    mathItems: ["/game/minecraft/dirt.svg", "/game/minecraft/diamond-ore.svg"],
     palette: {
       ground: "#3b2a1d",
       panel: "#c6c6c6",
@@ -78,6 +85,7 @@ export const GAME_STYLES: GameStyle[] = [
       submit: "Finish the story",
       cheer: "Well done!",
     },
+    mathItems: ["/game/fairytale/crown.svg", "/game/fairytale/mushroom.svg"],
     palette: {
       ground: "#3b2f6b",
       panel: "#fffaf0",
@@ -100,6 +108,7 @@ export const GAME_STYLES: GameStyle[] = [
       cheer: "Slam dunk!",
       heading: "Game day!",
     },
+    mathItems: ["/game/basketball/ball.svg", "/game/basketball/ball-blue.svg"],
     palette: {
       ground: "#14213d",
       panel: "#fff7ed",
@@ -125,6 +134,7 @@ export const GAME_STYLES: GameStyle[] = [
       cheer: "Great detective work!",
       heading: "New case!",
     },
+    mathItems: ["/game/zootopia/paw-ink.svg", "/game/zootopia/badge.svg"],
     palette: {
       ground: "#0f3d3e",
       panel: "#fdf6e9",
@@ -150,6 +160,7 @@ export const GAME_STYLES: GameStyle[] = [
       cheer: "POW!",
       heading: "Hero alert!",
     },
+    mathItems: ["/game/avengers/star.svg", "/game/avengers/emblem.svg"],
     palette: {
       ground: "#14162b",
       panel: "#fff8e7",

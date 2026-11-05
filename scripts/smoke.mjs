@@ -384,6 +384,65 @@ check("parent sees the note after approval", !parentAfter.includes("No weekly no
   check("the admin can open a tutor", tutorPage.status === 200 && tutorPage.text.includes("Smoke Student A"));
 }
 
+// --- math practice ----------------------------------------------------------
+// Sums the page can send: right or wrong answers to a real game at that level.
+{
+  const sM = (await a("/api/students", post({ name: "Smoke Student Math" }))).json;
+  const kid = (await a(`/api/students/${sM.id}`)).json;
+  const sums = (level) => {
+    // The first ten sums of each level, listed by hand so this does not lean on the code it checks.
+    if (level === 1) return [[1,1],[1,2],[2,1],[1,3],[3,1],[2,2],[1,4],[4,1],[2,3],[3,2]].map(([x, y]) => ({ a: x, op: "+", b: y }));
+    if (level === 2) return [[1,1],[2,2],[3,3],[4,4],[5,5],[1,2],[2,3],[3,4],[4,5],[1,3]].map(([x, y]) => ({ a: x, op: "+", b: y }));
+    throw new Error("not listed");
+  };
+  const play = (level, wrong = 0) => sums(level).map((s, i) => ({ ...s, answer: s.a + s.b + (i < wrong ? 1 : 0) }));
+  const send = (who, body) => who("/api/math", post({ key: kid.studentKey, ...body }));
+
+  check("math practice is off until the tutor turns it on",
+    (await anon(`/s/${kid.studentKey}/math`)).status === 404
+      && (await send(anon, { level: 1, replies: play(1) })).status === 403);
+  check("the tutor can preview it while it is off",
+    (await a(`/student/${sM.id}/math`)).status === 200);
+  check("tutor B cannot turn on tutor A's child's math",
+    (await b(`/api/students/${sM.id}`, patch({ math: { on: true } }))).status === 404);
+  check("a made-up math level is refused",
+    (await a(`/api/students/${sM.id}`, patch({ math: { on: true, level: 9 } }))).status === 400);
+
+  const on = await a(`/api/students/${sM.id}`, patch({ math: { on: true } }));
+  check("the tutor turns math on, starting at level 1", on.json?.math?.on === true && on.json.math.level === 1);
+  check("the child's page offers it", (await anon(`/s/${kid.studentKey}`)).text.includes("Math practice"));
+  check("the child's game opens", (await anon(`/s/${kid.studentKey}/math`)).status === 200);
+
+  check("a stranger cannot save a game without the key",
+    (await anon("/api/math", post({ level: 1, replies: play(1) }))).status === 403);
+  check("the tutor's own session does not save a game",
+    (await send(a, { level: 1, replies: play(1) })).status === 403);
+  check("a game with too few sums is refused",
+    (await send(anon, { level: 1, replies: play(1).slice(0, 3) })).status === 400);
+  check("sums from another level are refused",
+    (await send(anon, { level: 1, replies: play(2) })).status === 400);
+  const claimed = await send(anon, { level: 1, replies: play(1, 7), right: 10, total: 10 });
+  check("the server does its own marking, whatever the page claims",
+    claimed.json?.right === 3 && claimed.json.total === 10, claimed.text.slice(0, 120));
+  check("half wrong or worse stays at the bottom level", claimed.json?.level === 1);
+
+  const up = await send(anon, { level: 1, replies: play(1) });
+  check("nearly all right moves the child up a level", up.json?.right === 10 && up.json.level === 2);
+  const down = await send(anon, { level: 2, replies: play(2, 6) });
+  check("half wrong moves the child back down", down.json?.right === 4 && down.json.level === 1);
+  const stale = await send(anon, { level: 2, replies: play(2) });
+  check("an old game at another level does not move the child", stale.json?.level === 1);
+
+  const parent = await anon(`/p/${kid.parentKey}`);
+  check("the parent sees how the sums are going",
+    parent.text.includes("Math practice") && parent.text.includes("Hardest lately"));
+  check("the tutor sees it too", (await a(`/student/${sM.id}`)).text.includes("Hardest lately"));
+  const off = await a(`/api/students/${sM.id}`, patch({ math: { on: false } }));
+  check("turning it off keeps the games", off.json?.math?.on === false && off.json.math.games.length === 4);
+  check("off again, the game closes", (await anon(`/s/${kid.studentKey}/math`)).status === 404);
+  check("off again, games are refused", (await send(anon, { level: 1, replies: play(1) })).status === 403);
+}
+
 // --- recordings are not kept ----------------------------------------------
 check("there is no audio upload any more",
   (await a(`/api/lessons/${lessonA.id}/audio`, { method: "POST" })).status === 404);

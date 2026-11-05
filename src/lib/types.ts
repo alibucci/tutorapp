@@ -226,6 +226,26 @@ export type Student = {
    * the lessons and homework are kept, and restoring brings it all back.
    */
   archivedAt?: string;
+  /** Sums in the child's theme, apart from any lesson. Off until the tutor says. */
+  math?: MathPractice;
+};
+
+export type MathPractice = {
+  on: boolean;
+  /** Which level the next game is drawn from. See MATH_LEVELS. */
+  level: number;
+  games: MathGame[];
+};
+
+/** One finished game, marked by the server. */
+export type MathGame = {
+  at: string;
+  /** The level it was played at, which may not be the child's level now. */
+  level: number;
+  right: number;
+  total: number;
+  /** The sums missed on the first go, such as "8 + 5". */
+  wrong: string[];
 };
 
 /**

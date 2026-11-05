@@ -2,6 +2,7 @@ import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
 import { isGameStyle } from "@/lib/gameStyles";
+import { isMathLevel } from "@/lib/math";
 import { accessKey, updateStudent } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -36,6 +37,7 @@ export async function PATCH(request: Request, { params }: Params) {
     rotateLinks?: boolean;
     gameStyle?: string;
     archived?: boolean;
+    math?: { on?: boolean; level?: number };
   }>(request, LIMIT.small);
   if (parsed instanceof Response) return parsed;
   const body = parsed;
@@ -75,9 +77,29 @@ export async function PATCH(request: Request, { params }: Params) {
     patch.parentKey = accessKey();
   }
 
-  if (Object.keys(patch).length === 0) {
+  const math = body.math;
+  if (math?.on !== undefined && typeof math.on !== "boolean") {
+    return NextResponse.json({ error: "Math practice is on or off." }, { status: 400 });
+  }
+  if (math?.level !== undefined && !isMathLevel(math.level)) {
+    return NextResponse.json({ error: "Unknown math level." }, { status: 400 });
+  }
+
+  if (Object.keys(patch).length === 0 && !math) {
     return NextResponse.json({ error: "Nothing to change." }, { status: 400 });
   }
 
-  return NextResponse.json(await updateStudent(id, patch));
+  return NextResponse.json(
+    // Against the record as it is now: the child may be saving a game.
+    await updateStudent(id, (current) => ({
+      ...patch,
+      ...(math && {
+        math: {
+          on: math.on ?? current.math?.on ?? false,
+          level: math.level ?? current.math?.level ?? 1,
+          games: current.math?.games ?? [],
+        },
+      }),
+    })),
+  );
 }

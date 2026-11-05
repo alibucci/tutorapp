@@ -2082,3 +2082,104 @@ textarea.field { line-height: var(--leading-normal); }
   border-radius: 0 !important;
   background: url("/game/avengers/emblem.svg") center / contain no-repeat !important;
 }
+
+/* ---------------------------------------------------------------------------
+   Math practice. The things to count come from `mathItems` in gameStyles.ts;
+   the colours of the panel, buttons and verdict come from the skin as usual.
+   --------------------------------------------------------------------------- */
+
+.math-sum {
+  margin-top: var(--space-2);
+  text-align: center;
+  font-size: 2.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.game-minecraft .math-sum {
+  font-family: var(--font-pixel), monospace;
+  font-size: 1.5rem;
+  line-height: 1.6;
+}
+
+.math-picture { margin-top: var(--space-3); }
+
+.math-groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-3);
+}
+/* Too many for one line: above and below the sign, not wrapped around it. */
+.math-groups-stacked { flex-direction: column; gap: var(--space-1); }
+.math-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  max-width: calc(5 * 2.5rem + 4 * 4px);
+}
+.math-group .math-item { width: 2.5rem; }
+.math-plus { font-size: 1.75rem; font-weight: 800; }
+
+/* Rows of ten, the way a child would lay them out on a table. */
+.math-tens {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+  max-width: 25rem;
+  margin-inline: auto;
+}
+
+.math-item {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.game-minecraft .math-item { image-rendering: pixelated; }
+.math-item-empty {
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.08);
+}
+.math-item-gone { opacity: 0.35; }
+.math-item-gone::after {
+  content: "";
+  position: absolute;
+  inset: 44% -6%;
+  border-radius: 2px;
+  background: #b91c1c;
+  transform: rotate(-45deg);
+}
+.math-count {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  min-width: 1.05em;
+  padding: 0 2px;
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-family: system-ui, sans-serif;
+  line-height: 1.3;
+  text-align: center;
+  color: #fff;
+  background: rgb(0 0 0 / 0.78);
+}
+
+.math-options {
+  display: grid;
+  grid-template-columns: repeat(var(--math-options), minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.math-options .game-option {
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 1.625rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.game-option:disabled { cursor: default; }
