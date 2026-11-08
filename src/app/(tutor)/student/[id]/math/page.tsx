@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { MathGame } from "@/components/MathGame";
 import { studentFor } from "@/lib/access";
-import { gameStyle } from "@/lib/gameStyles";
+import { styleFor } from "@/lib/gameStyles";
 import { makeGame } from "@/lib/math";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export default async function MathPreview({
   const level = student.math?.level ?? 1;
   return (
     <MathGame
-      style={gameStyle(student.gameStyle)}
+      style={styleFor(student)}
       level={level}
       problems={makeGame(level)}
       backHref={`/student/${id}`}

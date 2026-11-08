@@ -4,11 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /** Child and parent share one sign-in; this is how each finds their page. */
-export function FamilyTabs({ studentName }: { studentName: string }) {
+export function FamilyTabs({
+  studentName,
+  parent = true,
+}: {
+  studentName: string;
+  /** False for an adult learner, who signs in for themselves. */
+  parent?: boolean;
+}) {
   const path = usePathname();
   const tabs = [
     { href: "/me", label: studentName, on: path.startsWith("/me") },
-    { href: "/family", label: "For parents", on: path.startsWith("/family") },
+    ...(parent ? [{ href: "/family", label: "For parents", on: path.startsWith("/family") }] : []),
   ];
   return (
     <nav aria-label="Pages" className="segmented">

@@ -3,11 +3,17 @@ import { homeworkFor } from "@/lib/access";
 import { LIMIT, readJson } from "@/lib/http";
 import { noticeHomeworkDone } from "@/lib/notices";
 import { updateLesson } from "@/lib/store";
-import type { Exercise, ExerciseKind, RoundAnswer, RoundReply } from "@/lib/types";
+import { answered, saidRight } from "@/lib/speaking";
+import { EXERCISE_KINDS, type Exercise, type RoundAnswer, type RoundReply } from "@/lib/types";
 
 type Params = { params: Promise<{ id: string }> };
 
-const KINDS: ExerciseKind[] = ["choose", "build", "catch"];
+const KINDS = EXERCISE_KINDS;
+
+/** What a learner said or typed, kept to a sensible length. */
+function spoken(reply: RoundReply): string | null {
+  return typeof reply === "string" ? reply.trim().slice(0, 400) : null;
+}
 
 /**
  * Mark one round.
@@ -36,6 +42,29 @@ function mark(exercise: Exercise, index: number, reply: RoundReply): RoundAnswer
       answered: given,
       right: given === round.answer.join(" "),
     };
+  }
+  if (exercise.kind === "words") {
+    const round = exercise.rounds[index];
+    if (!round || typeof reply !== "number") return null;
+    return {
+      asked: round.meaning,
+      answered: round.options[reply] ?? "(nothing)",
+      right: reply === round.answer,
+    };
+  }
+  if (exercise.kind === "repeat" || exercise.kind === "dialogue") {
+    const target =
+      exercise.kind === "repeat" ? exercise.rounds[index]?.sentence : exercise.rounds[index]?.you;
+    const said = spoken(reply);
+    if (!target || said === null) return null;
+    return { asked: target, answered: said || "(nothing)", right: saidRight(target, said) };
+  }
+  if (exercise.kind === "speak") {
+    const round = exercise.rounds[index];
+    const said = spoken(reply);
+    if (!round || said === null) return null;
+    // No one right answer: a real attempt in English is what counts.
+    return { asked: round.question, answered: said || "(nothing)", right: answered(said) };
   }
   const round = exercise.rounds[index];
   if (!round || typeof reply !== "boolean") return null;

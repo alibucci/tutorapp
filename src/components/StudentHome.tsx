@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { gameFonts } from "@/lib/fonts";
-import { gameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
+import { paletteVars, skinOf, styleFor, themeOf } from "@/lib/gameStyles";
 import { gameScore, homeworkDone, homeworkImageUrl } from "@/lib/homework";
 import { SUMS_PER_GAME } from "@/lib/math";
 import { listLessons } from "@/lib/store";
@@ -41,7 +41,7 @@ export async function StudentHome({
   );
   const open = quests.filter((l) => !homeworkDone(l.homework));
   const finished = quests.filter((l) => homeworkDone(l.homework));
-  const style = gameStyle(student.gameStyle);
+  const style = styleFor(student);
 
   const working = student.skills.filter((s) => s.status !== "solid").slice(0, 3);
   const done = student.skills.filter((s) => s.status === "solid");
@@ -54,12 +54,20 @@ export async function StudentHome({
         <h1 className="t-display mt-2">
           {open.length
             ? open.length === 1
-              ? "A new quest is waiting."
-              : `${open.length} quests are waiting.`
+              ? style.plain
+                ? "New homework is waiting."
+                : "A new quest is waiting."
+              : style.plain
+                ? `${open.length} homeworks are waiting.`
+                : `${open.length} quests are waiting.`
             : finished.length
               ? first
-                ? "Quests done! Here's what's next."
-                : "All quests done. Nice work!"
+                ? style.plain
+                  ? "Homework done. Here's what's next."
+                  : "Quests done! Here's what's next."
+                : style.plain
+                  ? "All homework done."
+                  : "All quests done. Nice work!"
               : first
                 ? "Here's what to work on."
                 : student.math?.on
@@ -78,13 +86,19 @@ export async function StudentHome({
               style={paletteVars(style) as React.CSSProperties}
             >
               <span>
-                <span className="game-entry-kicker">{style.name} homework</span>
+                <span className="game-entry-kicker">
+                  {style.plain ? "Homework" : `${style.name} homework`}
+                </span>
                 <span className="game-entry-title">
                   {lesson.homework?.imageFile
                     ? "Describe the picture"
-                    : `${lesson.homework?.exercises?.length ?? 0} quick ${
-                        lesson.homework?.exercises?.length === 1 ? "game" : "games"
-                      }`}
+                    : style.plain
+                      ? `${lesson.homework?.exercises?.length ?? 0} ${
+                          lesson.homework?.exercises?.length === 1 ? "task" : "tasks"
+                        }`
+                      : `${lesson.homework?.exercises?.length ?? 0} quick ${
+                          lesson.homework?.exercises?.length === 1 ? "game" : "games"
+                        }`}
                 </span>
                 <span className="game-entry-meta">
                   From {lesson.title} · {taskCount(lesson)}
@@ -159,7 +173,7 @@ export async function StudentHome({
 
       {finished.length > 0 && (
         <section>
-          <h2 className="t-eyebrow mb-3">Quests you have done</h2>
+          <h2 className="t-eyebrow mb-3">{style.plain ? "Done" : "Quests you have done"}</h2>
           <ul className="space-y-2.5">
             {finished.map((lesson) => {
               const src = homeworkImageUrl(lesson, linkKey);
@@ -188,7 +202,7 @@ export async function StudentHome({
                           : taskCount(lesson)}
                       </span>
                       <span className="mt-1 block t-small font-semibold text-accent">
-                        Play again →
+                        {style.plain ? "Open again →" : "Play again →"}
                       </span>
                     </span>
                   </Link>

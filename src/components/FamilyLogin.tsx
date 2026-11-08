@@ -19,11 +19,15 @@ export function FamilyLogin({
   studentId,
   studentName,
   username,
+  parent = true,
 }: {
   studentId: string;
   studentName: string;
   username?: string;
+  /** False for an adult learner, who signs in for themselves. */
+  parent?: boolean;
 }) {
+  const who = parent ? `${studentName} and their parent are` : `${studentName} is`;
   const router = useRouter();
   const [chosen, setChosen] = useState(() => suggestUsername(studentName));
   const [busy, setBusy] = useState(false);
@@ -86,12 +90,12 @@ export function FamilyLogin({
     if (!issued) return;
     const url = `${window.location.origin}/login`;
     const text = [
-      `${studentName} 的作业和每周学习报告：`,
+      parent ? `${studentName} 的作业和每周学习报告：` : "你的作业：",
       url,
       `用户名：${issued.username}`,
       `密码：${issued.password}`,
       "",
-      `${studentName}'s homework and your weekly notes:`,
+      parent ? `${studentName}'s homework and your weekly notes:` : "Your homework:",
       url,
       `Username: ${issued.username}`,
       `Password: ${issued.password}`,
@@ -107,10 +111,11 @@ export function FamilyLogin({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="t-title">Family sign-in</h2>
+        <h2 className="t-title">{parent ? "Family sign-in" : "Sign-in"}</h2>
         <p className="t-small t-muted mt-1">
-          One sign-in for {studentName} and their parent. Inside there are two
-          tabs: homework and goals for {studentName}, weekly notes for the parent.
+          {parent
+            ? `One sign-in for ${studentName} and their parent. Inside there are two tabs: homework and goals for ${studentName}, weekly notes for the parent.`
+            : `${studentName}'s own sign-in, for their homework and goals.`}
         </p>
       </div>
 
@@ -198,7 +203,7 @@ export function FamilyLogin({
       <ConfirmDialog
         open={confirm === "reset"}
         title="Reset the family's password?"
-        body={`${studentName} and their parent are signed out on every phone straight away. You get a new password to send them.`}
+        body={`${who} signed out on every phone straight away. You get a new password to send.`}
         confirmLabel="Reset password"
         cancelLabel="Keep the old one"
         onConfirm={() => void issue()}
@@ -207,7 +212,7 @@ export function FamilyLogin({
       <ConfirmDialog
         open={confirm === "remove"}
         title="Remove the family's sign-in?"
-        body={`${studentName} and their parent are signed out on every phone and cannot sign in again until you make a new one.`}
+        body={`${who} signed out on every phone and cannot sign in again until you make a new one.`}
         confirmLabel="Remove"
         cancelLabel="Keep it"
         onConfirm={() => void remove()}

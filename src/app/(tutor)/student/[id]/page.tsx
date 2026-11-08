@@ -4,6 +4,9 @@ import { ArchiveStudent } from "@/components/ArchiveStudent";
 import { FamilyLogin } from "@/components/FamilyLogin";
 import { IntroNoteButton } from "@/components/IntroNoteButton";
 import { MathPanel } from "@/components/MathPanel";
+import { ProfilePanel } from "@/components/ProfilePanel";
+import { styleFor } from "@/lib/gameStyles";
+import { hasParent } from "@/lib/profile";
 import { MathSummary } from "@/components/MathSummary";
 import { GameStylePicker } from "@/components/GameStylePicker";
 import { ReportsPanel } from "@/components/ReportsPanel";
@@ -55,7 +58,7 @@ export default async function StudentPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <GameStylePicker studentId={student.id} value={student.gameStyle} />
+          <GameStylePicker studentId={student.id} value={student.gameStyle} ownName={student.customStyle?.name} />
           <span className="tag tag-quiet min-h-9 px-3 t-small">
             {student.recordingConsent ? "Both voices recorded" : "Tutor's voice only"}
           </span>
@@ -67,6 +70,16 @@ export default async function StudentPage({
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
       <div className="stack-lg min-w-0">
+      <ProfilePanel
+        // Saved values in the key: a save from elsewhere starts the form again.
+        key={JSON.stringify(student.profile ?? {})}
+        studentId={student.id}
+        studentName={student.name}
+        profile={student.profile}
+        themeName={styleFor(student).name}
+        ownTheme={student.gameStyle === "custom" && Boolean(student.customStyle)}
+      />
+
       <section className="space-y-3">
         <h2 className="t-title">Working on</h2>
         <SkillList skills={student.skills} />
@@ -118,6 +131,7 @@ export default async function StudentPage({
         studentId={student.id}
         studentName={student.name}
         username={student.login?.username}
+        parent={hasParent(student)}
       />
 
       <MathPanel
@@ -130,7 +144,7 @@ export default async function StudentPage({
         {student.math && student.math.games.length > 0 && <MathSummary math={student.math} />}
       </MathPanel>
 
-      <ReportsPanel student={student} reports={reports} />
+      {hasParent(student) && <ReportsPanel student={student} reports={reports} />}
 
       <details className="card group">
         <summary className="flex cursor-pointer items-center justify-between gap-4 p-4 font-semibold">
@@ -138,7 +152,7 @@ export default async function StudentPage({
           <span className="t-small t-muted font-normal group-open:hidden">Show</span>
         </summary>
         <div className="border-t border-line p-4">
-          <ShareLinks student={student} />
+          <ShareLinks student={student} parent={hasParent(student)} />
         </div>
       </details>
 

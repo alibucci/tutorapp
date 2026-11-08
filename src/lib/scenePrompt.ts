@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { MODEL_FAST, complete } from "./llm";
 import type { GameStyle } from "./gameStyles";
-import type { Lesson } from "./types";
+import { isChild } from "./profile";
+import type { Lesson, StudentProfile } from "./types";
 
 const SceneSchema = z.object({
   scene: z
@@ -11,9 +12,9 @@ const SceneSchema = z.object({
     .describe("The picture, in English, as one paragraph for an image model"),
 });
 
-const SYSTEM = `You describe one picture for a child's English homework.
+const SYSTEM = `You describe one picture for a learner's English homework.
 
-The child will look at it and answer three things: describe what you see, say
+The learner will look at it and answer three things: describe what you see, say
 what you think will happen next, and give three adjectives for the situation.
 So the picture must:
 - show a single clear moment with something happening - people or animals in
@@ -21,12 +22,12 @@ So the picture must:
 - leave an obvious "what happens next" (a ball about to land, a cake about to
   fall, a storm arriving, someone about to open a door);
 - have a mood that invites adjectives (busy, messy, surprising, cosy, windy);
-- give the child words to practise from this lesson - if they struggled with
+- give the learner words to practise from this lesson - if they struggled with
   the past tense, show actions that are easy to narrate; if the lesson was
   about food, put food in it.
 
 Rules:
-- Safe and friendly for a 9-year-old. No violence, weapons, injury, fear,
+- Safe and friendly for the learner described below. No violence, weapons, injury, fear,
   romance, religion or politics, whatever the lesson discussed.
 - No text, signs, letters or numbers anywhere in the picture.
 - Never name a game, brand, film or character. Describe what things look like.
@@ -42,9 +43,14 @@ export async function writeScene(
   lesson: Lesson,
   style: GameStyle,
   previous?: string,
+  profile?: StudentProfile,
 ): Promise<string> {
   const s = lesson.summary;
   const user = [
+    isChild(profile)
+      ? `Learner: a child${profile?.age ? ` of ${profile.age}` : " of about 9"}`
+      : `Learner: ${profile?.age ? `${profile.age} years old` : "a teenager or adult"}. Show their grown-up world, not a cartoon for children.`,
+    profile?.about ? `About them: ${profile.about}` : "",
     `Lesson topics: ${s?.covered.join("; ") || "general English"}`,
     `What was hard: ${s?.struggles.map((x) => x.what).join("; ") || "nothing recorded"}`,
     s?.homeworkFocus ? `Practice focus: ${s.homeworkFocus}` : "",

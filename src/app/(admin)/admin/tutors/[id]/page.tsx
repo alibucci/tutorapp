@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { gameStyle } from "@/lib/gameStyles";
+import { styleFor } from "@/lib/gameStyles";
 import { getTutor, listLessons, listStudents } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -51,9 +51,7 @@ export default async function TutorPage({
                       {student.name}
                     </span>
                     <span className="block t-caption t-muted">
-                      {student.gameStyle
-                        ? gameStyle(student.gameStyle).name
-                        : "no game style"}
+                      {styleFor(student).name}
                       {" · "}
                       {student.login ? "has sign-in" : "no sign-in"}
                       {student.recordingConsent ? " · consent on file" : ""}

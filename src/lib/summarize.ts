@@ -33,7 +33,7 @@ const SummarySchema = z.object({
   homeworkFocus: z
     .string()
     .describe(
-      "One short sentence to the child, who reads it alone, in the words a nine-year-old uses - taken from what they struggled with. No grammar words at all (no 'tense', 'verb', 'plural', 'past simple'). E.g. 'Tell me what you did yesterday: ate, swam, went.' Empty string if nothing fits.",
+      "One short sentence to the learner, who reads it alone, taken from what they struggled with. To a child: the words a nine-year-old uses and no grammar words at all (no 'tense', 'verb', 'plural', 'past simple'), e.g. 'Tell me what you did yesterday: ate, swam, went.' To a teenager or adult: plain and direct, e.g. 'Link your words: \"a-cup-of\" not \"a. cup. of.\"' Empty string if nothing fits.",
     ),
 });
 
@@ -124,6 +124,7 @@ export function renderLesson(lesson: Lesson, student: Student): string {
   return [
     `Lesson: ${lesson.title}`,
     `Student: ${student.name}`,
+    ...(student.profile?.age ? [`Age: ${student.profile.age}`] : []),
     `Mode: ${lesson.mode}`,
     ...(lesson.groupId
       ? [

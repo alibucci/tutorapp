@@ -443,6 +443,26 @@ check("parent sees the note after approval", !parentAfter.includes("No weekly no
   check("off again, games are refused", (await send(anon, { level: 1, replies: play(1) })).status === 403);
 }
 
+// --- learner profile ----------------------------------------------------------
+{
+  check("a profile with a made-up level is refused",
+    (await a("/api/students", post({ name: "Smoke Student P0", profile: { level: "genius" } }))).status === 400);
+  const grown = (await a("/api/students", post({
+    name: "Smoke Student Grown", gameStyle: "fairytale", profile: { age: 30, goal: "accent", shortTasks: true },
+  }))).json;
+  check("a profile is saved with the student",
+    grown?.profile?.age === 30 && grown.profile.goal === "accent" && grown.profile.shortTasks === true);
+  check("a theme the tutor picked is kept, with no description to make one from",
+    grown?.gameStyle === "fairytale" && !grown.customStyle);
+  check("their own theme cannot be picked before there is one",
+    (await a(`/api/students/${grown.id}`, patch({ gameStyle: "custom" }))).status === 400);
+  const page = (await a(`/student/${grown.id}`)).text;
+  check("an adult's page has no parent link or weekly notes for a parent",
+    page.includes("Listen and repeat") && !page.includes("Parent link") && !page.includes("Family sign-in"));
+  const edited = await a(`/api/students/${grown.id}`, patch({ profile: { age: 30, goal: "speaking" } }));
+  check("the profile can be changed later", edited.json?.profile?.goal === "speaking" && !edited.json.profile.shortTasks);
+}
+
 // --- recordings are not kept ----------------------------------------------
 check("there is no audio upload any more",
   (await a(`/api/lessons/${lessonA.id}/audio`, { method: "POST" })).status === 404);

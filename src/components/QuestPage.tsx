@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { HomeworkGame } from "@/components/HomeworkGame";
 import { homeworkFor } from "@/lib/access";
-import { gameStyle } from "@/lib/gameStyles";
+import { fromSent, styleFor } from "@/lib/gameStyles";
 import { homeworkDone, homeworkImageUrl } from "@/lib/homework";
 
 /** One homework, for whichever way the child got in. */
@@ -25,7 +25,8 @@ export async function QuestPage({
       lessonId={lessonId}
       imageSrc={homeworkImageUrl(found.lesson, linkKey) ?? undefined}
       focus={homework.focus}
-      style={gameStyle(found.student.gameStyle)}
+      // As it was sent; before that, as it would be sent now.
+      style={homework.style ? fromSent(homework.style) : styleFor(found.student)}
       linkKey={linkKey}
       backHref={backHref}
       answered={homework.answers}

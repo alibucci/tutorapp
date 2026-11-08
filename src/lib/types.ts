@@ -228,6 +228,56 @@ export type Student = {
   archivedAt?: string;
   /** Sums in the child's theme, apart from any lesson. Off until the tutor says. */
   math?: MathPractice;
+  /** Who this learner is, so the homework can fit them. See profile.ts. */
+  profile?: StudentProfile;
+  /**
+   * A theme made for this learner from what the tutor wrote about them. Used
+   * when `gameStyle` is "custom". Same shape as a ready-made theme.
+   */
+  customStyle?: CustomStyle;
+};
+
+export type EnglishLevel = "beginner" | "elementary" | "intermediate" | "upper" | "advanced";
+export type LearningGoal = "school" | "speaking" | "accent" | "other";
+
+/**
+ * What the tutor says about a learner. Nothing about health: a child who needs
+ * short bursts gets `shortTasks`, never a diagnosis written down.
+ */
+export type StudentProfile = {
+  age?: number;
+  level?: EnglishLevel;
+  goal?: LearningGoal;
+  /** In the tutor's words: "a couple, 25, own a restaurant in Shanghai". */
+  about?: string;
+  /** Fewer, shorter tasks, and a change of activity more often. */
+  shortTasks?: boolean;
+  /** Overrides the look the age would pick. */
+  look?: "game" | "plain";
+};
+
+export type CustomStyle = {
+  name: string;
+  imageStyle: string;
+  words: {
+    start: string;
+    step: string;
+    done: string;
+    reward: string;
+    submit: string;
+    cheer: string;
+    heading?: string;
+  };
+  palette: {
+    ground: string;
+    panel: string;
+    ink: string;
+    accent: string;
+    accentInk: string;
+  };
+  /** The description it was made from, so an unchanged one is not paid for twice. */
+  madeFrom: string;
+  madeAt: string;
 };
 
 export type MathPractice = {
@@ -320,8 +370,47 @@ export type CatchRound = {
   keep: boolean;
 };
 
+/** Hear a sentence, then say it back. */
+export type RepeatRound = {
+  sentence: string;
+  /** One short line on how to say it, shown after the answer. */
+  tip: string;
+};
+
+/** One exchange: the other person speaks, then the learner says their line. */
+export type DialogueRound = {
+  them: string;
+  you: string;
+};
+
+/** A question to answer out loud, in the learner's own words. */
+export type SpeakRound = {
+  question: string;
+  /** What a good answer could sound like, shown after the answer. */
+  example: string;
+};
+
+/** Which word fits a meaning: the vocabulary of the learner's topic. */
+export type WordsRound = {
+  meaning: string;
+  options: string[];
+  answer: number;
+  why: string;
+};
+
 export type Exercise =
   | { kind: "choose"; title: string; topic: string; rounds: ChooseRound[] }
+  | { kind: "repeat"; title: string; topic: string; rounds: RepeatRound[] }
+  | {
+      kind: "dialogue";
+      title: string;
+      topic: string;
+      /** Where this happens and who the other person is. */
+      setting: string;
+      rounds: DialogueRound[];
+    }
+  | { kind: "speak"; title: string; topic: string; rounds: SpeakRound[] }
+  | { kind: "words"; title: string; topic: string; rounds: WordsRound[] }
   | { kind: "build"; title: string; topic: string; rounds: BuildRound[] }
   | {
       kind: "catch";
@@ -338,14 +427,20 @@ export const EXERCISE_LABEL: Record<ExerciseKind, string> = {
   choose: "Pick the right word",
   build: "Build the sentence",
   catch: "Keep the right words",
+  repeat: "Listen and repeat",
+  dialogue: "Role-play",
+  speak: "Answer out loud",
+  words: "Topic words",
 };
+
+export const EXERCISE_KINDS = Object.keys(EXERCISE_LABEL) as ExerciseKind[];
 
 /**
  * What the child sent back for one round: the option they picked, the words
  * they put in order, or whether they kept the word. The server turns this
  * into a verdict - it holds the exercise, the browser only holds a copy.
  */
-export type RoundReply = number | string[] | boolean;
+export type RoundReply = number | string[] | boolean | string;
 
 /** One round, as the tutor reads it back. */
 export type RoundAnswer = {
@@ -393,6 +488,18 @@ export type Homework = {
   answers?: HomeworkAnswers;
   /** One entry per game the child finished. */
   results?: ExerciseResult[];
+  /**
+   * The look it was sent in. Changing the learner's profile later changes the
+   * next homework, not one already given out.
+   */
+  style?: SentStyle;
+};
+
+/** A theme as it was when a homework went out: enough to draw it again. */
+export type SentStyle = Omit<CustomStyle, "madeFrom" | "madeAt"> & {
+  id: string;
+  plain?: boolean;
+  skin?: "minecraft";
 };
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import { LIMIT, readForm, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
+import { sentStyle, styleFor } from "@/lib/gameStyles";
 import { deleteImage, saveImage, updateLesson } from "@/lib/store";
 import type { Homework } from "@/lib/types";
 
@@ -127,6 +128,9 @@ export async function PATCH(request: Request, { params }: Params) {
         return null;
       }
       next.sentAt ??= new Date().toISOString();
+      // The look it goes out in stays with it: a profile changed next week
+      // changes the next homework, not this one.
+      next.style ??= sentStyle(styleFor(found.student));
     }
     if (body.send === false) {
       if (next.answers) {
@@ -134,6 +138,7 @@ export async function PATCH(request: Request, { params }: Params) {
         return null;
       }
       delete next.sentAt;
+      delete next.style;
     }
     return { homework: next };
   });

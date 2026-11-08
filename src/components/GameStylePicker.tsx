@@ -8,9 +8,12 @@ import { GAME_STYLES } from "@/lib/gameStyles";
 export function GameStylePicker({
   studentId,
   value,
+  ownName,
 }: {
   studentId: string;
   value?: string;
+  /** The name of the theme made for this learner, if there is one. */
+  ownName?: string;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -36,6 +39,7 @@ export function GameStylePicker({
         className="min-h-9 cursor-pointer rounded-[var(--radius)] border border-line-strong bg-surface px-3 t-small font-semibold"
       >
         {!value && <option value="">Pick a game style…</option>}
+        {ownName && <option value="custom">Homework: {ownName} (theirs)</option>}
         {GAME_STYLES.map((style) => (
           <option key={style.id} value={style.id}>
             Homework: {style.name}

@@ -50,6 +50,7 @@ export function HomeworkPanel({
   studentKey,
   styleId,
   styleName,
+  ownStyleName,
   canDraw,
 }: {
   lesson: Lesson;
@@ -61,6 +62,8 @@ export function HomeworkPanel({
   studentKey: string;
   /** The student's game style, for the button's wording. */
   styleName: string;
+  /** The theme made for this learner, offered beside the ready-made ones. */
+  ownStyleName?: string;
   /** Whether this server can draw pictures (an image API key is set). */
   canDraw: boolean;
 }) {
@@ -385,7 +388,7 @@ export function HomeworkPanel({
           <div className="space-y-2 border-t border-line pt-4">
             <p className="t-eyebrow">How {studentName} will see it</p>
             <div className="flex flex-wrap items-center gap-2">
-              <GameStylePicker studentId={studentId} value={styleId} />
+              <GameStylePicker studentId={studentId} value={styleId} ownName={ownStyleName} />
             </div>
             <a
               href={`/s/${studentKey}/quest/${lesson.id}`}

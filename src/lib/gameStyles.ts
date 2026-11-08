@@ -1,3 +1,6 @@
+import { lookFor } from "./profile";
+import type { SentStyle, Student } from "./types";
+
 /**
  * The look of a child's homework. One entry per theme children ask for.
  *
@@ -46,6 +49,11 @@ export type GameStyle = {
   mathItems: [string, string];
   /** A hand-made skin in globals.css. Without one, the palette skin is used. */
   skin?: "minecraft";
+  /**
+   * For a learner past the age of games: the same colours, but no points,
+   * quests or levels, and plain words on every button.
+   */
+  plain?: boolean;
 };
 
 export const GAME_STYLES: GameStyle[] = [
@@ -171,13 +179,137 @@ export const GAME_STYLES: GameStyle[] = [
   },
 ];
 
+/** Any theme, as words for someone too old for a game. */
+export const PLAIN_WORDS: GameStyle["words"] = {
+  start: "Start",
+  step: "Task",
+  done: "Homework done.",
+  reward: "correct",
+  submit: "Check",
+  cheer: "Well done",
+  heading: "Homework",
+};
+
+/** For a learner with no theme of their own and no game: calm and neutral. */
+export const PLAIN_STYLE: GameStyle = {
+  id: "plain",
+  name: "Clean",
+  imageStyle:
+    "clean modern editorial illustration: realistic proportions, calm natural colours, soft daylight, uncluttered composition",
+  words: PLAIN_WORDS,
+  mathItems: ["/game/plain/dot.svg", "/game/plain/square.svg"],
+  palette: {
+    ground: "#eef1f5",
+    panel: "#ffffff",
+    ink: "#1f2933",
+    accent: "#1f6f5c",
+    accentInk: "#ffffff",
+  },
+};
+
+/**
+ * The look of this learner's homework: the theme the tutor picked, or the one
+ * made for them, and without the game for someone too old for it.
+ */
+export function styleFor(student: Pick<Student, "gameStyle" | "customStyle" | "profile">): GameStyle {
+  const custom = student.customStyle;
+  const plain = lookFor(student.profile) === "plain";
+  const base: GameStyle =
+    student.gameStyle === "custom" && custom
+      ? {
+          id: "custom",
+          name: custom.name,
+          imageStyle: custom.imageStyle,
+          words: custom.words,
+          palette: custom.palette,
+          // Its own pictures cannot be drawn ahead; counters in its colours.
+          mathItems: PLAIN_STYLE.mathItems,
+        }
+      : student.gameStyle
+        ? gameStyle(student.gameStyle)
+        : plain
+          ? PLAIN_STYLE
+          : DEFAULT_GAME_STYLE;
+  if (!plain) return base;
+  // Its colours, nothing else: no blocks, no court, no quest.
+  return { ...base, words: PLAIN_WORDS, skin: undefined, plain: true };
+}
+
+/** What a homework keeps of its look when it is sent. */
+export function sentStyle(style: GameStyle): SentStyle {
+  return {
+    id: style.id,
+    name: style.name,
+    imageStyle: style.imageStyle,
+    words: style.words,
+    palette: style.palette,
+    ...(style.skin && { skin: style.skin }),
+    ...(style.plain && { plain: true }),
+  };
+}
+
+/** A sent homework's look, back as a theme to draw it with. */
+export function fromSent(sent: SentStyle): GameStyle {
+  const preset = GAME_STYLES.find((s) => s.id === sent.id);
+  return {
+    ...sent,
+    mathItems: preset?.mathItems ?? PLAIN_STYLE.mathItems,
+  };
+}
+
+/** WCAG contrast between two #rrggbb colours. */
+export function contrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+}
+
+/**
+ * A palette that passes 4.5:1 on both pairs. Text that fails becomes black or
+ * white, whichever reads; an accent too pale or too dark for either is pulled
+ * towards black until white on it reads.
+ */
+export function readablePalette(p: GameStyle["palette"]): GameStyle["palette"] {
+  const pick = (bg: string, ink: string) =>
+    contrast(ink, bg) >= 4.5
+      ? ink
+      : contrast("#111111", bg) >= contrast("#ffffff", bg)
+        ? "#111111"
+        : "#ffffff";
+  let accent = p.accent;
+  for (let i = 0; i < 12 && Math.max(contrast("#111111", accent), contrast("#ffffff", accent)) < 4.5; i++) {
+    accent = mix(accent, "#000000", 0.15);
+  }
+  return {
+    ground: p.ground,
+    panel: p.panel,
+    ink: pick(p.panel, p.ink),
+    accent,
+    accentInk: pick(accent, p.accentInk),
+  };
+}
+
+function mix(a: string, b: string, t: number): string {
+  const ch = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  return `#${[1, 3, 5]
+    .map((i) => Math.round(ch(a, i) * (1 - t) + ch(b, i) * t).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
 /**
  * The theme's own class, beside its skin. A palette theme with pictures of its
  * own - a court, a city - hangs them on this in globals.css, on top of the
  * shared palette skin.
  */
 export function themeOf(style: GameStyle): string {
-  return `theme-${style.id}`;
+  // The plain look keeps a theme's colours, not its pictures.
+  return style.plain ? "theme-plain" : `theme-${style.id}`;
 }
 
 /** The skin class for a theme: its own, or the shared palette one. */

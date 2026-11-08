@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { MathGame } from "@/components/MathGame";
 import { owns } from "@/lib/access";
 import { getSession } from "@/lib/auth";
-import { gameStyle } from "@/lib/gameStyles";
+import { styleFor } from "@/lib/gameStyles";
 import { makeGame } from "@/lib/math";
 import { getStudentByKey } from "@/lib/store";
 
@@ -22,7 +22,7 @@ export default async function LinkMath({
   const session = await getSession();
   return (
     <MathGame
-      style={gameStyle(student.gameStyle)}
+      style={styleFor(student)}
       level={student.math.level}
       problems={makeGame(student.math.level)}
       backHref={`/s/${key}`}

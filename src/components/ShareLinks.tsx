@@ -9,7 +9,14 @@ import type { Student } from "@/lib/types";
  * The other way in: a private link, no password. Handy for a parent who will
  * never keep a password; sign-ins above are for everyone else.
  */
-export function ShareLinks({ student }: { student: Student }) {
+export function ShareLinks({
+  student,
+  parent = true,
+}: {
+  student: Student;
+  /** False for an adult learner: there is no parent to send a link to. */
+  parent?: boolean;
+}) {
   const router = useRouter();
   const [copied, setCopied] = useState<string | null>(null);
   const [rotating, setRotating] = useState(false);
@@ -21,11 +28,15 @@ export function ShareLinks({ student }: { student: Student }) {
       hint: "Their homework and what they are working on.",
       path: `/s/${student.studentKey}`,
     },
-    {
-      label: "Parent link",
-      hint: "Weekly notes you have approved. Nothing else is visible.",
-      path: `/p/${student.parentKey}`,
-    },
+    ...(parent
+      ? [
+          {
+            label: "Parent link",
+            hint: "Weekly notes you have approved. Nothing else is visible.",
+            path: `/p/${student.parentKey}`,
+          },
+        ]
+      : []),
   ];
 
   async function copy(path: string) {

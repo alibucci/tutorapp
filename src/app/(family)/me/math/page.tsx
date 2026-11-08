@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { MathGame } from "@/components/MathGame";
 import { requireFamily } from "@/lib/auth";
-import { gameStyle } from "@/lib/gameStyles";
+import { styleFor } from "@/lib/gameStyles";
 import { makeGame } from "@/lib/math";
 import { getStudent } from "@/lib/store";
 
@@ -15,7 +15,7 @@ export default async function MyMath() {
   if (!student?.math?.on) notFound();
   return (
     <MathGame
-      style={gameStyle(student.gameStyle)}
+      style={styleFor(student)}
       level={student.math.level}
       problems={makeGame(student.math.level)}
       backHref="/me"

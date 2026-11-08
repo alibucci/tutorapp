@@ -7,6 +7,7 @@ import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
 import { gameFonts } from "@/lib/fonts";
 import { type GameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
 import { PracticeGame } from "@/components/PracticeGame";
+import { MicButton } from "@/components/SpokenAnswer";
 import {
   ADJECTIVES_TASK,
   EXERCISE_LABEL,
@@ -275,13 +276,17 @@ export function HomeworkGame({
           <div className="game-panel">
             <p className="game-title">{style.words.heading ?? "New quest!"}</p>
             <p className="game-text mt-3">
-              {exercises?.length
-                ? `${exercises.length} quick ${exercises.length === 1 ? "game" : "games"}${
-                    imageSrc ? ", then the picture." : "."
-                  }`
-                : "Look at the picture."}{" "}
-              {steps.length} {steps.length === 1 ? "task" : "tasks"}
-              {maxPoints > 0 && `, up to ${maxPoints} ${style.words.reward}`}.
+              {style.plain
+                ? `${steps.length} ${steps.length === 1 ? "task" : "tasks"}, a few minutes each.`
+                : <>
+                    {exercises?.length
+                      ? `${exercises.length} quick ${exercises.length === 1 ? "game" : "games"}${
+                          imageSrc ? ", then the picture." : "."
+                        }`
+                      : "Look at the picture."}{" "}
+                    {steps.length} {steps.length === 1 ? "task" : "tasks"}
+                    {maxPoints > 0 && `, up to ${maxPoints} ${style.words.reward}`}.
+                  </>}
             </p>
             {focus && (
               <p className="game-tip mt-3">
@@ -388,7 +393,9 @@ export function HomeworkGame({
         {done && (
           <div className="game-panel">
             <p className="game-text">
-              {points} {style.words.reward}. Your tutor will see how you did.
+              {style.plain
+                ? `${points} of ${maxPoints} right first time. Your tutor will see your answers.`
+                : `${points} ${style.words.reward}. Your tutor will see how you did.`}
             </p>
             {scores.length > 0 && (
               <ul className="mt-4 space-y-2">
@@ -432,9 +439,12 @@ export function HomeworkGame({
 
         {/* The hotbar: one slot per task, the current one selected. */}
         <div className="game-hud">
-          <p className="game-level">
-            {points} {style.words.reward}
-          </p>
+          {/* No points on screen for someone past the age of games. */}
+          {!style.plain && (
+            <p className="game-level">
+              {points} {style.words.reward}
+            </p>
+          )}
           <div
             className="game-xp"
             aria-label={`${completed} of ${steps.length} done`}
@@ -446,7 +456,7 @@ export function HomeworkGame({
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <ol className="game-hotbar">
+          <ol className={`game-hotbar ${style.plain ? "sr-only" : ""}`}>
             {steps.map((s, i) => (
               <li
                 key={s.type === "game" ? `g${i}` : s.task.id}
@@ -475,54 +485,3 @@ function Answer({ label, text }: { label: string; text: string }) {
 
 /** Words a child says around adjectives that are not adjectives. */
 const FILLER = new Set(["and", "um", "uh", "er", "like", "it's", "is", "very", "the", "a"]);
-
-/**
- * The big microphone. Tap to talk, tap again to stop; the words appear in the
- * answer, where the child can still fix them by hand.
- */
-function MicButton({
-  listening,
-  busy,
-  interim,
-  error,
-  onStart,
-  onStop,
-}: {
-  listening: boolean;
-  busy: boolean;
-  interim: string;
-  error: string | null;
-  onStart: () => void;
-  onStop: () => void;
-}) {
-  return (
-    <div className="mt-4 flex flex-col items-center gap-2">
-      <button
-        type="button"
-        onClick={listening ? onStop : onStart}
-        disabled={busy}
-        aria-pressed={listening}
-        aria-label={listening ? "Stop recording" : "Say your answer"}
-        className={`game-mic ${listening ? "game-mic-on" : ""}`}
-      >
-        {listening ? (
-          <svg aria-hidden width="34" height="34" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="6" width="12" height="12" rx="2" />
-          </svg>
-        ) : (
-          <svg aria-hidden width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="2" width="6" height="12" rx="3" />
-            <path d="M5 10a7 7 0 0 0 14 0M12 19v3" />
-          </svg>
-        )}
-      </button>
-      <p className="game-hint text-center min-h-[1.5rem]">
-        {listening
-          ? interim || "I'm listening… tap again when you finish."
-          : error
-            ? "The microphone did not work. You can type instead."
-            : "Tap and say it - or type below."}
-      </p>
-    </div>
-  );
-}

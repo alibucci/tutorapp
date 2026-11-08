@@ -1,4 +1,4 @@
-import { gameStyle } from "@/lib/gameStyles";
+import type { GameStyle } from "@/lib/gameStyles";
 
 /**
  * Small pieces every screen shares. Server-safe: no hooks, no state.
@@ -33,9 +33,7 @@ export function Avatar({ name, size = "md" }: { name: string; size?: "md" | "lg"
   );
 }
 
-export function StyleTag({ id }: { id?: string }) {
-  if (!id) return <span className="tag tag-quiet">No game style</span>;
-  const style = gameStyle(id);
+export function StyleTag({ style }: { style: GameStyle }) {
   if (style.skin) return <span className={`tag tag-${style.skin}`}>{style.name}</span>;
   // Any other theme: a chip in its own accent, with a swatch of its ground.
   return (

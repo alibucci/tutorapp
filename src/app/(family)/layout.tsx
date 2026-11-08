@@ -1,6 +1,7 @@
 import { FamilyTabs } from "@/components/FamilyTabs";
 import { SignOut } from "@/components/SignOut";
 import { requireFamily } from "@/lib/auth";
+import { hasParent } from "@/lib/profile";
 import { getStudent } from "@/lib/store";
 
 export const metadata = { title: "aloudli" };
@@ -21,7 +22,10 @@ export default async function FamilyLayout({
   return (
     <>
       <header className="page page-narrow flex items-center justify-between gap-3 pt-4">
-        <FamilyTabs studentName={student?.name ?? "Student"} />
+        <FamilyTabs
+          studentName={student?.name ?? "Student"}
+          parent={student ? hasParent(student) : true}
+        />
         <SignOut name="" />
       </header>
       <main

@@ -10,6 +10,7 @@ import {
   StyleTag,
 } from "@/components/ui";
 import { requireSession } from "@/lib/auth";
+import { styleFor } from "@/lib/gameStyles";
 import { recentActivity, timeAgo } from "@/lib/feed";
 import { homeworkDone } from "@/lib/homework";
 import { listGroupLessons, listLessons, listStudents } from "@/lib/store";
@@ -235,7 +236,7 @@ export default async function Home() {
                     <span className="block max-w-full truncate text-[1.0625rem] font-semibold">
                       {student.name}
                     </span>
-                    <StyleTag id={student.gameStyle} />
+                    <StyleTag style={styleFor(student)} />
                   </span>
                   <span className={`mt-auto t-small font-medium ${status.tone}`}>
                     {status.text}

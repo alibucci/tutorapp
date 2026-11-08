@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
-import { gameStyle } from "@/lib/gameStyles";
+import { styleFor } from "@/lib/gameStyles";
 import { PictureError, canDrawPictures, drawPictures } from "@/lib/imageGen";
 import { picturePrompt, writeScene } from "@/lib/scenePrompt";
 import { homeworkDone } from "@/lib/homework";
@@ -49,10 +49,10 @@ export async function POST(_request: Request, { params }: Params) {
 }
 
 async function draw(id: string, lesson: Lesson, student: Student): Promise<Response> {
-  const style = gameStyle(student.gameStyle);
+  const style = styleFor(student);
   try {
     // A redraw asks for a different scene, not the same one again.
-    const scene = await writeScene(lesson, style, lesson.homework?.scene);
+    const scene = await writeScene(lesson, style, lesson.homework?.scene, student.profile);
     const images = await drawPictures(picturePrompt(scene, style), OPTIONS);
     const names = await Promise.all(images.map((img) => saveImage(id, img.data, img.ext)));
 

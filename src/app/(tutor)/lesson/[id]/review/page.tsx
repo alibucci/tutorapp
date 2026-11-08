@@ -8,7 +8,8 @@ import { SummaryPanel } from "@/components/SummaryPanel";
 import { ChevronLeft } from "@/components/ui";
 import { lessonFor } from "@/lib/access";
 import { moveOptions } from "@/lib/moveLesson";
-import { gameStyle } from "@/lib/gameStyles";
+import { styleFor } from "@/lib/gameStyles";
+import { hasParent } from "@/lib/profile";
 import { canDrawPictures } from "@/lib/imageGen";
 import { INTERRUPTION_LABEL, promptLabel } from "@/lib/types";
 
@@ -31,10 +32,12 @@ export default async function ReviewPage({
   const homeworkSent = Boolean(lesson.homework?.sentAt);
   const messageSent = Boolean(lesson.parentMessage?.copiedAt);
   // Green when done, amber on the first one still waiting.
+  // An adult has no parent to write to: two steps, not three.
+  const parent = hasParent(student);
   const steps = [
     { href: "#summary", label: "Summary", done: Boolean(lesson.summary) },
     { href: "#homework", label: "Homework", done: homeworkSent },
-    { href: "#parent", label: "Parent", done: messageSent },
+    ...(parent ? [{ href: "#parent", label: "Parent", done: messageSent }] : []),
   ];
   const next = steps.findIndex((s) => !s.done);
 
@@ -133,14 +136,17 @@ export default async function ReviewPage({
           studentName={student?.name ?? "the student"}
           studentKey={student?.studentKey ?? ""}
           styleId={student?.gameStyle}
-          styleName={gameStyle(student?.gameStyle).name}
+          styleName={styleFor(student).name}
+          ownStyleName={student.customStyle?.name}
           canDraw={canDrawPictures()}
         />
       )}
 
-      <div id="parent" className="scroll-mt-20">
-        <ParentMessagePanel key={student.id} lesson={lesson} />
-      </div>
+      {parent && (
+        <div id="parent" className="scroll-mt-20">
+          <ParentMessagePanel key={student.id} lesson={lesson} />
+        </div>
+      )}
       </div>
       </div>
 

@@ -2183,3 +2183,32 @@ textarea.field { line-height: var(--leading-normal); }
   font-variant-numeric: tabular-nums;
 }
 .game-option:disabled { cursor: default; }
+
+/* ---------------------------------------------------------------------------
+   Spoken tasks: a line to hear, a line to say, and a way to hear it.
+   --------------------------------------------------------------------------- */
+
+.game-line-say {
+  padding: var(--space-3) var(--space-4);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--g-accent, #1f6f5c) 10%, transparent);
+}
+.game-minecraft .game-line-say { border-radius: 0; background: #b5b5b5; }
+.game-listen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-2);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--g-accent-ink, #fff);
+  background: var(--g-accent, #1f6f5c);
+  cursor: pointer;
+}
+.game-minecraft .game-listen { border-radius: 0; color: #fff; background: #6f6f6f; border: 2px solid #000; }
+.game-listen:active { transform: scale(0.97); }
+/* The skins colour .game-small for the dark ground; here it sits on the panel. */
+.game-palette .game-line-say .game-small { color: color-mix(in oklab, var(--g-ink) 70%, transparent); }
+.game-minecraft .game-line-say .game-small { color: #3f3f3f; text-shadow: none; }

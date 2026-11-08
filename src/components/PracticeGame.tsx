@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { ListenButton, SpokenAnswer } from "@/components/SpokenAnswer";
+import { answered as hasAnswer, saidRight } from "@/lib/speaking";
 import type {
   BuildRound,
   CatchRound,
   ChooseRound,
+  DialogueRound,
   Exercise,
+  RepeatRound,
   RoundReply,
+  SpeakRound,
+  WordsRound,
 } from "@/lib/types";
 
 /**
@@ -62,6 +68,42 @@ export function PracticeGame({ exercise, onRound, onDone, words }: Props) {
           rule={exercise.rule}
           onRound={onRound}
           onDone={onDone}
+        />
+      );
+    case "words":
+      return <Words rounds={exercise.rounds} title={exercise.title} onRound={onRound} onDone={onDone} />;
+    case "repeat":
+      return (
+        <SayIt
+          title={exercise.title}
+          total={exercise.rounds.length}
+          onRound={onRound}
+          onDone={onDone}
+          round={(i) => repeatRound(exercise.rounds[i])}
+          words={words}
+        />
+      );
+    case "dialogue":
+      return (
+        <SayIt
+          title={exercise.title}
+          setting={exercise.setting}
+          total={exercise.rounds.length}
+          onRound={onRound}
+          onDone={onDone}
+          round={(i) => dialogueRound(exercise.rounds[i])}
+          words={words}
+        />
+      );
+    case "speak":
+      return (
+        <SayIt
+          title={exercise.title}
+          total={exercise.rounds.length}
+          onRound={onRound}
+          onDone={onDone}
+          round={(i) => speakRound(exercise.rounds[i])}
+          words={words}
         />
       );
   }
@@ -473,6 +515,247 @@ function Catch({
             last={last}
           />
         </>
+      )}
+    </div>
+  );
+}
+
+// --- 4. Topic words --------------------------------------------------------
+
+function Words({
+  rounds,
+  title,
+  onRound,
+  onDone,
+}: {
+  rounds: WordsRound[];
+  title: string;
+  onRound: (right: boolean) => void;
+  onDone: (replies: RoundReply[]) => void;
+}) {
+  const [at, setAt] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [replies, setReplies] = useState<number[]>([]);
+
+  const round = rounds[at];
+  const answered = picked !== null;
+  const correct = picked === round.answer;
+  const last = at + 1 >= rounds.length;
+
+  function pick(i: number) {
+    if (answered) return;
+    setPicked(i);
+    const n = attempt + 1;
+    setAttempt(n);
+    if (n === 1) {
+      setReplies([...replies, i]);
+      onRound(i === round.answer);
+    }
+  }
+
+  function next() {
+    if (last) {
+      onDone(replies);
+      return;
+    }
+    setAt(at + 1);
+    setPicked(null);
+    setAttempt(0);
+  }
+
+  return (
+    <div className="game-panel" key={at}>
+      <Counter at={at} of={rounds.length} />
+      <p className="game-title mt-2">{title}</p>
+      <p className="game-sentence mt-4">{round.meaning}</p>
+      <div className="mt-4 grid gap-2">
+        {round.options.map((option, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => pick(i)}
+            disabled={answered}
+            className={`game-option ${
+              answered && correct && i === round.answer
+                ? "game-option-yes"
+                : answered && i === picked
+                  ? "game-option-no"
+                  : ""
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+      {answered && (
+        <>
+          <Verdict
+            right={correct}
+            attempt={attempt}
+            why={correct || attempt > 1 ? round.why : "Read it again and pick another one."}
+          />
+          <Buttons
+            canRetry={!correct && attempt === 1}
+            onRetry={() => setPicked(null)}
+            onNext={next}
+            last={last}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+// --- 5-7. Saying things: repeat, role-play, answer out loud -----------------
+
+/** One spoken round, whatever kind: what is shown, and how it is marked. */
+type SpokenRound = {
+  /** Someone else's line or the question, read out on request. */
+  prompt?: { label: string; text: string };
+  /** What the learner should say, when there is a fixed line to say. */
+  target?: string;
+  /** Shown above the answer box. */
+  ask: string;
+  /** Whether an answer counts. */
+  check: (said: string) => boolean;
+  /** After the answer: how to say it, or what a good answer sounds like. */
+  after: string;
+  multiline?: boolean;
+};
+
+function repeatRound(r: RepeatRound): SpokenRound {
+  return {
+    target: r.sentence,
+    ask: "Listen, then say it.",
+    check: (said) => saidRight(r.sentence, said),
+    after: r.tip,
+  };
+}
+
+function dialogueRound(r: DialogueRound): SpokenRound {
+  return {
+    prompt: r.them ? { label: "They say", text: r.them } : undefined,
+    target: r.you,
+    ask: "Your line - say it out loud.",
+    check: (said) => saidRight(r.you, said),
+    after: r.you,
+  };
+}
+
+function speakRound(r: SpeakRound): SpokenRound {
+  return {
+    prompt: { label: "Question", text: r.question },
+    ask: "Answer in your own words.",
+    check: hasAnswer,
+    after: `For example: ${r.example}`,
+    multiline: true,
+  };
+}
+
+function SayIt({
+  title,
+  setting,
+  total,
+  round: roundAt,
+  onRound,
+  onDone,
+  words,
+}: {
+  title: string;
+  setting?: string;
+  total: number;
+  round: (i: number) => SpokenRound;
+  onRound: (right: boolean) => void;
+  onDone: (replies: RoundReply[]) => void;
+  words: { submit: string };
+}) {
+  const [at, setAt] = useState(0);
+  const [said, setSaid] = useState("");
+  const [checked, setChecked] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [replies, setReplies] = useState<string[]>([]);
+
+  const round = roundAt(at);
+  const correct = round.check(said);
+  const last = at + 1 >= total;
+
+  function check() {
+    setChecked(true);
+    const n = attempt + 1;
+    setAttempt(n);
+    // The first try is the one that counts, as in every other game.
+    if (n === 1) {
+      setReplies([...replies, said.trim()]);
+      onRound(correct);
+    }
+  }
+
+  function next() {
+    if (last) {
+      onDone(replies);
+      return;
+    }
+    setAt(at + 1);
+    setSaid("");
+    setChecked(false);
+    setAttempt(0);
+  }
+
+  return (
+    <div className="game-panel" key={at}>
+      <Counter at={at} of={total} />
+      <p className="game-title mt-2">{title}</p>
+      {setting && at === 0 && <p className="game-hint mt-2">{setting}</p>}
+
+      {round.prompt && (
+        <div className="game-line-say mt-4">
+          <p className="game-small">{round.prompt.label}</p>
+          <p className="game-sentence mt-1">{round.prompt.text}</p>
+          <ListenButton text={round.prompt.text} />
+        </div>
+      )}
+
+      {round.target && (
+        <div className="game-line-say mt-3">
+          <p className="game-small">{round.prompt ? "You say" : "Say this"}</p>
+          <p className="game-sentence mt-1">{round.target}</p>
+          {!round.prompt && <ListenButton text={round.target} />}
+        </div>
+      )}
+
+      <p className="game-hint mt-3">{round.ask}</p>
+      <SpokenAnswer
+        key={`${at}-${attempt > 1 ? "again" : "first"}`}
+        value={said}
+        onChange={(next) => {
+          setSaid(next);
+          setChecked(false);
+        }}
+        disabled={checked && (correct || attempt > 1)}
+        multiline={round.multiline}
+      />
+
+      {checked && (
+        <Verdict
+          right={correct}
+          attempt={attempt}
+          why={
+            correct || attempt > 1
+              ? round.after
+              : round.target
+                ? "Nearly - listen once more and say it again."
+                : "Say a little more - a whole sentence."
+          }
+        />
+      )}
+
+      {checked && (correct || attempt > 1) ? (
+        <Buttons canRetry={false} onRetry={() => {}} onNext={next} last={last} />
+      ) : (
+        <button onClick={check} disabled={!said.trim()} className="game-button mt-4">
+          {checked ? "Check again" : words.submit}
+        </button>
       )}
     </div>
   );

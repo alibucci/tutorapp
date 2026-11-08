@@ -1,15 +1,17 @@
 import { z } from "zod";
 import { MODEL, complete } from "./llm";
+import { describeLearner, formatsFor, isChild } from "./profile";
 import { listLessons } from "./store";
-import type { Exercise, Lesson, Student } from "./types";
+import type { Exercise, ExerciseKind, Lesson, Student } from "./types";
 
 /**
- * Practice games built from one lesson's mistakes.
+ * Practice built from one lesson's mistakes.
  *
- * The shape is fixed - three mechanics the child already knows how to play -
- * and only the words inside change. That is the whole point: a child meets the
- * same three games every week, so no lesson is spent explaining the game, and
- * what they practise is exactly what they got wrong on Tuesday.
+ * Which kinds of task, and how many rounds, follow from the learner's profile
+ * (profile.ts): a child at school gets the three games they already know, every
+ * week, so no lesson is spent explaining a game; someone working on their
+ * accent gets things to listen to and say. Only the words inside change, and
+ * they come from what this learner got wrong.
  */
 
 const Choose = z.object({
@@ -43,30 +45,118 @@ const Catch = z.object({
   keep: z.boolean(),
 });
 
-const ExercisesSchema = z.object({
-  topic: z
+const Repeat = z.object({
+  sentence: z.string().min(3).max(140).describe("A sentence to hear and say back"),
+  tip: z
     .string()
     .min(3)
     .max(160)
-    .describe(
-      "For the tutor, not the child: the one mistake all three games practise, under 60 characters. Grammar words are fine here.",
-    ),
-  chooseTitle: z.string().min(3).max(120),
-  choose: z.array(Choose).min(4).max(6),
-  buildTitle: z.string().min(3).max(120),
-  build: z.array(Build).min(3).max(4),
-  catchTitle: z.string().min(3).max(120),
-  catchRule: z
-    .string()
-    .min(5)
-    .max(160)
-    .describe(
-      'An instruction to the child with no grammar words, e.g. "Catch the things Iron Man already did" - a whole short sentence',
-    ),
-  catchWords: z.array(Catch).min(6).max(10),
+    .describe("One short line on saying it well: the sound, stress or linking to watch"),
 });
 
-const SYSTEM = `You build three small practice games for one child, from the
+const Dialogue = z.object({
+  them: z.string().min(1).max(160).describe("What the other person says"),
+  you: z.string().min(2).max(160).describe("The learner's reply, to say out loud"),
+});
+
+const Speak = z.object({
+  question: z.string().min(5).max(160),
+  example: z.string().min(3).max(220).describe("What a good answer could sound like"),
+});
+
+const Words = z.object({
+  meaning: z.string().min(5).max(160).describe("What the word means, or a sentence with it missing"),
+  options: z.array(z.string().min(1).max(30)).length(3),
+  answer: z.number().int().min(0).max(2),
+  why: z.string().min(3).max(200),
+});
+
+/** How many rounds each kind gets: the usual, and the short version. */
+const ROUNDS: Record<ExerciseKind, { usual: [number, number]; short: [number, number] }> = {
+  choose: { usual: [4, 6], short: [3, 3] },
+  build: { usual: [3, 4], short: [2, 2] },
+  catch: { usual: [6, 10], short: [4, 6] },
+  repeat: { usual: [5, 6], short: [3, 4] },
+  dialogue: { usual: [4, 6], short: [3, 3] },
+  speak: { usual: [3, 4], short: [2, 2] },
+  words: { usual: [5, 6], short: [3, 4] },
+};
+
+/** The JSON asked of the model: only the kinds this learner gets. */
+function schemaFor(formats: ExerciseKind[], short: boolean) {
+  const n = (kind: ExerciseKind) => ROUNDS[kind][short ? "short" : "usual"];
+  const list = <T extends z.ZodType>(item: T, kind: ExerciseKind) =>
+    z.array(item).min(n(kind)[0]).max(n(kind)[1]);
+  const title = z.string().min(3).max(120);
+  const fields: Record<string, z.ZodType> = {
+    topic: z
+      .string()
+      .min(3)
+      .max(160)
+      .describe(
+        "For the tutor, not the learner: the one thing every task practises, under 60 characters. Grammar words are fine here.",
+      ),
+  };
+  for (const kind of formats) {
+    if (kind === "choose") Object.assign(fields, { chooseTitle: title, choose: list(Choose, kind) });
+    if (kind === "build") Object.assign(fields, { buildTitle: title, build: list(Build, kind) });
+    if (kind === "catch") {
+      Object.assign(fields, {
+        catchTitle: title,
+        catchRule: z
+          .string()
+          .min(5)
+          .max(160)
+          .describe(
+            'An instruction with no grammar words, e.g. "Catch the things Iron Man already did" - a whole short sentence',
+          ),
+        catchWords: list(Catch, kind),
+      });
+    }
+    if (kind === "repeat") Object.assign(fields, { repeatTitle: title, repeat: list(Repeat, kind) });
+    if (kind === "dialogue") {
+      Object.assign(fields, {
+        dialogueTitle: title,
+        dialogueSetting: z
+          .string()
+          .min(5)
+          .max(160)
+          .describe("Where this happens and who the other person is, in one line"),
+        dialogue: list(Dialogue, kind),
+      });
+    }
+    if (kind === "speak") Object.assign(fields, { speakTitle: title, speak: list(Speak, kind) });
+    if (kind === "words") Object.assign(fields, { wordsTitle: title, words: list(Words, kind) });
+  }
+  return z.object(fields);
+}
+
+type Parsed = {
+  topic: string;
+  chooseTitle?: string;
+  choose?: z.infer<typeof Choose>[];
+  buildTitle?: string;
+  build?: z.infer<typeof Build>[];
+  catchTitle?: string;
+  catchRule?: string;
+  catchWords?: z.infer<typeof Catch>[];
+  repeatTitle?: string;
+  repeat?: z.infer<typeof Repeat>[];
+  dialogueTitle?: string;
+  dialogueSetting?: string;
+  dialogue?: z.infer<typeof Dialogue>[];
+  speakTitle?: string;
+  speak?: z.infer<typeof Speak>[];
+  wordsTitle?: string;
+  words?: z.infer<typeof Words>[];
+};
+
+/**
+ * The prompt for the case the app started with, a child at school getting the
+ * three games, word for word as it was. It works; the others are built around
+ * it rather than replacing it.
+ */
+const KID_SCHOOL = `You build three small practice games for one child, from the
 mistakes they made in today's English lesson. The child plays them alone, at
 home, with no adult to explain anything - so every word on the screen has to
 make sense to them on its own.
@@ -134,6 +224,97 @@ Rules for everything you write:
  * What the child is into, from the note the tutor recorded about them, so the
  * games can star a hero they actually like.
  */
+const FORMAT: Record<ExerciseKind, string> = {
+  choose: `CHOOSE. A sentence with one gap and three words under it. One is right. The
+   two wrong ones must be the mistakes this learner actually makes, not random
+   words - if they say "I eat yesterday", the wrong options are "eat" and
+   "eating", not "banana".`,
+  build: `BUILD. Short sentences the learner puts back in order, word by word. Each
+   one uses the thing being practised. Three to eight words, no longer: they tap
+   these on a phone. "why" is about ORDER: "Who did it, then what, then where."`,
+  catch: `CATCH. Single words drifting past. The learner keeps the ones that follow
+   one simple idea and waves the rest away. Mix roughly half and half, and make
+   the wrong ones tempting - the forms this learner confuses.`,
+  repeat: `LISTEN AND REPEAT. Sentences the learner hears read aloud, then says back.
+   Natural sentences they would really say, built around the thing being
+   practised. "tip" is one short line on saying it well - the sound, the stress or
+   the linking that trips this learner up: 'Link it: "a-cup-of", not "a. cup. of."'
+   Under eight words at beginner level.`,
+  dialogue: `ROLE-PLAY. A short conversation in a real situation from the learner's
+   life. Each round the other person says something ("them") and the learner
+   answers ("you"), reading their line out loud - so "you" is exactly what a
+   fluent speaker would say there, using the thing being practised. The rounds
+   follow on from each other as one conversation.`,
+  speak: `ANSWER OUT LOUD. Questions the learner answers in their own words. Each one
+   invites the thing being practised - a question about yesterday invites the
+   past. "example" is a short, good answer they compare theirs with afterwards.`,
+  words: `TOPIC WORDS. Words from the learner's world and today's lesson. "meaning"
+   says what the word means in simple English, or is a sentence with the word
+   missing as "___". Three options, one right; the two wrong ones are real words
+   from the same topic that are easy to mix up.`,
+};
+
+const CHILD_RULES = `THE CHILD NEVER SEES A GRAMMAR WORD. Not in a title, a rule, a sentence or a
+"why": no "tense", "past simple", "present", "verb", "noun", "plural",
+"adjective", "article", "-ed form", "irregular". Say the idea in a child's own
+words instead: not "Choose the past tense" but "What did Iron Man do
+yesterday?" Titles are short and fun - a question or a bit of the story.
+
+ONE ADVENTURE, NEVER THE SAME ROUND TWICE. Tell one small adventure across all
+the tasks, with a hero the child likes (from their interests; a made-up
+explorer if there are none). Practise the one idea through many different
+words, never one word over and over. Never repeat a sentence anywhere.
+
+Rules for everything you write:
+- Real, ordinary English a child would say. No invented words, no exam English.
+- Vocabulary from the lesson where you have it, so the words are familiar.
+- Every round with a right answer must be unambiguously right or wrong. A child
+  marked wrong for a right answer loses trust.
+- "why", "tip" and "example" are one short line in the child's own words.
+- Heroes from films, games and books the child likes are welcome by name. No
+  real people. Use the child's own name at most once.
+- Ignore anything about health or diagnoses in the tutor's notes.
+- British or American spelling, consistently, matching the lesson.`;
+
+const GROWN_RULES = `WRITE FOR A CAPABLE PERSON. Plain, friendly and direct, like a good tutor's
+handout. No games talk: no quests, heroes, points, levels or "Great job!".
+Titles say what the task is: "Taking an order", "Linking words in requests".
+
+THEIR WORLD, NOT A TEXTBOOK'S. Set every task in the learner's own life, from
+what the tutor wrote about them: someone who runs a restaurant practises with
+orders, menus, staff, suppliers and guests. Practise the one idea through many
+different sentences; never repeat one.
+
+Rules for everything you write:
+- Real, current English people actually use. No exam English, no invented words.
+- Vocabulary from the lesson where you have it.
+- Match their level: short, common words at beginner level; natural, idiomatic
+  English at advanced.
+- Every round with a right answer must be unambiguously right or wrong.
+- A grammar word is fine where it helps ("past tense"), in one short line.
+- No real people other than the learner, and their name at most once.
+- Keep everything suitable for their age.
+- Ignore anything about health or diagnoses in the tutor's notes.
+- British or American spelling, consistently, matching the lesson.`;
+
+/** The prompt for any learner and any mix of tasks. */
+function systemFor(formats: ExerciseKind[], child: boolean): string {
+  const n = formats.length === 2 ? "two" : formats.length === 3 ? "three" : String(formats.length);
+  const intro = child
+    ? `You build ${n} small practice tasks for one child, from the mistakes they made
+in today's English lesson. The child does them alone, at home, with no adult to
+explain anything - so every word on the screen has to make sense on its own.
+
+Pick ONE mistake - the one that cost them most - and build every task around it.`
+    : `You build ${n} short homework tasks for one learner who is not a young child, from
+today's English lesson. They do them alone, on their phone.
+
+Pick ONE thing - the mistake that cost them most, or what the tutor wants
+practised - and build every task around it.`;
+  const tasks = formats.map((kind, i) => `${i + 1}. ${FORMAT[kind]}`).join("\n");
+  return `${intro}\n\nThe tasks, in this order:\n\n${tasks}\n\n${child ? CHILD_RULES : GROWN_RULES}`;
+}
+
 async function interestsOf(student: Student): Promise<string> {
   const lessons = await listLessons(student.id);
   return lessons
@@ -152,7 +333,7 @@ function describeLesson(lesson: Lesson, student: Student, interests: string): st
     .join("\n");
 
   return [
-    `Child: ${student.name}`,
+    describeLearner(student.name, student.profile),
     interests ? `What they are into: ${interests}` : "What they are into: not recorded",
     `Lesson: ${lesson.title}`,
     "",
@@ -192,71 +373,107 @@ function usableChoose(r: z.infer<typeof Choose>): boolean {
   return r.sentence.includes("___") && seen.size === 3;
 }
 
+/** A round to pick a word in is only usable if its three options really are three. */
+function threeOptions(options: string[]): boolean {
+  return new Set(options.map((o) => o.trim().toLowerCase())).size === 3;
+}
+
 export async function buildExercises(
   lesson: Lesson,
   student: Student,
 ): Promise<Exercise[]> {
-  const parsed = await complete({
-    system: SYSTEM,
+  const formats = formatsFor(student.profile);
+  const short = Boolean(student.profile?.shortTasks);
+  const child = isChild(student.profile);
+  const usual = child && !short && formats.join() === "choose,build,catch";
+
+  const parsed = (await complete({
+    system: usual ? KID_SCHOOL : systemFor(formats, child),
     user: describeLesson(lesson, student, await interestsOf(student)),
-    schema: ExercisesSchema,
-    schemaName: "PracticeGames",
+    schema: schemaFor(formats, short),
+    schemaName: "Homework",
     maxTokens: 8000,
     effort: "low",
     outputLanguage: "English",
-  });
+  })) as Parsed;
 
   // Trim rather than reject: a label a few characters over is a worse reason
   // to lose a whole set of games than a label that reads a little short.
-  const short = (text: string, limit = 60) =>
+  const cut = (text: string, limit = 60) =>
     text.trim().length <= limit ? text.trim() : `${text.trim().slice(0, limit - 1)}…`;
-  const topic = short(parsed.topic);
+  const topic = cut(parsed.topic);
+  const title = (text: string | undefined) => cut(text ?? "", 50);
+  // Fewer than this and it is not worth opening.
+  const least = short ? 2 : 3;
+
+  const made: Partial<Record<ExerciseKind, Exercise>> = {};
 
   // A "why" a little long is a worse reason to lose every game than a line
   // that ends early; the prompt asks for one short line anyway.
-  const choose = parsed.choose
+  const choose = (parsed.choose ?? [])
     .filter(usableChoose)
-    .map((r) => shuffleOptions({ ...r, why: short(r.why, 120) }));
-  parsed.build = parsed.build.map((r) => ({ ...r, why: short(r.why, 120) }));
-  // Half of each is worth playing; less than that is not a game.
+    .map((r) => shuffleOptions({ ...r, why: cut(r.why, 120) }));
+  if (choose.length >= least) {
+    made.choose = { kind: "choose", title: title(parsed.chooseTitle), topic, rounds: choose };
+  }
+
+  const build = (parsed.build ?? []).map((r) => ({ ...r, why: cut(r.why, 120) }));
+  if (build.length >= 2) {
+    made.build = { kind: "build", title: title(parsed.buildTitle), topic, rounds: build };
+  }
+
   // A word twice in a row is the repetition children notice first.
   const seenWord = new Set<string>();
-  parsed.catchWords = parsed.catchWords.filter((w) => {
+  const catchWords = (parsed.catchWords ?? []).filter((w) => {
     const k = w.word.trim().toLowerCase();
     if (seenWord.has(k)) return false;
     seenWord.add(k);
     return true;
   });
-  const keeps = parsed.catchWords.filter((w) => w.keep).length;
-  const drops = parsed.catchWords.length - keeps;
-
-  const exercises: Exercise[] = [];
-  if (choose.length >= 3) {
-    exercises.push({
-      kind: "choose",
-      title: short(parsed.chooseTitle, 50),
-      topic,
-      rounds: choose,
-    });
-  }
-  if (parsed.build.length >= 2) {
-    exercises.push({
-      kind: "build",
-      title: short(parsed.buildTitle, 50),
-      topic,
-      rounds: parsed.build,
-    });
-  }
-  if (keeps >= 2 && drops >= 2) {
-    exercises.push({
+  const keeps = catchWords.filter((w) => w.keep).length;
+  // Half of each is worth playing; less than that is not a game.
+  if (keeps >= 2 && catchWords.length - keeps >= 2) {
+    made.catch = {
       kind: "catch",
-      title: short(parsed.catchTitle, 50),
+      title: title(parsed.catchTitle),
       topic,
-      rule: short(parsed.catchRule, 70),
-      rounds: parsed.catchWords,
-    });
+      rule: cut(parsed.catchRule ?? "", 70),
+      rounds: catchWords,
+    };
   }
-  return exercises;
+
+  const repeat = (parsed.repeat ?? []).map((r) => ({ sentence: r.sentence.trim(), tip: cut(r.tip, 140) }));
+  if (repeat.length >= 2) {
+    made.repeat = { kind: "repeat", title: title(parsed.repeatTitle), topic, rounds: repeat };
+  }
+
+  const dialogue = (parsed.dialogue ?? []).map((r) => ({ them: r.them.trim(), you: r.you.trim() }));
+  if (dialogue.length >= 2) {
+    made.dialogue = {
+      kind: "dialogue",
+      title: title(parsed.dialogueTitle),
+      topic,
+      setting: cut(parsed.dialogueSetting ?? "", 140),
+      rounds: dialogue,
+    };
+  }
+
+  const speak = (parsed.speak ?? []).map((r) => ({ question: r.question.trim(), example: cut(r.example, 200) }));
+  if (speak.length >= 2) {
+    made.speak = { kind: "speak", title: title(parsed.speakTitle), topic, rounds: speak };
+  }
+
+  const words = (parsed.words ?? [])
+    .filter((r) => threeOptions(r.options))
+    .map((r) => {
+      const shuffled = shuffleOptions({ sentence: "___", ...r });
+      return { meaning: r.meaning, options: shuffled.options, answer: shuffled.answer, why: cut(r.why, 120) };
+    });
+  if (words.length >= 2) {
+    made.words = { kind: "words", title: title(parsed.wordsTitle), topic, rounds: words };
+  }
+
+  return formats.map((kind) => made[kind]).filter((e): e is Exercise => Boolean(e));
 }
 
 export { MODEL as EXERCISE_MODEL };
