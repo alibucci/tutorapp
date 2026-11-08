@@ -100,6 +100,10 @@ export async function PATCH(request: Request, { params }: Params) {
   // nothing. Refuse to store it.
   if (found.lesson.capture === "tutor") delete patch.transcript;
 
+  // When the lesson started is set once. A page that pressed Start again after
+  // stopping used to move it to the end of the lesson.
+  if (found.lesson.startedAt) delete patch.startedAt;
+
   const lesson = await updateLesson(id, patch);
   return NextResponse.json(lesson);
 }

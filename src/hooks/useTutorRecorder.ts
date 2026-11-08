@@ -276,11 +276,11 @@ export function useTutorRecorder(options: Options = {}) {
     if (ctxRef.current && ctxRef.current.state !== "running") void ctxRef.current.resume();
     const recorder = new MediaRecorder(stream, {
       mimeType: pickMimeType(),
-      // A clip is read by the recogniser, not thrown away like the lesson
-      // recorder's chunks, so it gets the bitrate that keeps consonants
-      // clean. It is converted to WAV before it is sent, so this costs
-      // nothing on the network.
-      audioBitsPerSecond: 128000,
+      // Sent as recorded, so this is what crosses the network: about 4 KB a
+      // second. A one-minute test through Deepgram read the same words at 32
+      // kbit/s as from WAV seven times the size, and the size is what a slow
+      // mobile connection in China could not carry.
+      audioBitsPerSecond: 32000,
     });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => {

@@ -23,9 +23,9 @@ const BASE = () =>
 export const ASR_MODEL = process.env.DASHSCOPE_ASR_MODEL ?? "qwen3-asr-flash";
 
 /**
- * One clip is one debrief answer or one microphone check: 16 kHz mono WAV,
- * about 32 KB a second. This allows a little over a minute - far more than a
- * prompt lasts, and inside what either provider accepts in one request.
+ * One clip is one piece of a lesson, one debrief answer or one microphone
+ * check: compressed, about 4 KB a second, or 16 kHz WAV at 32 KB a second when
+ * it has to be. This allows over a minute of WAV - far more than a piece lasts.
  */
 export const MAX_CLIP_BYTES = 2.5 * 1024 * 1024;
 
@@ -33,7 +33,25 @@ export function canTranscribe(): boolean {
   return DEEPGRAM_KEY().length > 0 || KEY().length > 0;
 }
 
-export class TranscribeError extends Error {}
+export class TranscribeError extends Error {
+  constructor(
+    message: string,
+    /** The provider's own HTTP status, when it answered at all. */
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * Whether the provider takes the browser's own compressed audio - AAC from
+ * Safari, Opus from Chrome - as it comes. Deepgram does, and it is seven or
+ * eight times smaller than WAV, which is what lets a lesson through a slow
+ * mobile connection at all. Qwen gets WAV.
+ */
+export function acceptsCompressed(): boolean {
+  return DEEPGRAM_KEY().length > 0;
+}
 
 /** BCP-47 tag from the lesson to the model's own code. */
 function languageCode(tag: string): string | undefined {
@@ -125,6 +143,7 @@ async function askDeepgram(
   if (!res.ok) {
     throw new TranscribeError(
       `Speech service error (${res.status}): ${body.err_msg ?? "request failed"}`,
+      res.status,
     );
   }
   return body;
@@ -168,7 +187,7 @@ async function transcribeQwen(
   if (!res.ok) {
     const code = body.error?.code ?? body.code ?? String(res.status);
     const message = body.error?.message ?? body.message ?? "request failed";
-    throw new TranscribeError(`Speech service error (${code}): ${message}`);
+    throw new TranscribeError(`Speech service error (${code}): ${message}`, res.status);
   }
   return (body.choices?.[0]?.message?.content ?? "").trim();
 }

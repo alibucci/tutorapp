@@ -50,6 +50,10 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   const [confirmingRestart, setConfirmingRestart] = useState(false);
   /** Finish was pressed and the last pieces are still being transcribed. */
   const [finishing, setFinishing] = useState(false);
+  /** Finishing has taken long enough to offer not waiting any longer. */
+  const [slowFinish, setSlowFinish] = useState(false);
+  /** Ends the wait for the last pieces, when the tutor will not wait. */
+  const stopWaitingRef = useRef<(() => void) | null>(null);
   /** The end-of-lesson save failed; the transcript is still here to retry. */
   const [unsaved, setUnsaved] = useState(false);
   /**
@@ -70,7 +74,9 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   /** Time from before an interruption, so a carried-on lesson stays in order. */
   const baseRef = useRef(0);
   const isGroup = lesson.kind === "group";
-  const speech = useClipTranscriber(lesson.language, { lines: isGroup });
+  // Pieces that fail go again by themselves every half minute, while the
+  // lesson carries on, rather than piling up for the end.
+  const speech = useClipTranscriber(lesson.language, { lines: isGroup, autoRetry: true });
   const rec = useTutorRecorder({
     gate,
     // The screen went off: what was said up to now goes off to be read.
@@ -136,9 +142,12 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     // A piece the gate never opened for is room noise or silence: there is
     // nothing in it to read, and sending it would only be paid for.
     const heard = heardRef.current;
-    return rec.endClip().then((clip) => {
+    const ended = rec.endClip().then((clip) => {
       if (clip && heard) void speech.send(clip, t);
     });
+    // A recorder the phone has frozen may never say it stopped; the lesson
+    // must still be able to end.
+    return Promise.race([ended, new Promise<void>((resolve) => window.setTimeout(resolve, 5000))]);
   }
 
   // The interval and the auto-pause outlive any one render; they call through
@@ -267,6 +276,28 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     }
   }
 
+  /**
+   * Wait for every piece still out, unless the tutor stops waiting. Each piece
+   * has its own time limit, so this ends either way; the button is for a
+   * tutor who would rather decide than watch.
+   */
+  async function waitForPieces(): Promise<TranscriptSegment[] | null> {
+    setFinishing(true);
+    setSlowFinish(false);
+    const slow = window.setTimeout(() => setSlowFinish(true), 30_000);
+    const transcript = await Promise.race([
+      speech.settle(),
+      new Promise<null>((resolve) => {
+        stopWaitingRef.current = () => resolve(null);
+      }),
+    ]);
+    window.clearTimeout(slow);
+    stopWaitingRef.current = null;
+    setFinishing(false);
+    setSlowFinish(false);
+    return transcript;
+  }
+
   async function end() {
     setConfirmingEnd(false);
     setFinishing(true);
@@ -274,20 +305,18 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     await cutClip();
     // Audio is never kept, so only the transcript and the timings are saved.
     rec.stop();
-    const transcript = await speech.settle();
-    setFinishing(false);
-    // Leaving now would lose what failed - it exists only on this page.
-    if (speech.failedRef.current.length) return;
+    const transcript = await waitForPieces();
+    // Leaving now would lose what failed or is still on its way - it exists
+    // only on this page. The tutor chooses below.
+    if (!transcript || speech.failedRef.current.length) return;
     await finishSave(transcript);
   }
 
   /** After a failed piece: try it again, then finish once all are back. */
   async function retryAndFinish() {
-    setFinishing(true);
     speech.retry();
-    const transcript = await speech.settle();
-    setFinishing(false);
-    if (speech.failedRef.current.length) return;
+    const transcript = await waitForPieces();
+    if (!transcript || speech.failedRef.current.length) return;
     await finishSave(transcript);
   }
 
@@ -487,7 +516,11 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
           >
             {saving ? "Saving…" : "Try saving again"}
           </button>
-        ) : interrupted ? null : !live ? (
+        ) : interrupted || finishing || rec.state === "stopped" ? (
+          // Stopped: this take is over. Starting again here would record a
+          // second lesson over the end of the first.
+          null
+        ) : !live ? (
           <button
             onClick={() => void begin()}
             disabled={rec.state === "idle" || saving}
@@ -561,15 +594,34 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
       {saveError && <p className="note note-warn">{saveError}</p>}
 
       {finishing && (
-        <p className="note note-quiet">Transcribing the last part of the lesson…</p>
+        <div className="note note-quiet space-y-2">
+          <p>
+            {speech.pending.length > 1
+              ? `Sending the last ${speech.pending.length} parts of the lesson…`
+              : "Transcribing the last part of the lesson…"}
+          </p>
+          {slowFinish && (
+            <>
+              <p className="t-small">
+                The connection is slow. You can stop waiting: what has not
+                arrived stays on this page to send again.
+              </p>
+              <button onClick={() => stopWaitingRef.current?.()} className="btn btn-quiet">
+                Stop waiting
+              </button>
+            </>
+          )}
+        </div>
       )}
 
-      {!finishing && !live && speech.failed.length > 0 && (
+      {!finishing && !live && (speech.failed.length > 0 || (rec.state === "stopped" && speech.pending.length > 0)) && (
         <div className="note note-warn space-y-2">
           <p>
-            {speech.failed.length === 1 ? "One part" : `${speech.failed.length} parts`} of the
-            lesson could not be transcribed: {speech.failed[0].error} The audio is still on
-            this page, but only until you leave it.
+            {speech.failed.length > 0 &&
+              `${speech.failed.length === 1 ? "One part" : `${speech.failed.length} parts`} of the lesson could not be transcribed: ${speech.failed[0].error} `}
+            {speech.pending.length > 0 &&
+              `${speech.pending.length === 1 ? "One part is" : `${speech.pending.length} parts are`} still on the way. `}
+            The audio is still on this page, but only until you leave it.
           </p>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => void retryAndFinish()} className="btn btn-primary">
@@ -617,7 +669,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         {live && speech.failed.length > 0 && (
           <p className="t-caption">
             {speech.failed.length} {speech.failed.length === 1 ? "part" : "parts"} could not be
-            transcribed yet - you can retry when you finish.
+            sent yet - probably the connection. Trying again every half minute; keep going.
           </p>
         )}
       </section>
