@@ -44,38 +44,59 @@ type ChatResponse = {
  */
 export type Effort = "low" | "high" | "max";
 
+/** One call's limit, unless the caller sets its own. */
+const TIMEOUT_MS = 120_000;
+
+/**
+ * The model was too slow, overloaded or out of reach - not wrong. Another
+ * model may well answer.
+ */
+class ModelUnavailable extends Error {}
+
 async function chat(
   messages: Message[],
   model: string,
   maxTokens: number,
   effort: Effort | undefined,
+  timeoutMs: number,
 ): Promise<string> {
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
-    method: "POST",
-    // A hung connection would otherwise leave the tutor watching a spinner
-    // forever. A full summary takes well under a minute.
-    signal: AbortSignal.timeout(120_000),
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey()}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      response_format: { type: "json_object" },
-      // Reasoning tokens come out of this budget, so keep it generous - a tight
-      // cap returns an empty string rather than an error.
-      max_tokens: maxTokens,
-      ...(effort ? { reasoning_effort: effort } : {}),
-    }),
-  });
-
-  const body = (await res.json()) as ChatResponse;
+  let res: Response;
+  let body: ChatResponse;
+  try {
+    res = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      // A hung connection would otherwise leave the tutor watching a spinner
+      // forever.
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey()}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        response_format: { type: "json_object" },
+        // Reasoning tokens come out of this budget, so keep it generous - a tight
+        // cap returns an empty string rather than an error.
+        max_tokens: maxTokens,
+        ...(effort ? { reasoning_effort: effort } : {}),
+      }),
+    });
+    body = (await res.json()) as ChatResponse;
+  } catch (e) {
+    throw new ModelUnavailable(
+      e instanceof Error && e.name === "TimeoutError"
+        ? `${model} took longer than ${Math.round(timeoutMs / 1000)} s - DeepSeek may be busy. Try again in a minute.`
+        : `${model} could not be reached. Try again in a minute.`,
+    );
+  }
 
   if (!res.ok) {
-    throw new Error(
-      `DeepSeek ${res.status}: ${body.error?.message ?? "request failed"}`,
-    );
+    const message = `DeepSeek ${res.status}: ${body.error?.message ?? "request failed"}`;
+    // Busy or broken on their side: worth another model. A bad key or an
+    // empty balance is not.
+    if (res.status >= 500 || res.status === 429) throw new ModelUnavailable(message);
+    throw new Error(message);
   }
 
   const choice = body.choices?.[0];
@@ -126,6 +147,13 @@ export async function complete<T>(opts: {
   maxTokens?: number;
   model?: string;
   effort?: Effort;
+  /** How long one call may take before it counts as failed. */
+  timeoutMs?: number;
+  /**
+   * A model to ask instead when the first is too slow or overloaded - so a
+   * busy hour at DeepSeek costs some polish, not the tutor's whole wait.
+   */
+  fallbackModel?: string;
   /**
    * Language for every human-readable string in the output. Without this the
    * model answers in whatever language the prompt happens to be written in,
@@ -133,8 +161,27 @@ export async function complete<T>(opts: {
    */
   outputLanguage?: string;
 }): Promise<T> {
+  const first = opts.model ?? MODEL;
+  const models =
+    opts.fallbackModel && opts.fallbackModel !== first ? [first, opts.fallbackModel] : [first];
+  for (let i = 0; i < models.length; i++) {
+    try {
+      // The fallback gets the full limit: it is the last chance.
+      return await completeWith(models[i], i === 0 ? (opts.timeoutMs ?? TIMEOUT_MS) : TIMEOUT_MS, opts);
+    } catch (e) {
+      if (!(e instanceof ModelUnavailable) || i === models.length - 1) throw e;
+      console.warn(`[llm] ${e.message} Asking ${models[i + 1]} instead.`);
+    }
+  }
+  throw new Error("unreachable");
+}
+
+async function completeWith<T>(
+  model: string,
+  timeoutMs: number,
+  opts: Parameters<typeof complete<T>>[0],
+): Promise<T> {
   const { system, user, schema, schemaName } = opts;
-  const model = opts.model ?? MODEL;
   const maxTokens = opts.maxTokens ?? 16000;
 
   const language = opts.outputLanguage
@@ -157,7 +204,7 @@ export async function complete<T>(opts: {
 
   let lastError = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await chat(messages, model, maxTokens, opts.effort);
+    const raw = await chat(messages, model, maxTokens, opts.effort, timeoutMs);
     if (!raw) {
       lastError = `${model} returned an empty response.`;
       continue;

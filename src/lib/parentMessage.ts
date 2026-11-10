@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MODEL, complete } from "./llm";
+import { MODEL, MODEL_FAST, complete } from "./llm";
 import { renderLesson } from "./summarize";
 import type { Lesson, ParentMessage, Student } from "./types";
 
@@ -44,6 +44,8 @@ export async function writeParentMessage(
     schemaName: "ParentMessage",
     maxTokens: 6000,
     effort: "low",
+    timeoutMs: 75_000,
+    fallbackModel: MODEL_FAST,
   });
   return { ...parsed, generatedAt: new Date().toISOString(), model: MODEL };
 }

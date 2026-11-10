@@ -79,6 +79,8 @@ export function DebriefRecorder({
   // screen with what had been said, rather than vanishing.
   const unfinished = lesson.debrief.length === 0 && lesson.debriefTranscript.length > 0;
   const [phase, setPhase] = useState<Phase>(unfinished ? "review" : "ready");
+  /** Something was recorded: false when the tutor went straight to typing. */
+  const [spoke, setSpoke] = useState(unfinished);
   const [index, setIndex] = useState(0);
   const [edits, setEdits] = useState<Record<string, string>>({});
   /** Typed during recording, alongside what is said. */
@@ -118,7 +120,10 @@ export function DebriefRecorder({
       /* eslint-disable react-hooks/set-state-in-effect */
       if (local?.edits) setEdits(local.edits);
       if (local?.typed) setTyped(local.typed);
-      if (local && local.segments.length) setPhase("review");
+      if (local && local.segments.length) {
+        setSpoke(true);
+        setPhase("review");
+      }
       /* eslint-enable react-hooks/set-state-in-effect */
     }
     // one-shot on mount
@@ -289,6 +294,7 @@ export function DebriefRecorder({
     clipStartRef.current = 0;
     startedAtRef.current = performance.now();
     setIndex(first);
+    setSpoke(true);
     setPhase("running");
     void wakeLock.acquire();
   }
@@ -300,6 +306,7 @@ export function DebriefRecorder({
     setEdits({});
     setTyped({});
     setError(null);
+    setSpoke(false);
     try {
       window.localStorage.removeItem(draftKey(lesson.id));
     } catch {
@@ -499,7 +506,8 @@ export function DebriefRecorder({
         </div>
       )}
 
-      {!transcribing &&
+      {spoke &&
+        !transcribing &&
         speech.failed.length === 0 &&
         speech.segments.length === 0 &&
         Object.keys(edits).length === 0 &&
@@ -512,7 +520,9 @@ export function DebriefRecorder({
         )}
 
       <p className="t-small t-muted">
-        {unfinished && Object.keys(edits).length === 0
+        {!spoke
+          ? "Type your answers - they go into the summary the same way as spoken ones."
+          : unfinished && Object.keys(edits).length === 0
           ? "This debrief was interrupted. Here is what was saved - check it, fill any gaps, then save."
           : "Transcribed from what you said. Fix anything the recogniser got wrong - it goes straight into the summary."}
       </p>

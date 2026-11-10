@@ -152,12 +152,12 @@ export function NewLessonForm({ students }: { students: Student[] }) {
 
           <label className="block">
             <span className="label">
-              Consent to record the child
+              Who agreed to recording
             </span>
             <input
               value={consentFrom}
               onChange={(e) => setConsentFrom(e.target.value)}
-              placeholder="Parent's name, or leave blank"
+              placeholder="Their name - e.g. Li Na (mother)"
               className="field"
             />
             <span className="hint">
@@ -180,7 +180,7 @@ export function NewLessonForm({ students }: { students: Student[] }) {
             }`}
           >
             {selected.recordingConsent
-              ? `Both voices will be recorded - consent from ${selected.recordingConsent.grantedBy}.`
+              ? `Both voices will be recorded - ${selected.recordingConsent.grantedBy} agreed to it.`
               : "No consent on file, so only your voice will be recorded."}
           </p>
         )
@@ -232,7 +232,7 @@ export function NewLessonForm({ students }: { students: Student[] }) {
           {
             value: "classroom" as const,
             label: "Physical classroom",
-            hint: "Adds an on-device gate so only near-mic speech is written to disk.",
+            hint: "Only speech close to your phone is sent to be written down - the rest of the room is left out. Audio is never saved.",
           },
         ].map((option) => (
           <label

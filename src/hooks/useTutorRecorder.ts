@@ -21,7 +21,7 @@ export type RecorderState =
 export type AutoPauseReason = "screen-off" | null;
 
 type Options = {
-  /** Classroom mode gates the signal so only near-mic speech is written. */
+  /** Classroom mode gates the signal so only near-mic speech is transcribed. */
   gate?: GateOptions | null;
   /** Fired when the recording pauses itself, so callers can stop their own work. */
   onAutoPause?: (reason: NonNullable<AutoPauseReason>) => void;

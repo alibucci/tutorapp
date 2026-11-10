@@ -84,14 +84,16 @@ export function HomeworkPanel({
   const [confirmReopen, setConfirmReopen] = useState(false);
   const [seconds, setSeconds] = useState(0);
 
-  // Drawing takes from a few seconds to a minute or two; count it out loud.
+  // Drawing and building take from a few seconds to a minute or two; count
+  // it out loud.
   useEffect(() => {
-    if (busy !== "draw") return;
+    if (busy !== "draw" && busy !== "games") return;
     const timer = window.setInterval(() => setSeconds((n) => n + 1), 1000);
     return () => window.clearInterval(timer);
   }, [busy]);
 
   async function buildGames() {
+    setSeconds(0);
     setBusy("games");
     setError(null);
     const result = await api(
@@ -213,7 +215,7 @@ export function HomeworkPanel({
               className="btn btn-soft btn-block"
             >
               {busy === "games"
-                ? "Reading the lesson…"
+                ? `Reading the lesson… ${seconds}s`
                 : `Build games from ${studentName}'s mistakes`}
             </button>
           ) : (

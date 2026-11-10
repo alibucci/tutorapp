@@ -75,16 +75,17 @@ export function AddStudentForm() {
       </label>
 
       <label className="block">
-        <span className="label">Recording consent from (optional)</span>
+        <span className="label">Who agreed to recording (optional)</span>
         <input
           value={consentFrom}
           onChange={(e) => setConsentFrom(e.target.value)}
-          placeholder="Parent's name, if they signed the consent form"
+          placeholder="Their name - e.g. Li Na (mother)"
           className="field"
         />
         <span className="hint">
-          Leave empty unless a parent has agreed in writing. Without it only
-          your voice is used.
+          The name of the parent who agreed in writing - or the student&rsquo;s own
+          name, for an adult. Leave empty without it: then only your voice is
+          used.
         </span>
       </label>
 

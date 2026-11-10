@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MODEL, complete } from "./llm";
+import { MODEL, MODEL_FAST, complete } from "./llm";
 import type { Lesson, LessonSummary, Student } from "./types";
 import { promptLabel } from "./types";
 
@@ -159,6 +159,9 @@ export async function summarizeLesson(
     schema: SummarySchema,
     schemaName: "LessonSummary",
     effort: "low",
+    // A busy hour at DeepSeek should cost polish, not the tutor's evening.
+    timeoutMs: 75_000,
+    fallbackModel: MODEL_FAST,
     outputLanguage: "English",
   });
 

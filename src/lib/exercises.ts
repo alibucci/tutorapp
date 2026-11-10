@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MODEL, complete } from "./llm";
+import { MODEL, MODEL_FAST, complete } from "./llm";
 import { describeLearner, formatsFor, isChild } from "./profile";
 import { listLessons } from "./store";
 import type { Exercise, ExerciseKind, Lesson, Student } from "./types";
@@ -394,6 +394,11 @@ export async function buildExercises(
     schemaName: "Homework",
     maxTokens: 8000,
     effort: "low",
+    // Usually half a minute. When DeepSeek is busy the careful model has
+    // taken over two; the fast one builds games about as good in a third of
+    // the time.
+    timeoutMs: 60_000,
+    fallbackModel: MODEL_FAST,
     outputLanguage: "English",
   })) as Parsed;
 

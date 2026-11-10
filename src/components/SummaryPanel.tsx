@@ -73,7 +73,7 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
             : lesson.debrief.length === 0 && !busy
               ? "Written once your debrief is in - it carries what the transcript cannot."
             : busy
-              ? "Reading the lesson and writing the summary and the parent message. This usually takes 15–30 seconds."
+              ? "Reading the lesson and writing the summary and the parent message. This usually takes under a minute - two at a busy time."
               : "Nothing generated yet."}
         </p>
       ) : (
