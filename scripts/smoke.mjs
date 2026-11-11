@@ -350,6 +350,22 @@ check("parent sees the note after approval", !parentAfter.includes("No weekly no
   check("a signed-out visitor cannot start a Telegram link",
     (await anon("/api/account/telegram", { method: "POST" })).status === 403
       || !configured);
+
+  // Email notices: hidden without a key; with one, on by default and the
+  // tutor's own switch. The test tutors' addresses end in .test, so nothing
+  // is ever actually sent from here.
+  const mail = Boolean(env.RESEND_API_KEY);
+  const off = await a("/api/account/email", patch({ on: false }));
+  check("email notices are hidden without a key, switchable with one",
+    mail ? off.status === 200 && off.json?.on === false : off.status === 404);
+  if (mail) {
+    check("email notices switch back on",
+      (await a("/api/account/email", patch({ on: true }))).json?.on === true);
+    check("a test email is never sent to a .test address",
+      (await a("/api/account/email", { method: "POST" })).status === 502);
+  }
+  check("a signed-out visitor cannot change email notices",
+    (await anon("/api/account/email", patch({ on: false }))).status === (mail ? 403 : 404));
 }
 
 {

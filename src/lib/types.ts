@@ -203,6 +203,8 @@ export type Tutor = {
   telegram?: { chatId: string; name: string; linkedAt: string };
   /** A connection in progress: the code the tutor is about to send the bot. */
   telegramLink?: { code: string; expiresAt: string };
+  /** Notices by email, to the login address. On unless switched off. */
+  emailNotices?: boolean;
 };
 
 export type Student = {

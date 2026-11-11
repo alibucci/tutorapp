@@ -1,7 +1,8 @@
 import { gameScore, homeworkDone } from "./homework";
 import { getStudent, getTutor } from "./store";
+import { canEmail, escapeHtml, sendEmail, siteUrl } from "./email";
 import { canNotify, notify } from "./telegram";
-import type { Lesson } from "./types";
+import type { Lesson, Tutor } from "./types";
 
 /**
  * The two things worth interrupting a tutor for.
@@ -15,33 +16,77 @@ const STRUGGLED_BELOW = 0.5;
 
 /** Fire and forget: a notice must never fail the request that caused it. */
 export function noticeHomeworkDone(before: Lesson, after: Lesson | null): void {
-  if (!canNotify() || !after) return;
+  if ((!canNotify() && !canEmail()) || !after) return;
   if (homeworkDone(before.homework) || !homeworkDone(after.homework)) return;
   void send(after).catch((e) => console.error("[notice]", e));
+}
+
+/** Email is on unless the tutor switched it off. */
+export function wantsEmail(tutor: Pick<Tutor, "emailNotices">): boolean {
+  return tutor.emailNotices !== false;
 }
 
 async function send(lesson: Lesson): Promise<void> {
   const student = await getStudent(lesson.studentId);
   if (!student) return;
   const tutor = await getTutor(student.tutorId);
-  const chatId = tutor?.telegram?.chatId;
-  if (!chatId) return;
+  if (!tutor) return;
 
   const score = gameScore(lesson.homework);
   const struggled = score.total > 0 && score.right / score.total < STRUGGLED_BELOW;
 
-  const lines = [
-    struggled
-      ? `<b>${student.name}</b> finished the homework, but found it hard.`
-      : `<b>${student.name}</b> finished the homework.`,
-    lesson.title,
-  ];
+  const headline = struggled
+    ? `${student.name} finished the homework, but found it hard.`
+    : `${student.name} finished the homework.`;
+  const details: string[] = [];
   if (score.total > 0) {
-    lines.push(`${score.right} of ${score.total} right${struggled ? " - worth going over again" : ""}`);
+    details.push(`${score.right} of ${score.total} right${struggled ? " - worth going over again" : ""}`);
   }
   for (const result of lesson.homework?.results ?? []) {
-    lines.push(`· ${result.topic}: ${result.right}/${result.total}`);
+    details.push(`${result.topic}: ${result.right}/${result.total}`);
   }
+  const link = `${siteUrl()}/lesson/${lesson.id}/review#homework`;
 
-  await notify(chatId, lines.join("\n"));
+  const sends: Promise<unknown>[] = [];
+  const chatId = tutor.telegram?.chatId;
+  if (chatId && canNotify()) {
+    sends.push(
+      notify(
+        chatId,
+        [
+          struggled
+            ? `<b>${escapeHtml(student.name)}</b> finished the homework, but found it hard.`
+            : `<b>${escapeHtml(student.name)}</b> finished the homework.`,
+          escapeHtml(lesson.title),
+          ...details.map((line, i) => escapeHtml(i === 0 && score.total > 0 ? line : `· ${line}`)),
+        ].join("\n"),
+      ),
+    );
+  }
+  if (canEmail() && wantsEmail(tutor)) {
+    sends.push(
+      sendEmail({
+        to: tutor.email,
+        subject: struggled
+          ? `${student.name} found the homework hard`
+          : `${student.name} finished the homework`,
+        text: [headline, lesson.title, "", ...details, "", `See the answers: ${link}`, "", OFF_TEXT].join("\n"),
+        html: emailHtml(headline, lesson.title, details, link),
+      }),
+    );
+  }
+  await Promise.all(sends);
+}
+
+const OFF_TEXT = `You get this because email notices are on for your aloudli account. Switch them off on your account page: ${siteUrl()}/account`;
+
+function emailHtml(headline: string, title: string, details: string[], link: string): string {
+  const e = escapeHtml;
+  return `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:16px;line-height:1.5;color:#1c1917;max-width:32rem">
+<p style="font-size:18px;font-weight:600;margin:0 0 4px">${e(headline)}</p>
+<p style="margin:0 0 16px;color:#57534e">${e(title)}</p>
+${details.length ? `<ul style="margin:0 0 16px;padding-left:20px">${details.map((d) => `<li>${e(d)}</li>`).join("")}</ul>` : ""}
+<p style="margin:0 0 24px"><a href="${e(link)}" style="color:#1f6f5c;font-weight:600">See the answers</a></p>
+<p style="margin:0;font-size:13px;color:#78716c">You get this because email notices are on for your aloudli account. <a href="${e(siteUrl())}/account" style="color:#78716c">Switch them off</a>.</p>
+</div>`;
 }
