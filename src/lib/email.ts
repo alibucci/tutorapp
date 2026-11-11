@@ -33,7 +33,7 @@ export function siteUrl(): string {
  * live there. Sending to them would only bounce, and bounces cost the
  * domain its good name with the mail providers.
  */
-function deliverable(to: string): boolean {
+export function deliverable(to: string): boolean {
   return !/\.(test|example|invalid|localhost)$/i.test(to.trim());
 }
 
@@ -65,6 +65,9 @@ export async function sendEmail(message: {
     return false;
   }
 }
+
+/** How long an address-confirmation link works. */
+export const CONFIRM_HOURS = 48;
 
 /** Text safe to put inside HTML. */
 export function escapeHtml(text: string): string {

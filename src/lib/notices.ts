@@ -21,9 +21,9 @@ export function noticeHomeworkDone(before: Lesson, after: Lesson | null): void {
   void send(after).catch((e) => console.error("[notice]", e));
 }
 
-/** Email is on unless the tutor switched it off. */
-export function wantsEmail(tutor: Pick<Tutor, "emailNotices">): boolean {
-  return tutor.emailNotices !== false;
+/** The confirmed address to email notices to, if there is one. */
+export function noticeAddress(tutor: Pick<Tutor, "noticeEmail">): string | null {
+  return tutor.noticeEmail?.confirmedAt ? tutor.noticeEmail.address : null;
 }
 
 async function send(lesson: Lesson): Promise<void> {
@@ -63,10 +63,11 @@ async function send(lesson: Lesson): Promise<void> {
       ),
     );
   }
-  if (canEmail() && wantsEmail(tutor)) {
+  const address = noticeAddress(tutor);
+  if (canEmail() && address) {
     sends.push(
       sendEmail({
-        to: tutor.email,
+        to: address,
         subject: struggled
           ? `${student.name} found the homework hard`
           : `${student.name} finished the homework`,
@@ -78,7 +79,7 @@ async function send(lesson: Lesson): Promise<void> {
   await Promise.all(sends);
 }
 
-const OFF_TEXT = `You get this because email notices are on for your aloudli account. Switch them off on your account page: ${siteUrl()}/account`;
+const OFF_TEXT = `You get this because you switched on email notices in your aloudli account. Switch them off on your account page: ${siteUrl()}/account`;
 
 function emailHtml(headline: string, title: string, details: string[], link: string): string {
   const e = escapeHtml;
@@ -87,6 +88,6 @@ function emailHtml(headline: string, title: string, details: string[], link: str
 <p style="margin:0 0 16px;color:#57534e">${e(title)}</p>
 ${details.length ? `<ul style="margin:0 0 16px;padding-left:20px">${details.map((d) => `<li>${e(d)}</li>`).join("")}</ul>` : ""}
 <p style="margin:0 0 24px"><a href="${e(link)}" style="color:#1f6f5c;font-weight:600">See the answers</a></p>
-<p style="margin:0;font-size:13px;color:#78716c">You get this because email notices are on for your aloudli account. <a href="${e(siteUrl())}/account" style="color:#78716c">Switch them off</a>.</p>
+<p style="margin:0;font-size:13px;color:#78716c">You get this because you switched on email notices in your aloudli account. <a href="${e(siteUrl())}/account" style="color:#78716c">Switch them off</a>.</p>
 </div>`;
 }

@@ -203,8 +203,18 @@ export type Tutor = {
   telegram?: { chatId: string; name: string; linkedAt: string };
   /** A connection in progress: the code the tutor is about to send the bot. */
   telegramLink?: { code: string; expiresAt: string };
-  /** Notices by email, to the login address. On unless switched off. */
-  emailNotices?: boolean;
+  /**
+   * Where homework notices go by email. Not the login: a login is often made
+   * up and no mailbox. Mail goes only once the tutor has opened the link sent
+   * to this address.
+   */
+  noticeEmail?: {
+    address: string;
+    confirmedAt?: string;
+    /** The confirmation link's secret, until it is used. */
+    token?: string;
+    sentAt?: string;
+  };
 };
 
 export type Student = {
