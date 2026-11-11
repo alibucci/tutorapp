@@ -212,6 +212,11 @@ export type Student = {
   name: string;
   createdAt: string;
   recordingConsent?: RecordingConsent;
+  /**
+   * The learner's own yes to having their pronunciation scored. Only an adult
+   * can give it, only from their own homework screen - never the tutor.
+   */
+  voiceConsent?: VoiceConsent;
   /** Opaque URL keys - a link is one way in, an account the other. */
   studentKey: string;
   parentKey: string;
@@ -489,6 +494,11 @@ export type Homework = {
   /** One entry per game the child finished. */
   results?: ExerciseResult[];
   /**
+   * Pronunciation scores, by "kind.round", from the first try at each line.
+   * Scores only: the recording itself is never kept.
+   */
+  voice?: Record<string, Pronounced>;
+  /**
    * The look it was sent in. Changing the learner's profile later changes the
    * next homework, not one already given out.
    */
@@ -580,3 +590,34 @@ export function promptLabel(id: string): string {
   const all = [...DEBRIEF_PROMPTS, ...INTRO_PROMPTS] as { id: string; label: string }[];
   return all.find((p) => p.id === id)?.label ?? id;
 }
+
+// ---------------------------------------------------------------------------
+// Pronunciation scoring.
+// ---------------------------------------------------------------------------
+
+/** What the learner agreed to, and which wording they saw. */
+export type VoiceConsent = { at: string; version: number };
+
+/** One line said aloud, as the scoring service heard it. 0-100 throughout. */
+export type Pronounced = {
+  overall: number;
+  /** How clearly each sound was made. */
+  pronunciation: number;
+  /** Pace and pauses. */
+  fluency: number;
+  /** Stress and rhythm. */
+  rhythm: number;
+  /** How much of the line was said at all. */
+  complete: number;
+  words: PronouncedWord[];
+  at: string;
+};
+
+export type PronouncedWord = {
+  word: string;
+  score: number;
+  /** Not heard at all. */
+  missed?: boolean;
+  /** The sounds that went wrong, with what was heard instead when known. */
+  sounds?: { sound: string; heard?: string }[];
+};

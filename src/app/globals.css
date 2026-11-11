@@ -2212,3 +2212,18 @@ textarea.field { line-height: var(--leading-normal); }
 /* The skins colour .game-small for the dark ground; here it sits on the panel. */
 .game-palette .game-line-say .game-small { color: color-mix(in oklab, var(--g-ink) 70%, transparent); }
 .game-minecraft .game-line-say .game-small { color: #3f3f3f; text-shadow: none; }
+
+/* Pronunciation checks: the score, and every word marked by how it came out.
+   Weak and missed words differ in line style, not only colour. */
+.game-voice-score { font-size: 2rem; font-weight: 800; line-height: 1.1; }
+.voice-weak {
+  text-decoration: underline wavy #c2410c;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+.voice-missed {
+  text-decoration: line-through #b91c1c;
+  text-decoration-thickness: 2px;
+  opacity: 0.7;
+}
+.game-recording { background: #b91c1c !important; color: #fff !important; }

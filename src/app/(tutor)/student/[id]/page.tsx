@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { canScoreVoice } from "@/lib/pronounce";
+import { hasVoiceConsent, mayScoreVoice } from "@/lib/voice";
 import { notFound } from "next/navigation";
 import { ArchiveStudent } from "@/components/ArchiveStudent";
 import { FamilyLogin } from "@/components/FamilyLogin";
@@ -62,6 +64,15 @@ export default async function StudentPage({
           <span className="tag tag-quiet min-h-9 px-3 t-small">
             {student.recordingConsent ? "Both voices recorded" : "Tutor's voice only"}
           </span>
+          {canScoreVoice() && mayScoreVoice(student) && (
+            // The learner decides this on their own screen; the tutor only sees it.
+            <span
+              className="tag tag-quiet min-h-9 px-3 t-small"
+              title="Asked on their homework screen the first time they say a line. Only they can switch it on or off."
+            >
+              {hasVoiceConsent(student) ? "Pronunciation checks on" : "Pronunciation checks not agreed"}
+            </span>
+          )}
         </div>
         {student.archivedAt && (
           <ArchiveStudent studentId={student.id} studentName={student.name} archived />

@@ -4,7 +4,14 @@ import { LIMIT, readJson } from "@/lib/http";
 import { noticeHomeworkDone } from "@/lib/notices";
 import { updateLesson } from "@/lib/store";
 import { answered, saidRight } from "@/lib/speaking";
-import { EXERCISE_KINDS, type Exercise, type RoundAnswer, type RoundReply } from "@/lib/types";
+import {
+  EXERCISE_KINDS,
+  type Exercise,
+  type Pronounced,
+  type RoundAnswer,
+  type RoundReply,
+} from "@/lib/types";
+import { VOICE_PASS, voiceSummary } from "@/lib/voice";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,7 +29,12 @@ function spoken(reply: RoundReply): string | null {
  * worked out here, against the exercise the tutor approved, so a score is a
  * fact about the child rather than a number the page was trusted to report.
  */
-function mark(exercise: Exercise, index: number, reply: RoundReply): RoundAnswer | null {
+function mark(
+  exercise: Exercise,
+  index: number,
+  reply: RoundReply,
+  voice?: Record<string, Pronounced>,
+): RoundAnswer | null {
   if (exercise.kind === "choose") {
     const round = exercise.rounds[index];
     if (!round || typeof reply !== "number") return null;
@@ -55,8 +67,15 @@ function mark(exercise: Exercise, index: number, reply: RoundReply): RoundAnswer
   if (exercise.kind === "repeat" || exercise.kind === "dialogue") {
     const target =
       exercise.kind === "repeat" ? exercise.rounds[index]?.sentence : exercise.rounds[index]?.you;
+    if (!target) return null;
+    // Scored by ear, on the server, when the learner asked for that: the
+    // score is the answer.
+    const scored = voice?.[`${exercise.kind}.${index}`];
+    if (scored) {
+      return { asked: target, answered: voiceSummary(scored), right: scored.overall >= VOICE_PASS };
+    }
     const said = spoken(reply);
-    if (!target || said === null) return null;
+    if (said === null) return null;
     return { asked: target, answered: said || "(nothing)", right: saidRight(target, said) };
   }
   if (exercise.kind === "speak") {
@@ -105,7 +124,7 @@ export async function POST(request: Request, { params }: Params) {
   // Never more rounds than the game has, whatever arrives.
   const replies = (parsed.replies as RoundReply[]).slice(0, exercise.rounds.length);
   const rounds = replies
-    .map((reply, i) => mark(exercise, i, reply))
+    .map((reply, i) => mark(exercise, i, reply, found.lesson.homework?.voice))
     .filter((r): r is RoundAnswer => r !== null);
   const right = rounds.filter((r) => r.right).length;
 

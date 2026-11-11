@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { ListenButton, SpokenAnswer } from "@/components/SpokenAnswer";
+import { VoiceConsent, type VoiceProps, VoiceRecorder, VoiceResult } from "@/components/VoiceCheck";
 import { answered as hasAnswer, saidRight } from "@/lib/speaking";
+import { VOICE_PASS } from "@/lib/voice";
 import type {
   BuildRound,
   CatchRound,
   ChooseRound,
   DialogueRound,
   Exercise,
+  Pronounced,
   RepeatRound,
   RoundReply,
   SpeakRound,
@@ -37,9 +40,11 @@ type Props = {
   onDone: (replies: RoundReply[]) => void;
   /** Words from the theme, so a quest says "quest" and a story says "page". */
   words: { submit: string };
+  /** Pronunciation checks, for an adult who may have them. */
+  voice?: VoiceProps;
 };
 
-export function PracticeGame({ exercise, onRound, onDone, words }: Props) {
+export function PracticeGame({ exercise, onRound, onDone, words, voice }: Props) {
   switch (exercise.kind) {
     case "choose":
       return (
@@ -81,6 +86,8 @@ export function PracticeGame({ exercise, onRound, onDone, words }: Props) {
           onDone={onDone}
           round={(i) => repeatRound(exercise.rounds[i])}
           words={words}
+          kind="repeat"
+          voice={voice}
         />
       );
     case "dialogue":
@@ -93,6 +100,8 @@ export function PracticeGame({ exercise, onRound, onDone, words }: Props) {
           onDone={onDone}
           round={(i) => dialogueRound(exercise.rounds[i])}
           words={words}
+          kind="dialogue"
+          voice={voice}
         />
       );
     case "speak":
@@ -661,6 +670,8 @@ function SayIt({
   onRound,
   onDone,
   words,
+  kind,
+  voice,
 }: {
   title: string;
   setting?: string;
@@ -669,25 +680,31 @@ function SayIt({
   onRound: (right: boolean) => void;
   onDone: (replies: RoundReply[]) => void;
   words: { submit: string };
+  /** Which game, for scoring a line by ear. */
+  kind?: "repeat" | "dialogue";
+  voice?: VoiceProps;
 }) {
   const [at, setAt] = useState(0);
   const [said, setSaid] = useState("");
   const [checked, setChecked] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [replies, setReplies] = useState<string[]>([]);
+  const [scored, setScored] = useState<Pronounced | null>(null);
 
   const round = roundAt(at);
-  const correct = round.check(said);
+  // A fixed line to say, and a learner who may have it scored by ear.
+  const byEar = Boolean(voice && kind && round.target && voice.state !== "off");
+  const correct = byEar ? Boolean(scored && scored.overall >= VOICE_PASS) : round.check(said);
   const last = at + 1 >= total;
 
-  function check() {
+  function check(right = correct, reply = said.trim()) {
     setChecked(true);
     const n = attempt + 1;
     setAttempt(n);
     // The first try is the one that counts, as in every other game.
     if (n === 1) {
-      setReplies([...replies, said.trim()]);
-      onRound(correct);
+      setReplies([...replies, reply]);
+      onRound(right);
     }
   }
 
@@ -700,7 +717,10 @@ function SayIt({
     setSaid("");
     setChecked(false);
     setAttempt(0);
+    setScored(null);
   }
+
+  const settled = checked && (correct || attempt > 1);
 
   return (
     <div className="game-panel" key={at}>
@@ -724,17 +744,27 @@ function SayIt({
         </div>
       )}
 
-      <p className="game-hint mt-3">{round.ask}</p>
-      <SpokenAnswer
-        key={`${at}-${attempt > 1 ? "again" : "first"}`}
-        value={said}
-        onChange={(next) => {
-          setSaid(next);
-          setChecked(false);
-        }}
-        disabled={checked && (correct || attempt > 1)}
-        multiline={round.multiline}
-      />
+      {byEar && voice && kind ? (
+        voice.state === "ask" ? (
+          <VoiceConsent voice={voice} />
+        ) : (
+          scored && <VoiceResult result={scored} />
+        )
+      ) : (
+        <>
+          <p className="game-hint mt-3">{round.ask}</p>
+          <SpokenAnswer
+            key={`${at}-${attempt > 1 ? "again" : "first"}`}
+            value={said}
+            onChange={(next) => {
+              setSaid(next);
+              setChecked(false);
+            }}
+            disabled={settled}
+            multiline={round.multiline}
+          />
+        </>
+      )}
 
       {checked && (
         <Verdict
@@ -750,11 +780,35 @@ function SayIt({
         />
       )}
 
-      {checked && (correct || attempt > 1) ? (
+      {settled ? (
         <Buttons canRetry={false} onRetry={() => {}} onNext={next} last={last} />
+      ) : byEar && voice && kind ? (
+        voice.state === "on" && (
+          <VoiceRecorder
+            key={`${at}-${attempt}`}
+            voice={voice}
+            kind={kind}
+            round={at}
+            attempt={attempt + 1}
+            onScored={(result) => {
+              setScored(result);
+              // The server keeps the score; this only says it was spoken.
+              check(result.overall >= VOICE_PASS, "(spoken)");
+            }}
+          />
+        )
       ) : (
-        <button onClick={check} disabled={!said.trim()} className="game-button mt-4">
+        <button onClick={() => check()} disabled={!said.trim()} className="game-button mt-4">
           {checked ? "Check again" : words.submit}
+        </button>
+      )}
+
+      {byEar && voice?.state === "on" && (
+        <button
+          onClick={() => void voice.setConsent(false)}
+          className="game-hint mt-4 underline"
+        >
+          Stop checking my voice
         </button>
       )}
     </div>

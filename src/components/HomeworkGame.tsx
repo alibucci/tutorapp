@@ -8,6 +8,7 @@ import { gameFonts } from "@/lib/fonts";
 import { type GameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
 import { PracticeGame } from "@/components/PracticeGame";
 import { MicButton } from "@/components/SpokenAnswer";
+import type { VoiceProps, VoiceState } from "@/components/VoiceCheck";
 import {
   ADJECTIVES_TASK,
   EXERCISE_LABEL,
@@ -53,6 +54,7 @@ export function HomeworkGame({
   finished,
   results,
   preview,
+  voiceCheck,
 }: {
   lessonId: string;
   /** Empty when this homework is games only. */
@@ -71,7 +73,31 @@ export function HomeworkGame({
   results?: ExerciseResult[];
   /** The tutor looking at the child's screen. Nothing is recorded. */
   preview?: boolean;
+  /** Pronunciation checks: whether offered to this learner, and their answer. */
+  voiceCheck?: { offered: boolean; agreed: boolean };
 }) {
+  const [voiceState, setVoiceState] = useState<VoiceState>(
+    !voiceCheck?.offered || preview ? "off" : voiceCheck.agreed ? "on" : "ask",
+  );
+  const voice: VoiceProps | undefined =
+    voiceState === "off"
+      ? undefined
+      : {
+          state: voiceState,
+          lessonId,
+          linkKey,
+          skip: () => setVoiceState("off"),
+          setConsent: async (agree) => {
+            const result = await api(
+              `/api/lessons/${lessonId}/homework/voice`,
+              { method: "PUT", json: { key: linkKey, agree } },
+              "Could not save that. Try again.",
+            );
+            if (!result.ok) return result.error;
+            setVoiceState(agree ? "on" : "off");
+            return null;
+          },
+        };
   // Games first - they are quick and they warm up the words the picture task
   // then asks the child to use.
   const steps: Step[] = [
@@ -304,6 +330,7 @@ export function HomeworkGame({
             key={`${game.kind}-${step}-${replay}`}
             exercise={game}
             words={{ submit: style.words.submit }}
+            voice={voice}
             onRound={(right) => {
               setInGame((n) => n + 1);
               if (right) setPoints((n) => n + 1);

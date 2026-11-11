@@ -504,6 +504,22 @@ function picture(bytes) {
   check("a wrong key cannot load the picture", (await img("wrong-key")).status === 404);
   check("the parent link cannot load the picture", (await img(keys.parentKey)).status === 404);
   check("the quest page opens", (await anon(`/s/${childKey}/quest/${lessonA.id}`)).status === 200);
+
+  // Pronunciation checks are for adults who agree themselves. This learner
+  // has no age, so counts as a child; nobody else may agree for anyone.
+  const voice = `/api/lessons/${lessonA.id}/homework/voice`;
+  check("a child cannot switch on pronunciation checks",
+    (await anon(voice, put({ key: childKey, agree: true }))).status === 403);
+  check("the tutor cannot agree to pronunciation checks for a learner",
+    (await a(voice, put({ agree: true }))).status === 404);
+  check("the parent link cannot agree to pronunciation checks",
+    (await anon(voice, put({ key: keys.parentKey, agree: true }))).status === 404);
+  check("without agreement, no recording is scored",
+    (await anon(`${voice}?kind=repeat&round=0&key=${childKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "audio/wav" },
+      body: new Uint8Array(4000),
+    })).status === 403);
   check("the tutor can look at the child's screen without breaking it",
     (await a(`/s/${childKey}/quest/${lessonA.id}`)).status === 200);
   check("a tutor's play is never written to the child's score",

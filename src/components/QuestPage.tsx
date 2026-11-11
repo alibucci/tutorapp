@@ -3,6 +3,8 @@ import { HomeworkGame } from "@/components/HomeworkGame";
 import { homeworkFor } from "@/lib/access";
 import { fromSent, styleFor } from "@/lib/gameStyles";
 import { homeworkDone, homeworkImageUrl } from "@/lib/homework";
+import { canScoreVoice } from "@/lib/pronounce";
+import { hasVoiceConsent, mayScoreVoice } from "@/lib/voice";
 
 /** One homework, for whichever way the child got in. */
 export async function QuestPage({
@@ -35,6 +37,10 @@ export async function QuestPage({
       results={homework.results}
       // A tutor is looking at the child's screen, not doing the homework.
       preview={found.tutor}
+      voiceCheck={{
+        offered: canScoreVoice() && mayScoreVoice(found.student),
+        agreed: hasVoiceConsent(found.student),
+      }}
     />
   );
 }
