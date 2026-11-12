@@ -242,6 +242,7 @@ export async function createLesson(
       Pick<
         Lesson,
         | "kind"
+        | "request"
         | "groupStudentIds"
         | "groupId"
         | "startedAt"
@@ -261,6 +262,7 @@ export async function createLesson(
     capture: input.capture,
     language: input.language,
     ...(input.kind && { kind: input.kind }),
+    ...(input.request && { request: input.request }),
     ...(input.groupStudentIds && { groupStudentIds: input.groupStudentIds }),
     ...(input.groupId && { groupId: input.groupId }),
     ...(input.startedAt && { startedAt: input.startedAt }),

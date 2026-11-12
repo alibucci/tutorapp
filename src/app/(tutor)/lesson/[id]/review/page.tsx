@@ -28,6 +28,9 @@ export default async function ReviewPage({
   const { lesson, student } = found;
   // The shared recording has no summary of its own: each child's lesson does.
   if (lesson.kind === "group") redirect(`/lesson/${id}/group`);
+  // Extra homework has no lesson behind it: no summary, debrief or parent
+  // message - only the games.
+  const practice = lesson.kind === "practice";
 
   const homeworkSent = Boolean(lesson.homework?.sentAt);
   const messageSent = Boolean(lesson.parentMessage?.copiedAt);
@@ -57,8 +60,8 @@ export default async function ReviewPage({
             {student && <span className="font-normal t-muted"> · {student.name}</span>}
           </h1>
           <p className="t-small t-muted">
-            {lesson.mode === "classroom" ? "In the room" : "Online"}
-            {lesson.recordedMs
+            {practice ? "Extra homework" : lesson.mode === "classroom" ? "In the room" : "Online"}
+            {!practice && lesson.recordedMs
               ? ` · ${Math.max(1, Math.round(lesson.recordedMs / 60000))} min`
               : ""}
             {` · ${DATE.format(new Date(lesson.createdAt))}`}
@@ -66,8 +69,9 @@ export default async function ReviewPage({
         </span>
       </header>
 
-      <ChangeStudent {...await moveOptions(lesson, student)} />
+      {!practice && <ChangeStudent {...await moveOptions(lesson, student)} />}
 
+      {!practice && (
       <nav
         aria-label="Steps"
         className="steps sticky top-0 z-[5] -mx-4 border-b border-line bg-background px-4 py-3"
@@ -82,8 +86,9 @@ export default async function ReviewPage({
           </a>
         ))}
       </nav>
+      )}
 
-      {lesson.debrief.length === 0 && (
+      {!practice && lesson.debrief.length === 0 && (
         <section className="card card-pad flex flex-wrap items-center justify-between gap-3">
           <span>
             <span className="block font-semibold">No debrief yet</span>
@@ -97,7 +102,7 @@ export default async function ReviewPage({
         </section>
       )}
 
-      {lesson.interruptions?.length > 0 && (
+      {!practice && lesson.interruptions?.length > 0 && (
         <section className="note note-warn">
           <p className="font-semibold">The recording was interrupted</p>
           <ul className="mt-1 space-y-0.5">
@@ -118,6 +123,12 @@ export default async function ReviewPage({
       {/* Phone: one column in step order. Desktop: what to read on the
           left, what to do on the right. */}
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-start">
+      {practice ? (
+        <section className="card card-pad space-y-1">
+          <p className="t-eyebrow">What you asked for</p>
+          <p>{lesson.request}</p>
+        </section>
+      ) : (
       <div className="stack-lg min-w-0">
       <div id="summary" className="scroll-mt-20">
         {/* Keyed by student: after a move, each starts again from nothing. */}
@@ -126,9 +137,10 @@ export default async function ReviewPage({
 
       <SkillReview key={student.id} lesson={lesson} studentName={student?.name} />
       </div>
+      )}
 
       <div className="stack-lg min-w-0">
-      {lesson.summary && (
+      {(lesson.summary || practice) && (
         <HomeworkPanel
           key={student.id}
           lesson={lesson}
@@ -142,7 +154,7 @@ export default async function ReviewPage({
         />
       )}
 
-      {parent && (
+      {parent && !practice && (
         <div id="parent" className="scroll-mt-20">
           <ParentMessagePanel key={student.id} lesson={lesson} />
         </div>

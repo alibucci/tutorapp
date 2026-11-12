@@ -285,8 +285,9 @@ export function HomeworkPanel({
           )}
           {exercises.length > 0 && !sent && (
             <p className="hint">
-              Tap a game to check it before you send - the words come from this
-              lesson, but they are written by the model.
+              Tap a game to check it before you send - the words come from{" "}
+              {lesson.kind === "practice" ? "what you asked for" : "this lesson"}, but
+              they are written by the model.
             </p>
           )}
         </div>
@@ -380,7 +381,8 @@ export function HomeworkPanel({
           {!finished && (
             <span className="hint">
               {studentName} reads this alone, so keep it in their words - no
-              grammar terms. Suggested from this lesson; change it freely.
+              grammar terms. Suggested from{" "}
+              {lesson.kind === "practice" ? "your request" : "this lesson"}; change it freely.
             </span>
           )}
         </label>

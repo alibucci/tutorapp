@@ -18,6 +18,7 @@ export default async function LessonPage({
   // link here used to open the lesson recorder on it, with the browser's
   // recogniser and whatever language the note was made in.
   if (lesson.kind === "intro") redirect(`/lesson/${id}/debrief`);
+  if (lesson.kind === "practice") redirect(`/lesson/${id}/review`);
   const who =
     lesson.kind === "group"
       ? (await Promise.all((lesson.groupStudentIds ?? []).map((sid) => getStudent(sid))))

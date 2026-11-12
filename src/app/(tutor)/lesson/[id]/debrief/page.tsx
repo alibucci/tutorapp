@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ChangeStudent } from "@/components/ChangeStudent";
 import { DebriefRecorder } from "@/components/DebriefRecorder";
 import { lessonFor } from "@/lib/access";
@@ -17,6 +17,7 @@ export default async function DebriefPage({
   const found = await lessonFor(id);
   if (!found) notFound();
   const { lesson, student } = found;
+  if (lesson.kind === "practice") redirect(`/lesson/${id}/review`);
   const isGroup = lesson.kind === "group";
   const students = isGroup
     ? (await Promise.all((lesson.groupStudentIds ?? []).map((id) => getStudent(id)))).filter(

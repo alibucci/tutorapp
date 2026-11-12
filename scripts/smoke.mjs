@@ -525,6 +525,16 @@ function picture(bytes) {
   check("the parent link cannot load the picture", (await img(keys.parentKey)).status === 404);
   check("the quest page opens", (await anon(`/s/${childKey}/quest/${lessonA.id}`)).status === 200);
 
+  // Extra homework: from the tutor's words, for their own students only.
+  // (Building it calls the model; the rules around it do not.)
+  const extra = `/api/students/${lessonA.studentId}/practice`;
+  check("extra homework needs a request of a few words",
+    (await a(extra, post({ request: "hi" }))).status === 400);
+  check("another tutor cannot make extra homework for this student",
+    (await b(extra, post({ request: "Adding up to 20" }))).status === 404);
+  check("a family cannot make extra homework",
+    (await anon(extra, post({ request: "Adding up to 20" }))).status === 404);
+
   // Pronunciation checks are for adults who agree themselves. This learner
   // has no age, so counts as a child; nobody else may agree for anyone.
   const voice = `/api/lessons/${lessonA.id}/homework/voice`;

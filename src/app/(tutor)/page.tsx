@@ -34,6 +34,17 @@ type Todo = {
 /** The one thing each recent lesson is still waiting for, if anything. */
 function todoFor(lesson: Lesson, name: string): Todo | null {
   const base = `/lesson/${lesson.id}`;
+  if (lesson.kind === "practice") {
+    return lesson.homework?.sentAt
+      ? null
+      : {
+          href: `${base}/review#homework`,
+          title: `Send ${name} their extra homework`,
+          detail: `${lesson.title} · check the games first`,
+          kind: "warn",
+          icon: <BookIcon />,
+        };
+  }
   if (lesson.kind === "intro" && lesson.debrief.length === 0) {
     const begun = lesson.debriefTranscript.length > 0;
     return {

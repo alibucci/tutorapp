@@ -21,7 +21,8 @@ export async function POST(_request: Request, { params }: Params) {
   if (!found) {
     return NextResponse.json({ error: "No such lesson." }, { status: 404 });
   }
-  if (!found.lesson.summary) {
+  // Extra homework is built from the tutor's request, not a summary.
+  if (!found.lesson.summary && found.lesson.kind !== "practice") {
     return NextResponse.json(
       { error: "The games are built from the summary - write that first." },
       { status: 400 },

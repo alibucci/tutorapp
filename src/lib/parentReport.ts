@@ -137,6 +137,8 @@ export function lessonsInWeek(
 ): Lesson[] {
   return lessons
     .filter((l) => {
+      // Extra homework is not a lesson: nothing was taught or recorded.
+      if (l.kind === "practice") return false;
       const day = lessonDay(l.createdAt);
       return day >= start && day <= end;
     })

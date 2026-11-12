@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExtraHomework } from "@/components/ExtraHomework";
 import { canScoreVoice } from "@/lib/pronounce";
 import { hasVoiceConsent, mayScoreVoice } from "@/lib/voice";
 import { notFound } from "next/navigation";
@@ -38,6 +39,8 @@ export default async function StudentPage({
   ]);
 
   const since = lessons.at(-1)?.createdAt ?? student.createdAt;
+  // Extra homework sits in the list, but it is not a lesson.
+  const taught = lessons.filter((l) => l.kind !== "practice").length;
 
   return (
     <div className="stack-lg">
@@ -54,7 +57,7 @@ export default async function StudentPage({
           <div className="min-w-0">
             <h1 className="t-display truncate">{student.name}</h1>
             <p className="t-small t-muted mt-1">
-              {lessons.length} {lessons.length === 1 ? "lesson" : "lessons"} · since{" "}
+              {taught} {taught === 1 ? "lesson" : "lessons"} · since{" "}
               {DATE.format(new Date(since))}
             </p>
           </div>
@@ -118,7 +121,11 @@ export default async function StudentPage({
                       <span className="block truncate font-semibold">{lesson.title}</span>
                       <span className="block t-small t-muted">
                         {DATE.format(new Date(lesson.createdAt))} ·{" "}
-                        {lesson.mode === "classroom" ? "in the room" : "online"}
+                        {lesson.kind === "practice"
+                          ? "extra homework"
+                          : lesson.mode === "classroom"
+                            ? "in the room"
+                            : "online"}
                       </span>
                     </span>
                     <span className={`shrink-0 t-small font-semibold ${next.tone}`}>
@@ -144,6 +151,8 @@ export default async function StudentPage({
         username={student.login?.username}
         parent={hasParent(student)}
       />
+
+      {!student.archivedAt && <ExtraHomework studentId={student.id} studentName={student.name} />}
 
       <MathPanel
         key={`${student.math?.on}-${student.math?.level}`}
@@ -185,6 +194,7 @@ function nextStep(lesson: Lesson): { text: string; tone: string; href: string } 
     return { text: "Homework done", tone: "text-live", href: `${base}/review` };
   }
   if (lesson.homework?.sentAt) return { text: "Homework sent", tone: "t-muted", href: `${base}/review` };
+  if (lesson.kind === "practice") return { text: "Send homework", tone: "text-warn", href: `${base}/review#homework` };
   if (lesson.summary) return { text: "Send homework", tone: "text-warn", href: `${base}/review#homework` };
   if (lesson.debrief.length) return { text: "Review", tone: "text-warn", href: `${base}/review` };
   // A note about the child has no lesson to record, only the questions.

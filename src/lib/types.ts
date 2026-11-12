@@ -112,8 +112,15 @@ export type Lesson = {
    * and debrief, only the tutor ever sees it, and it is split into one ordinary
    * lesson per child - so a child's page, homework and parents' notes work as
    * they always have, and nobody sees another child's answers.
+   *
+   * "practice" is extra homework the tutor asked for - see `request`.
    */
-  kind?: "intro" | "group";
+  kind?: "intro" | "group" | "practice";
+  /**
+   * On "practice": extra homework with no lesson behind it, built from what
+   * the tutor asked for in their own words.
+   */
+  request?: string;
   /** The children in a group lesson. `studentId` is the first of them. */
   groupStudentIds?: string[];
   /** On a group lesson, once split: the lesson made for each child. */

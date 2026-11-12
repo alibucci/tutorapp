@@ -2,7 +2,7 @@ import { z } from "zod";
 import { MODEL, MODEL_FAST, complete } from "./llm";
 import { describeLearner, formatsFor, isChild } from "./profile";
 import { listLessons } from "./store";
-import type { Exercise, ExerciseKind, Lesson, Student } from "./types";
+import { EXERCISE_KINDS, type Exercise, type ExerciseKind, type Lesson, type Student } from "./types";
 
 /**
  * Practice built from one lesson's mistakes.
@@ -315,6 +315,119 @@ practised - and build every task around it.`;
   return `${intro}\n\nThe tasks, in this order:\n\n${tasks}\n\n${child ? CHILD_RULES : GROWN_RULES}`;
 }
 
+/**
+ * Extra homework: not from a lesson's mistakes but from what the tutor typed -
+ * "adding and taking away up to 20", "animals for Friday's trip". Sometimes
+ * not English at all; the task shapes carry it anyway.
+ */
+function systemForPractice(formats: ExerciseKind[], child: boolean): string {
+  const n = formats.length === 2 ? "two" : formats.length === 3 ? "three" : String(formats.length);
+  const intro = `You build ${n} short homework tasks for one ${child ? "child" : "learner"},
+practising exactly what their tutor asked for (below) - nothing else. They do
+them alone, at home, on a phone${child ? ", with no adult to explain anything" : ""}.
+
+Where the request is not about English - sums, say - the tasks practise that,
+in simple English, using the same task shapes:
+- a CHOOSE round writes the sum in digits with the gap last - "7 + 5 = ___",
+  three numbers as options. A few words of story before it are welcome
+  ("Zippy finds more berries: 6 + 4 = ___"), but the sum itself is always
+  written out in digits, never only as a word problem;
+- CATCH "words" can be short sums written in full, like "9 + 4 = 13", kept
+  when they are true and waved away when they are not;
+- stay inside the limits the tutor gave ("up to 20" means no number above 20
+  anywhere, answers included). Every sum must be right: check each one.`;
+  const tasks = formats.map((kind, i) => `${i + 1}. ${FORMAT[kind]}`).join("\n");
+  return `${intro}\n\nThe tasks, in this order:\n\n${tasks}\n\n${child ? CHILD_RULES : GROWN_RULES}`;
+}
+
+const FormatPick = z.object({
+  kinds: z
+    .array(z.enum(EXERCISE_KINDS as unknown as [ExerciseKind, ...ExerciseKind[]]))
+    .min(2)
+    .max(3)
+    .describe("The task kinds that fit the request best, most useful first"),
+});
+
+const KIND_HINT: Record<ExerciseKind, string> = {
+  choose: "choose: fill one gap from three options (also sums: 7 + 5 = ___)",
+  build: "build: put a short sentence's words in order",
+  catch: "catch: keep the items that follow a rule, drop the rest (also true/false sums)",
+  words: "words: pick the word that matches a meaning",
+  repeat: "repeat: hear a sentence and say it back (pronunciation)",
+  dialogue: "dialogue: a role-play, saying the learner's lines aloud",
+  speak: "speak: answer a question aloud in their own words",
+};
+
+/** Which shapes of task suit what the tutor asked for. */
+async function formatsForRequest(request: string, student: Student, short: boolean) {
+  try {
+    const { kinds } = await complete({
+      system: `A tutor asks for extra homework for one learner. Pick two or three kinds of task that practise it best. Speaking kinds (repeat, dialogue, speak) only when the request is about speaking or pronunciation. For sums or numbers, use choose and catch.
+
+The kinds:
+${EXERCISE_KINDS.map((k) => `- ${KIND_HINT[k]}`).join("\n")}`,
+      user: `${describeLearner(student.name, student.profile)}\n\nThe tutor asks for: ${request}`,
+      schema: FormatPick,
+      schemaName: "Kinds",
+      model: MODEL_FAST,
+      effort: "low",
+      maxTokens: 2000,
+      timeoutMs: 40_000,
+    });
+    const unique = [...new Set(kinds)];
+    return short ? unique.slice(0, 2) : unique;
+  } catch {
+    // The learner's usual kinds are a fair answer to most requests.
+    const usual = formatsFor(student.profile);
+    return short ? usual.slice(0, 2) : usual;
+  }
+}
+
+/** What the model needs for extra homework: the learner and the request. */
+function describeRequest(lesson: Lesson, student: Student, interests: string): string {
+  return [
+    describeLearner(student.name, student.profile),
+    interests ? `What they are into: ${interests}` : "What they are into: not recorded",
+    "",
+    `What the tutor wants practised: ${lesson.request ?? lesson.title}`,
+  ].join("\n");
+}
+
+/**
+ * Sums are checked here, not trusted to the model: a child marked wrong for
+ * a right answer stops trusting the game. "7 + 5 = ___" gets the right
+ * answer marked, or is dropped if it is not among the options; "9 + 4 = 13"
+ * in a catch game is kept exactly when it is true.
+ */
+const SUM = /(\d{1,4})\s*([+\-−–])\s*(\d{1,4})\s*=\s*/;
+function sumOf(text: string, anywhere = false): number | null {
+  const m = text.match(anywhere ? SUM : new RegExp(`^\\s*${SUM.source}`));
+  if (!m) return null;
+  const a = Number(m[1]);
+  const b = Number(m[3]);
+  return m[2] === "+" ? a + b : a - b;
+}
+
+function checkSumChoice(r: z.infer<typeof Choose>): z.infer<typeof Choose> | null {
+  const numbers = r.options.every((o) => /^\s*-?\d+\s*$/.test(o));
+  const sum = r.sentence.match(new RegExp(`${SUM.source}___`));
+  if (!sum) {
+    // Numbers to pick from but no sum we can check: a word problem the
+    // model may have got wrong. Not worth the risk.
+    return numbers ? null : r;
+  }
+  const total = sumOf(sum[0], true);
+  const at = r.options.findIndex((o) => o.trim() !== "" && Number(o.trim()) === total);
+  return at < 0 ? null : { ...r, answer: at };
+}
+
+function checkSumCatch(w: z.infer<typeof Catch>): z.infer<typeof Catch> {
+  const total = sumOf(w.word);
+  const said = w.word.match(/=\s*(-?\d{1,5})\s*$/);
+  if (total === null || !said) return w;
+  return { ...w, keep: Number(said[1]) === total };
+}
+
 async function interestsOf(student: Student): Promise<string> {
   const lessons = await listLessons(student.id);
   return lessons
@@ -382,14 +495,18 @@ export async function buildExercises(
   lesson: Lesson,
   student: Student,
 ): Promise<Exercise[]> {
-  const formats = formatsFor(student.profile);
+  const practice = lesson.kind === "practice";
   const short = Boolean(student.profile?.shortTasks);
   const child = isChild(student.profile);
-  const usual = child && !short && formats.join() === "choose,build,catch";
+  const formats = practice
+    ? await formatsForRequest(lesson.request ?? lesson.title, student, short)
+    : formatsFor(student.profile);
+  const usual = !practice && child && !short && formats.join() === "choose,build,catch";
+  const interests = await interestsOf(student);
 
   const parsed = (await complete({
-    system: usual ? KID_SCHOOL : systemFor(formats, child),
-    user: describeLesson(lesson, student, await interestsOf(student)),
+    system: practice ? systemForPractice(formats, child) : usual ? KID_SCHOOL : systemFor(formats, child),
+    user: practice ? describeRequest(lesson, student, interests) : describeLesson(lesson, student, interests),
     schema: schemaFor(formats, short),
     schemaName: "Homework",
     maxTokens: 8000,
@@ -417,6 +534,8 @@ export async function buildExercises(
   // that ends early; the prompt asks for one short line anyway.
   const choose = (parsed.choose ?? [])
     .filter(usableChoose)
+    .map(checkSumChoice)
+    .filter((r): r is z.infer<typeof Choose> => r !== null)
     .map((r) => shuffleOptions({ ...r, why: cut(r.why, 120) }));
   if (choose.length >= least) {
     made.choose = { kind: "choose", title: title(parsed.chooseTitle), topic, rounds: choose };
@@ -429,7 +548,7 @@ export async function buildExercises(
 
   // A word twice in a row is the repetition children notice first.
   const seenWord = new Set<string>();
-  const catchWords = (parsed.catchWords ?? []).filter((w) => {
+  const catchWords = (parsed.catchWords ?? []).map(checkSumCatch).filter((w) => {
     const k = w.word.trim().toLowerCase();
     if (seenWord.has(k)) return false;
     seenWord.add(k);
