@@ -6,11 +6,9 @@ import { notFound } from "next/navigation";
 import { ArchiveStudent } from "@/components/ArchiveStudent";
 import { FamilyLogin } from "@/components/FamilyLogin";
 import { IntroNoteButton } from "@/components/IntroNoteButton";
-import { MathPanel } from "@/components/MathPanel";
 import { ProfilePanel } from "@/components/ProfilePanel";
 import { styleFor } from "@/lib/gameStyles";
 import { hasParent } from "@/lib/profile";
-import { MathSummary } from "@/components/MathSummary";
 import { GameStylePicker } from "@/components/GameStylePicker";
 import { ReportsPanel } from "@/components/ReportsPanel";
 import { ShareLinks } from "@/components/ShareLinks";
@@ -154,15 +152,6 @@ export default async function StudentPage({
 
       {!student.archivedAt && <ExtraHomework studentId={student.id} studentName={student.name} />}
 
-      <MathPanel
-        key={`${student.math?.on}-${student.math?.level}`}
-        studentId={student.id}
-        studentName={student.name}
-        on={Boolean(student.math?.on)}
-        level={student.math?.level ?? 1}
-      >
-        {student.math && student.math.games.length > 0 && <MathSummary math={student.math} />}
-      </MathPanel>
 
       {hasParent(student) && <ReportsPanel student={student} reports={reports} />}
 

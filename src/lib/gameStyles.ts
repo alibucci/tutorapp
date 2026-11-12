@@ -41,12 +41,6 @@ export type GameStyle = {
     accent: string;
     accentInk: string;
   };
-  /**
-   * The two things a child counts in math practice, one for each side of a
-   * sum. They have to look different at a glance, and from each other in a
-   * row of ten, so 8 + 5 shows where one number stops.
-   */
-  mathItems: [string, string];
   /** A hand-made skin in globals.css. Without one, the palette skin is used. */
   skin?: "minecraft";
   /**
@@ -70,7 +64,6 @@ export const GAME_STYLES: GameStyle[] = [
       submit: "Craft it",
       cheer: "Achievement get!",
     },
-    mathItems: ["/game/minecraft/dirt.svg", "/game/minecraft/diamond-ore.svg"],
     palette: {
       ground: "#3b2a1d",
       panel: "#c6c6c6",
@@ -93,7 +86,6 @@ export const GAME_STYLES: GameStyle[] = [
       submit: "Finish the story",
       cheer: "Well done!",
     },
-    mathItems: ["/game/fairytale/crown.svg", "/game/fairytale/mushroom.svg"],
     palette: {
       ground: "#3b2f6b",
       panel: "#fffaf0",
@@ -116,7 +108,6 @@ export const GAME_STYLES: GameStyle[] = [
       cheer: "Slam dunk!",
       heading: "Game day!",
     },
-    mathItems: ["/game/basketball/ball.svg", "/game/basketball/ball-blue.svg"],
     palette: {
       ground: "#14213d",
       panel: "#fff7ed",
@@ -142,7 +133,6 @@ export const GAME_STYLES: GameStyle[] = [
       cheer: "Great detective work!",
       heading: "New case!",
     },
-    mathItems: ["/game/zootopia/paw-ink.svg", "/game/zootopia/badge.svg"],
     palette: {
       ground: "#0f3d3e",
       panel: "#fdf6e9",
@@ -168,7 +158,6 @@ export const GAME_STYLES: GameStyle[] = [
       cheer: "POW!",
       heading: "Hero alert!",
     },
-    mathItems: ["/game/avengers/star.svg", "/game/avengers/emblem.svg"],
     palette: {
       ground: "#14162b",
       panel: "#fff8e7",
@@ -197,7 +186,6 @@ export const PLAIN_STYLE: GameStyle = {
   imageStyle:
     "clean modern editorial illustration: realistic proportions, calm natural colours, soft daylight, uncluttered composition",
   words: PLAIN_WORDS,
-  mathItems: ["/game/plain/dot.svg", "/game/plain/square.svg"],
   palette: {
     ground: "#eef1f5",
     panel: "#ffffff",
@@ -223,7 +211,6 @@ export function styleFor(student: Pick<Student, "gameStyle" | "customStyle" | "p
           words: custom.words,
           palette: custom.palette,
           // Its own pictures cannot be drawn ahead; counters in its colours.
-          mathItems: PLAIN_STYLE.mathItems,
         }
       : student.gameStyle
         ? gameStyle(student.gameStyle)
@@ -250,11 +237,7 @@ export function sentStyle(style: GameStyle): SentStyle {
 
 /** A sent homework's look, back as a theme to draw it with. */
 export function fromSent(sent: SentStyle): GameStyle {
-  const preset = GAME_STYLES.find((s) => s.id === sent.id);
-  return {
-    ...sent,
-    mathItems: preset?.mathItems ?? PLAIN_STYLE.mathItems,
-  };
+  return { ...sent };
 }
 
 /** WCAG contrast between two #rrggbb colours. */

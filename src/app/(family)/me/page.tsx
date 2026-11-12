@@ -12,6 +12,6 @@ export default async function MyHome() {
   const student = await getStudent(session.id);
   if (!student) notFound();
   return (
-    <StudentHome student={student} questHref={(id) => `/me/quest/${id}`} mathHref="/me/math" />
+    <StudentHome student={student} questHref={(id) => `/me/quest/${id}`} />
   );
 }

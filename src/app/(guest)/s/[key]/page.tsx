@@ -19,7 +19,6 @@ export default async function StudentView({
     <StudentHome
       student={student}
       questHref={(lessonId) => `/s/${key}/quest/${lessonId}`}
-      mathHref={`/s/${key}/math`}
       linkKey={key}
     />
   );

@@ -1,4 +1,3 @@
-import { MathSummary } from "@/components/MathSummary";
 import { gameScore, homeworkDone, homeworkImageUrl, progressByTopic } from "@/lib/homework";
 import { listLessons, listReports } from "@/lib/store";
 import {
@@ -104,15 +103,6 @@ export async function ParentHome({
             </section>
           )}
         </>
-      )}
-
-      {student.math && student.math.games.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="t-title">Math practice</h2>
-          <div className="card p-4">
-            <MathSummary math={student.math} />
-          </div>
-        </section>
       )}
 
       <HomeworkHistory lessons={homework} name={student.name} linkKey={linkKey} />

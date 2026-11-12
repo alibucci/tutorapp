@@ -2,7 +2,6 @@ import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
 import { isGameStyle } from "@/lib/gameStyles";
-import { isMathLevel } from "@/lib/math";
 import { readProfile } from "@/lib/profile";
 import { themeFor } from "@/lib/themeFor";
 import { accessKey, updateStudent } from "@/lib/store";
@@ -39,7 +38,6 @@ export async function PATCH(request: Request, { params }: Params) {
     rotateLinks?: boolean;
     gameStyle?: string;
     archived?: boolean;
-    math?: { on?: boolean; level?: number };
     profile?: unknown;
     /** Make the learner's own theme again from the description. */
     remakeTheme?: boolean;
@@ -92,15 +90,7 @@ export async function PATCH(request: Request, { params }: Params) {
     patch.parentKey = accessKey();
   }
 
-  const math = body.math;
-  if (math?.on !== undefined && typeof math.on !== "boolean") {
-    return NextResponse.json({ error: "Math practice is on or off." }, { status: 400 });
-  }
-  if (math?.level !== undefined && !isMathLevel(math.level)) {
-    return NextResponse.json({ error: "Unknown math level." }, { status: 400 });
-  }
-
-  if (Object.keys(patch).length === 0 && !math && !body.remakeTheme) {
+  if (Object.keys(patch).length === 0 && !body.remakeTheme) {
     return NextResponse.json({ error: "Nothing to change." }, { status: 400 });
   }
 
@@ -115,17 +105,7 @@ export async function PATCH(request: Request, { params }: Params) {
       Boolean(about) &&
       (!style || style === "custom"));
 
-  // Against the record as it is now: the child may be saving a game.
-  const saved = await updateStudent(id, (current) => ({
-    ...patch,
-    ...(math && {
-      math: {
-        on: math.on ?? current.math?.on ?? false,
-        level: math.level ?? current.math?.level ?? 1,
-        games: current.math?.games ?? [],
-      },
-    }),
-  }));
+  const saved = await updateStudent(id, patch);
   if (saved && remake) {
     const made = await themeFor(saved);
     return NextResponse.json({ ...(made.student ?? saved), ...(made.error && { themeError: made.error }) });
