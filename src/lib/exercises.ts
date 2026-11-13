@@ -2,7 +2,7 @@ import { z } from "zod";
 import { MODEL, MODEL_FAST, complete } from "./llm";
 import { describeLearner, formatsFor, isChild } from "./profile";
 import { listLessons } from "./store";
-import { type SumsPlan, sumsHomework } from "./sums";
+import { type NumbersPlan, numbersHomework } from "./sums";
 import { EXERCISE_KINDS, type Exercise, type ExerciseKind, type Lesson, type Student } from "./types";
 
 /**
@@ -347,11 +347,11 @@ const RequestPlan = z.object({
     .min(2)
     .max(3)
     .describe("The task kinds that fit the request best, most useful first"),
-  sums: z.object({
+  numbers: z.object({
     only: z
       .boolean()
       .describe(
-        "True when the request is plain arithmetic - adding, taking away, times tables, dividing - and nothing else. False for word problems, money, time, or anything with words to learn.",
+        "True when the request is only about numbers: sums (adding, taking away, times tables, dividing) and/or counting. False for word problems, money, time, shapes, or anything with words to learn.",
       ),
     add: z.boolean(),
     subtract: z.boolean(),
@@ -363,14 +363,23 @@ const RequestPlan = z.object({
       .min(5)
       .max(1000)
       .describe(
-        'The largest number allowed anywhere, answers included: "up to 20" is 20. For times tables up to 10 x 10, 100. With no limit given, pick one that fits the learner.',
+        'For sums: the largest number allowed in a sum, answers included: "up to 20" is 20. For times tables up to 10 x 10, 100. With no limit given, pick one that fits the learner.',
       ),
     tables: z
       .array(z.number().int().min(1).max(12))
       .max(12)
       .describe('For times or dividing: which tables, e.g. [3] for "the 3 times table". Empty for any.'),
+    counting: z
+      .boolean()
+      .describe('Counting is asked for: "count to 50", "numbers in order", "counting in 5s".'),
+    countTo: z.number().int().min(10).max(1000).describe("How far to count: 50 for \"count to 50\". 20 when not asked."),
+    countBy: z
+      .array(z.number().int().min(1).max(100))
+      .max(4)
+      .describe("Counting in ones [1], or in 2s, 5s, 10s as asked. Empty for ones."),
     topic: z.string().max(60).describe('What is practised, plainly: "Adding and taking away up to 20"'),
-    chooseTitle: z.string().max(50).describe("A short, fun title for picking answers, in the learner's world"),
+    chooseTitle: z.string().max(50).describe("A short, fun title for working out answers, in the learner's world"),
+    buildTitle: z.string().max(50).describe("A short, fun title for putting numbers in counting order"),
     catchTitle: z.string().max(50).describe("A short, fun title for catching the sums that are right"),
   }),
 });
@@ -385,7 +394,7 @@ const KIND_HINT: Record<ExerciseKind, string> = {
   speak: "speak: answer a question aloud in their own words",
 };
 
-type Plan = { kinds: ExerciseKind[]; sums: (SumsPlan & z.infer<typeof RequestPlan>["sums"]) | null };
+type Plan = { kinds: ExerciseKind[]; numbers: (NumbersPlan & z.infer<typeof RequestPlan>["numbers"]) | null };
 
 /**
  * Read what the tutor asked for: plain sums, which code makes, or anything
@@ -396,7 +405,7 @@ async function planRequest(request: string, student: Student, short: boolean): P
     const plan = await complete({
       system: `A tutor asks for extra homework for one learner. Read the request.
 
-If it is plain arithmetic, fill in "sums" (only: true) - the sums themselves are made by code, so just say which operations and how big the numbers.
+If it is only about numbers - sums, counting, or both - fill in "numbers" (only: true). The questions themselves are made by code, so just say which operations, how big the numbers, and how far to count.
 
 Either way, pick two or three kinds of task that practise it best. Speaking kinds (repeat, dialogue, speak) only when the request is about speaking or pronunciation.
 
@@ -411,13 +420,13 @@ ${EXERCISE_KINDS.map((k) => `- ${KIND_HINT[k]}`).join("\n")}`,
       timeoutMs: 40_000,
     });
     const kinds = [...new Set(plan.kinds)];
-    const s = plan.sums;
-    const sums = s.only && (s.add || s.subtract || s.multiply || s.divide) ? s : null;
-    return { kinds: short ? kinds.slice(0, 2) : kinds, sums };
+    const n = plan.numbers;
+    const numbers = n.only && (n.add || n.subtract || n.multiply || n.divide || n.counting) ? n : null;
+    return { kinds: short ? kinds.slice(0, 2) : kinds, numbers };
   } catch {
     // The learner's usual kinds are a fair answer to most requests.
     const usual = formatsFor(student.profile);
-    return { kinds: short ? usual.slice(0, 2) : usual, sums: null };
+    return { kinds: short ? usual.slice(0, 2) : usual, numbers: null };
   }
 }
 
@@ -537,8 +546,11 @@ export async function buildExercises(
   const short = Boolean(student.profile?.shortTasks);
   const child = isChild(student.profile);
   const plan = practice ? await planRequest(lesson.request ?? lesson.title, student, short) : null;
-  // Plain sums: made by code, right by construction. No model writes them.
-  if (plan?.sums) return sumsHomework(plan.sums, plan.sums, short);
+  // Sums and counting: made by code, right by construction. No model writes them.
+  if (plan?.numbers) {
+    const made = numbersHomework(plan.numbers, plan.numbers, short);
+    if (made.length) return made;
+  }
   const formats = plan ? plan.kinds : formatsFor(student.profile);
   const usual = !practice && child && !short && formats.join() === "choose,build,catch";
   const interests = await interestsOf(student);

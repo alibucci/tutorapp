@@ -355,7 +355,11 @@ function Build({
     <div className="game-panel" key={at}>
       <Counter at={at} of={rounds.length} />
       <p className="game-title mt-2">{title}</p>
-      <p className="game-hint mt-2">Tap the words in the right order.</p>
+      <p className="game-hint mt-2">
+        {round.answer.every((w) => /^\d+$/.test(w))
+          ? "Tap the numbers in counting order, smallest first."
+          : "Tap the words in the right order."}
+      </p>
 
       <div className={`game-line mt-4 ${checked ? (correct ? "game-line-yes" : "game-line-no") : ""}`}>
         {placed.length === 0 && <span className="game-line-empty">Tap a word below…</span>}
