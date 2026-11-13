@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -94,6 +95,13 @@ export function NewLessonForm({ students }: { students: Student[] }) {
           ))}
           <option value="">+ New student</option>
         </select>
+        <span className="hint">
+          Need their age, goal or interests set first?{" "}
+          <Link href="/student/new" className="underline">
+            Add the student with a full profile
+          </Link>
+          .
+        </span>
       </label>
 
       {!addingStudent && students.length > 1 && (

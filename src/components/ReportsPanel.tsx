@@ -101,7 +101,7 @@ function ReportCard({ report }: { report: ParentReport }) {
           {WEEK.format(new Date(`${report.weekEnd}T12:00:00Z`))}
         </span>
         <span className="t-caption t-muted">
-          {approved ? "visible to parent" : "draft - not sent"}
+          {approved ? "visible to parent" : "not yet visible to the parent"}
         </span>
       </div>
 
@@ -139,7 +139,7 @@ function ReportCard({ report }: { report: ParentReport }) {
             disabled={busy}
             className="btn btn-primary"
           >
-            {busy ? "Saving..." : "Approve and send"}
+            {busy ? "Saving..." : "Approve"}
           </button>
         ) : (
           <button

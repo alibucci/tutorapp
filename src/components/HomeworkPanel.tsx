@@ -216,7 +216,9 @@ export function HomeworkPanel({
             >
               {busy === "games"
                 ? `Reading the lesson… ${seconds}s`
-                : `Build games from ${studentName}'s mistakes`}
+                : lesson.kind === "practice"
+                  ? "Build games"
+                  : `Build games from ${studentName}'s mistakes`}
             </button>
           ) : (
             <ul className="space-y-2">
@@ -285,7 +287,7 @@ export function HomeworkPanel({
           )}
           {exercises.length > 0 && !sent && (
             <p className="hint">
-              Tap a game to check it before you send - the words come from{" "}
+              Use Preview to check it before you send - the words come from{" "}
               {lesson.kind === "practice" ? "what you asked for" : "this lesson"}, but
               they are written by the model.
             </p>

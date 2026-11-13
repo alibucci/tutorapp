@@ -87,7 +87,7 @@ function todoFor(lesson: Lesson, name: string): Todo | null {
     return {
       href: `${base}/review#homework`,
       title: `Send ${name} their homework`,
-      detail: `${lesson.title} · add a picture`,
+      detail: `${lesson.title} · build games and preview`,
       kind: "warn",
       icon: <ImageIcon />,
     };

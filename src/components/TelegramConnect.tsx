@@ -55,7 +55,7 @@ export function TelegramConnect({ connectedTo }: { connectedTo?: string }) {
     if (result.data.expired) {
       if (timer.current) window.clearInterval(timer.current);
       setWaiting(false);
-      setError("That link ran out. Press connect again.");
+      setError("That link ran out. Press Connect Telegram again.");
     }
   }
 
