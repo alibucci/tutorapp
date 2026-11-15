@@ -57,12 +57,12 @@ export function HelpVideo({
           <button type="button" onClick={() => play()} className="group block h-full w-full" aria-label={`Play: ${title}`}>
             {/* eslint-disable-next-line @next/next/no-img-element -- a private poster served by Caddy, already sized */}
             <img src={poster} alt="" loading="lazy" className="h-full w-full object-cover" />
-            <span className="absolute inset-0 grid place-items-center">
-              <span className="grid h-16 w-16 place-items-center rounded-full bg-accent text-white shadow-lg transition-transform group-hover:scale-105">
-                <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden>
-                  <path d="M8 5v14l11-7z" fill="currentColor" />
-                </svg>
-              </span>
+            {/* Bottom-left, so it never covers the film's title on the picture. */}
+            <span className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-accent py-2 pl-3 pr-4 font-semibold text-white shadow-lg transition-transform group-hover:scale-105">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+                <path d="M8 5v14l11-7z" fill="currentColor" />
+              </svg>
+              Play
             </span>
           </button>
         )}
