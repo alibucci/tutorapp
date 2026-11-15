@@ -38,7 +38,7 @@ export function HelpVideo({
 
   return (
     <div className="space-y-3">
-      <div className="relative aspect-video w-full overflow-hidden rounded-[var(--radius)] bg-sunken">
+      <div className="relative aspect-video w-full overflow-hidden rounded-[var(--radius)] border border-line bg-sunken">
         {started ? (
           <video
             ref={ref}
