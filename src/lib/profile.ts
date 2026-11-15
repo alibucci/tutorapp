@@ -1,6 +1,6 @@
 import type {
   EnglishLevel,
-  ExerciseKind,
+  EnglishKind,
   LearningGoal,
   Student,
   StudentProfile,
@@ -51,8 +51,8 @@ export function hasParent(student: Pick<Student, "profile">): boolean {
  * Which kinds of task fit the goal. School English keeps the three games a
  * child already knows; the spoken goals swap them for talking.
  */
-export function formatsFor(profile: StudentProfile | undefined): ExerciseKind[] {
-  const all: Record<LearningGoal, ExerciseKind[]> = {
+export function formatsFor(profile: StudentProfile | undefined): EnglishKind[] {
+  const all: Record<LearningGoal, EnglishKind[]> = {
     school: ["choose", "build", "catch"],
     speaking: ["dialogue", "speak", "words"],
     accent: ["repeat", "dialogue", "speak"],

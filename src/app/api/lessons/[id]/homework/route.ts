@@ -1,6 +1,7 @@
 import { LIMIT, readForm, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
+import { cardById } from "@/lib/christianity";
 import { sentStyle, styleFor } from "@/lib/gameStyles";
 import { deleteImage, saveImage, updateLesson } from "@/lib/store";
 import type { Homework } from "@/lib/types";
@@ -125,6 +126,14 @@ export async function PATCH(request: Request, { params }: Params) {
     if (body.send === true) {
       if (!next.imageFile && !next.exercises?.length) {
         problem = { error: "Add a picture or build the games before sending.", status: 400 };
+        return null;
+      }
+      // A story reaches a child only once its card is approved.
+      if (current.module && !cardById(current.module.storyId)?.approved) {
+        problem = {
+          error: "This story's card is not approved yet, so it cannot be sent. You can still preview it.",
+          status: 409,
+        };
         return null;
       }
       next.sentAt ??= new Date().toISOString();

@@ -80,6 +80,8 @@ export function HomeworkPanel({
   const answers = homework?.answers;
   const candidates = homework?.candidates ?? [];
   const exercises = homework?.exercises ?? [];
+  const read = homework?.read;
+  const story = Boolean(lesson.module);
   const finished = homeworkDone(homework);
   const [confirmReopen, setConfirmReopen] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -194,16 +196,49 @@ export function HomeworkPanel({
           />
         )}
 
+        {read && (
+          <div className="space-y-3">
+            <p className="t-eyebrow">The story</p>
+            {read.pages.map((page, i) => (
+              <div key={i} className="rounded-[var(--radius)] bg-sunken p-3 space-y-2">
+                {page.heading && <p className="t-small font-semibold">{page.heading}</p>}
+                {page.paragraphs.map((p, j) => (
+                  <p key={j} className="t-small">{p}</p>
+                ))}
+                {page.pictures.length > 0 && (
+                  <div className="flex gap-2">
+                    {page.pictures.map((p) => (
+                      // eslint-disable-next-line @next/next/no-img-element -- small static drawings
+                      <img key={p.src} src={p.src} alt={p.alt} className="h-16 w-20 rounded-[var(--radius-sm)] object-cover" />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            {read.newWords?.length ? (
+              <p className="t-small t-muted">New words: {read.newWords.join(", ")}</p>
+            ) : null}
+            {read.checks?.length ? (
+              <ul className="t-caption t-muted space-y-0.5">
+                {read.checks.map((c) => (
+                  <li key={c}>✓ {c}</li>
+                ))}
+              </ul>
+            ) : null}
+            {read.closing && <p className="t-small">Last screen: <span className="font-semibold">{read.closing}</span></p>}
+          </div>
+        )}
+
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <p className="t-eyebrow">Practice games</p>
+            <p className="t-eyebrow">{story ? "Tasks about the story" : "Practice games"}</p>
             {!finished && exercises.length > 0 && (
               <button
                 onClick={() => void buildGames()}
                 disabled={busy !== null}
                 className="btn btn-ghost btn-sm"
               >
-                {busy === "games" ? "Building…" : "Build different ones"}
+                {busy === "games" ? "Building…" : story ? "Write the story again" : "Build different ones"}
               </button>
             )}
           </div>
@@ -215,8 +250,10 @@ export function HomeworkPanel({
               className="btn btn-soft btn-block"
             >
               {busy === "games"
-                ? `Reading the lesson… ${seconds}s`
-                : lesson.kind === "practice"
+                ? `${story ? "Writing the story" : "Reading the lesson"}… ${seconds}s`
+                : story
+                  ? "Build the story"
+                  : lesson.kind === "practice"
                   ? "Build games"
                   : `Build games from ${studentName}'s mistakes`}
             </button>
@@ -287,9 +324,13 @@ export function HomeworkPanel({
           )}
           {exercises.length > 0 && !sent && (
             <p className="hint">
-              Use Preview to check it before you send - the words come from{" "}
-              {lesson.kind === "practice" ? "what you asked for" : "this lesson"}, but
-              they are written by the model.
+              {story
+                ? "Use Preview to check it before you send - the story is retold by the model from a fixed card, and checked against it, but read it yourself."
+                : <>
+                    Use Preview to check it before you send - the words come from{" "}
+                    {lesson.kind === "practice" ? "what you asked for" : "this lesson"}, but
+                    they are written by the model.
+                  </>}
             </p>
           )}
         </div>

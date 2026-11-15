@@ -39,8 +39,8 @@ function todoFor(lesson: Lesson, name: string): Todo | null {
       ? null
       : {
           href: `${base}/review#homework`,
-          title: `Send ${name} their extra homework`,
-          detail: `${lesson.title} · check the games first`,
+          title: lesson.module ? `Send ${name} their Bible story` : `Send ${name} their extra homework`,
+          detail: `${lesson.title} · check ${lesson.module ? "the story" : "the games"} first`,
           kind: "warn",
           icon: <BookIcon />,
         };

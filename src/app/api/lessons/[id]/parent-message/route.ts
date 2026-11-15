@@ -1,6 +1,7 @@
 import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
+import { keepParentLine } from "@/lib/christianity";
 import { MODEL } from "@/lib/llm";
 import { translateParentMessage } from "@/lib/parentMessage";
 import { updateLesson } from "@/lib/store";
@@ -46,12 +47,14 @@ export async function PUT(request: Request, { params }: Params) {
   }
 
   try {
-    const zh = await translateParentMessage(text);
+    // A programme homework keeps its checked Chinese line about the story,
+    // whatever the edit did to the rest.
+    const kept = keepParentLine(found.lesson, text, await translateParentMessage(text));
     const now = new Date().toISOString();
     const lesson = await updateLesson(id, {
       parentMessage: {
-        en: text,
-        zh,
+        en: kept.en,
+        zh: kept.zh,
         generatedAt: found.lesson.parentMessage?.generatedAt ?? now,
         editedAt: now,
         model: MODEL,

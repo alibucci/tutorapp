@@ -43,3 +43,6 @@ data/
 
 # Pulled server backups: secrets and children's names. Never commit these.
 backups/
+
+# local previews
+.tmp-preview/

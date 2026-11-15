@@ -3,7 +3,7 @@ import { MODEL, MODEL_FAST, complete } from "./llm";
 import { describeLearner, formatsFor, isChild } from "./profile";
 import { listLessons } from "./store";
 import { type NumbersPlan, numbersHomework } from "./sums";
-import { EXERCISE_KINDS, type Exercise, type ExerciseKind, type Lesson, type Student } from "./types";
+import { EXERCISE_KINDS, type EnglishKind, type Exercise, type Lesson, type Student } from "./types";
 
 /**
  * Practice built from one lesson's mistakes.
@@ -73,7 +73,7 @@ const Words = z.object({
 });
 
 /** How many rounds each kind gets: the usual, and the short version. */
-const ROUNDS: Record<ExerciseKind, { usual: [number, number]; short: [number, number] }> = {
+const ROUNDS: Record<EnglishKind, { usual: [number, number]; short: [number, number] }> = {
   choose: { usual: [4, 6], short: [3, 3] },
   build: { usual: [3, 4], short: [2, 2] },
   catch: { usual: [6, 10], short: [4, 6] },
@@ -84,9 +84,9 @@ const ROUNDS: Record<ExerciseKind, { usual: [number, number]; short: [number, nu
 };
 
 /** The JSON asked of the model: only the kinds this learner gets. */
-function schemaFor(formats: ExerciseKind[], short: boolean) {
-  const n = (kind: ExerciseKind) => ROUNDS[kind][short ? "short" : "usual"];
-  const list = <T extends z.ZodType>(item: T, kind: ExerciseKind) =>
+function schemaFor(formats: EnglishKind[], short: boolean) {
+  const n = (kind: EnglishKind) => ROUNDS[kind][short ? "short" : "usual"];
+  const list = <T extends z.ZodType>(item: T, kind: EnglishKind) =>
     z.array(item).min(n(kind)[0]).max(n(kind)[1]);
   const title = z.string().min(3).max(120);
   const fields: Record<string, z.ZodType> = {
@@ -225,7 +225,7 @@ Rules for everything you write:
  * What the child is into, from the note the tutor recorded about them, so the
  * games can star a hero they actually like.
  */
-const FORMAT: Record<ExerciseKind, string> = {
+const FORMAT: Record<EnglishKind, string> = {
   choose: `CHOOSE. A sentence with one gap and three words under it. One is right. The
    two wrong ones must be the mistakes this learner actually makes, not random
    words - if they say "I eat yesterday", the wrong options are "eat" and
@@ -299,7 +299,7 @@ Rules for everything you write:
 - British or American spelling, consistently, matching the lesson.`;
 
 /** The prompt for any learner and any mix of tasks. */
-function systemFor(formats: ExerciseKind[], child: boolean): string {
+function systemFor(formats: EnglishKind[], child: boolean): string {
   const n = formats.length === 2 ? "two" : formats.length === 3 ? "three" : String(formats.length);
   const intro = child
     ? `You build ${n} small practice tasks for one child, from the mistakes they made
@@ -321,7 +321,7 @@ practised - and build every task around it.`;
  * "adding and taking away up to 20", "animals for Friday's trip". Sometimes
  * not English at all; the task shapes carry it anyway.
  */
-function systemForPractice(formats: ExerciseKind[], child: boolean): string {
+function systemForPractice(formats: EnglishKind[], child: boolean): string {
   const n = formats.length === 2 ? "two" : formats.length === 3 ? "three" : String(formats.length);
   const intro = `You build ${n} short homework tasks for one ${child ? "child" : "learner"},
 practising exactly what their tutor asked for (below) - nothing else. They do
@@ -343,7 +343,7 @@ in simple English, using the same task shapes:
 
 const RequestPlan = z.object({
   kinds: z
-    .array(z.enum(EXERCISE_KINDS as unknown as [ExerciseKind, ...ExerciseKind[]]))
+    .array(z.enum(EXERCISE_KINDS as unknown as [EnglishKind, ...EnglishKind[]]))
     .min(2)
     .max(3)
     .describe("The task kinds that fit the request best, most useful first"),
@@ -384,7 +384,7 @@ const RequestPlan = z.object({
   }),
 });
 
-const KIND_HINT: Record<ExerciseKind, string> = {
+const KIND_HINT: Record<EnglishKind, string> = {
   choose: "choose: fill one gap from three options",
   build: "build: put a short sentence's words in order",
   catch: "catch: keep the items that follow a rule, drop the rest",
@@ -394,7 +394,7 @@ const KIND_HINT: Record<ExerciseKind, string> = {
   speak: "speak: answer a question aloud in their own words",
 };
 
-type Plan = { kinds: ExerciseKind[]; numbers: (NumbersPlan & z.infer<typeof RequestPlan>["numbers"]) | null };
+type Plan = { kinds: EnglishKind[]; numbers: (NumbersPlan & z.infer<typeof RequestPlan>["numbers"]) | null };
 
 /**
  * Read what the tutor asked for: plain sums, which code makes, or anything
@@ -475,7 +475,7 @@ function checkSumCatch(w: z.infer<typeof Catch>): z.infer<typeof Catch> {
   return { ...w, keep: Number(said[1]) === total };
 }
 
-async function interestsOf(student: Student): Promise<string> {
+export async function interestsOf(student: Student): Promise<string> {
   const lessons = await listLessons(student.id);
   return lessons
     .filter((l) => l.kind === "intro")
@@ -579,7 +579,7 @@ export async function buildExercises(
   // Fewer than this and it is not worth opening.
   const least = short ? 2 : 3;
 
-  const made: Partial<Record<ExerciseKind, Exercise>> = {};
+  const made: Partial<Record<EnglishKind, Exercise>> = {};
 
   // A "why" a little long is a worse reason to lose every game than a line
   // that ends early; the prompt asks for one short line anyway.

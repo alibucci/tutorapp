@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { HomeworkGame } from "@/components/HomeworkGame";
 import { homeworkFor } from "@/lib/access";
+import { cardById } from "@/lib/christianity";
 import { fromSent, styleFor } from "@/lib/gameStyles";
 import { homeworkDone, homeworkImageUrl } from "@/lib/homework";
 import { canScoreVoice } from "@/lib/pronounce";
@@ -21,6 +22,9 @@ export async function QuestPage({
   // Homework is games, a picture, or both - but it has to be something.
   if (!found || !homework) notFound();
   if (!homework.imageFile && !homework.exercises?.length) notFound();
+  // A story whose card is not approved is for the tutor's preview only.
+  const programme = found.lesson.module;
+  if (programme && !found.tutor && !cardById(programme.storyId)?.approved) notFound();
 
   return (
     <HomeworkGame
@@ -33,6 +37,7 @@ export async function QuestPage({
       backHref={backHref}
       answered={homework.answers}
       exercises={homework.exercises}
+      read={homework.read}
       finished={homeworkDone(homework)}
       results={homework.results}
       // A tutor is looking at the child's screen, not doing the homework.

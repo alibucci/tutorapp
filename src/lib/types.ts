@@ -117,6 +117,11 @@ export type Lesson = {
    */
   kind?: "intro" | "group" | "practice";
   /**
+   * On "practice": homework from a programme (see src/content), not from
+   * the tutor's words. Which story it is was picked by the system.
+   */
+  module?: LessonModule;
+  /**
    * On "practice": extra homework with no lesson behind it, built from what
    * the tutor asked for in their own words.
    */
@@ -257,6 +262,35 @@ export type Student = {
    * when `gameStyle` is "custom". Same shape as a ready-made theme.
    */
   customStyle?: CustomStyle;
+  /**
+   * Programmes outside English, switched on one by one. Absent means off, so
+   * a record from before this field needs nothing done to it.
+   */
+  modules?: { christianity?: ModuleState };
+};
+
+/**
+ * Where a learner is in a programme. Kept when the module is switched off,
+ * so switching it on again carries on from the same story.
+ */
+export type ModuleState = {
+  enabled: boolean;
+  /** When the tutor ticked "the parent asked for this". Required to switch on. */
+  parentAskedAt: string;
+  /** Index of the next story in the programme. */
+  position: number;
+  /** Story ids the learner has passed. */
+  passed: string[];
+  /** A story not passed: the next homework starts with a short recap of it. */
+  review?: string;
+};
+
+/** What a programme homework is, fixed when it is built. */
+export type LessonModule = {
+  id: "christianity";
+  storyId: string;
+  /** The story recapped at the start, when the last one was not passed. */
+  reviewOf?: string;
 };
 
 export type EnglishLevel = "beginner" | "elementary" | "intermediate" | "upper" | "advanced";
@@ -402,8 +436,38 @@ export type WordsRound = {
   why: string;
 };
 
+/** A question about a story the learner has just read. */
+export type QuestionRound = {
+  question: string;
+  options: string[];
+  answer: number;
+  why: string;
+};
+
+/** Things from a story to put back in the order they happened. */
+export type OrderRound = {
+  /** In the right order; the game shuffles them. */
+  events: string[];
+  why: string;
+};
+
+/**
+ * "What would you do?" Every option is a kind one; one is the kindest. There
+ * is nothing to lose here, only something to notice.
+ */
+export type KindRound = {
+  situation: string;
+  options: string[];
+  best: number;
+  why: string;
+};
+
 export type Exercise =
   | { kind: "choose"; title: string; topic: string; rounds: ChooseRound[] }
+  | { kind: "questions"; title: string; topic: string; rounds: QuestionRound[] }
+  | { kind: "recall"; title: string; topic: string; rounds: QuestionRound[] }
+  | { kind: "order"; title: string; topic: string; rounds: OrderRound[] }
+  | { kind: "kindness"; title: string; topic: string; rounds: KindRound[] }
   | { kind: "repeat"; title: string; topic: string; rounds: RepeatRound[] }
   | {
       kind: "dialogue";
@@ -435,9 +499,25 @@ export const EXERCISE_LABEL: Record<ExerciseKind, string> = {
   dialogue: "Role-play",
   speak: "Answer out loud",
   words: "Topic words",
+  questions: "About the story",
+  recall: "Remember the last story",
+  order: "What came first?",
+  kindness: "What would you do?",
 };
 
-export const EXERCISE_KINDS = Object.keys(EXERCISE_LABEL) as ExerciseKind[];
+/**
+ * The kinds an English homework is built from. Closed on purpose: the planner
+ * for extra homework picks from these, and the story kinds below only make
+ * sense after a text to read.
+ */
+export const EXERCISE_KINDS = ["choose", "build", "catch", "repeat", "dialogue", "speak", "words"] as const;
+export type EnglishKind = (typeof EXERCISE_KINDS)[number];
+
+/** Tasks about a text read first ("Read and answer"). */
+export const STORY_KINDS = ["questions", "recall", "order", "kindness"] as const;
+
+/** Every kind the server will mark. */
+export const ALL_EXERCISE_KINDS = [...EXERCISE_KINDS, ...STORY_KINDS] as ExerciseKind[];
 
 /**
  * What the child sent back for one round: the option they picked, the words
@@ -502,6 +582,28 @@ export type Homework = {
    * next homework, not one already given out.
    */
   style?: SentStyle;
+  /**
+   * "Read and answer": a text with pictures, read (and listened to) before the
+   * games, which then ask about it. Not tied to any one subject.
+   */
+  read?: ReadAndAnswer;
+};
+
+export type ReadAndAnswer = {
+  pages: ReadPage[];
+  /** One line on the last screen: "Today: we say thank you." */
+  closing?: string;
+  /** Words the learner meets for the first time, for the tutor. */
+  newWords?: string[];
+  /** What was checked by code before the tutor saw it, for the tutor. */
+  checks?: string[];
+};
+
+export type ReadPage = {
+  heading?: string;
+  paragraphs: string[];
+  /** Ready-made pictures, served as static files. */
+  pictures: { src: string; alt: string }[];
 };
 
 /** A theme as it was when a homework went out: enough to draw it again. */

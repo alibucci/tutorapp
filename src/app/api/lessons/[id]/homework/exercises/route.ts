@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
+import { StoryNotBuilt, buildStoryHomework, cardById } from "@/lib/christianity";
 import { buildExercises } from "@/lib/exercises";
 import { homeworkDone } from "@/lib/homework";
 import { updateLesson } from "@/lib/store";
@@ -46,6 +47,9 @@ export async function POST(_request: Request, { params }: Params) {
 }
 
 async function build(id: string, lesson: Lesson, student: Student): Promise<Response> {
+  // A programme homework is rebuilt from the same story card: text, checks
+  // and all. The story stays the one the system picked.
+  if (lesson.module) return rebuildStory(id, lesson, student);
   try {
     const exercises = await buildExercises(lesson, student);
     if (exercises.length === 0) {
@@ -63,6 +67,29 @@ async function build(id: string, lesson: Lesson, student: Student): Promise<Resp
   } catch (e) {
     console.error("[exercises]", e);
     const message = e instanceof Error ? e.message : "Could not build the games.";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
+}
+
+async function rebuildStory(id: string, lesson: Lesson, student: Student): Promise<Response> {
+  const card = cardById(lesson.module?.storyId);
+  if (!card) return NextResponse.json({ error: "That story is no longer in the programme." }, { status: 410 });
+  if (lesson.homework?.sentAt) {
+    return NextResponse.json({ error: "It has been sent. Take it back first to write it again." }, { status: 409 });
+  }
+  try {
+    const built = await buildStoryHomework(student, card, cardById(lesson.module?.reviewOf));
+    const updated = await updateLesson(id, (current) => {
+      if (current.homework?.sentAt || current.studentId !== student.id) return null;
+      return {
+        homework: { ...current.homework, ...built.homework },
+        parentMessage: current.parentMessage?.editedAt ? current.parentMessage : built.parentMessage,
+      };
+    });
+    return NextResponse.json(updated?.homework);
+  } catch (e) {
+    console.error("[christianity] rebuild", e);
+    const message = e instanceof StoryNotBuilt ? e.message : "Could not build it. Try again.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

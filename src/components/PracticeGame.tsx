@@ -11,6 +11,9 @@ import type {
   ChooseRound,
   DialogueRound,
   Exercise,
+  KindRound,
+  OrderRound,
+  QuestionRound,
   Pronounced,
   RepeatRound,
   RoundReply,
@@ -75,6 +78,13 @@ export function PracticeGame({ exercise, onRound, onDone, words, voice }: Props)
           onDone={onDone}
         />
       );
+    case "questions":
+    case "recall":
+      return <Questions rounds={exercise.rounds} title={exercise.title} onRound={onRound} onDone={onDone} />;
+    case "order":
+      return <Order rounds={exercise.rounds} title={exercise.title} onRound={onRound} onDone={onDone} />;
+    case "kindness":
+      return <Kindness rounds={exercise.rounds} title={exercise.title} onRound={onRound} onDone={onDone} />;
     case "words":
       return <Words rounds={exercise.rounds} title={exercise.title} onRound={onRound} onDone={onDone} />;
     case "repeat":
@@ -814,6 +824,258 @@ function SayIt({
         >
           Stop checking my voice
         </button>
+      )}
+    </div>
+  );
+}
+
+// --- Read and answer ---------------------------------------------------------
+//
+// Asked about a story the child has just read. Nothing here punishes: a wrong
+// tap shows the right answer and why, and the child goes on. No second go to
+// win a point back, no shaking, no "wrong".
+
+function Questions({
+  rounds,
+  title,
+  onRound,
+  onDone,
+}: {
+  rounds: QuestionRound[];
+  title: string;
+  onRound: (right: boolean) => void;
+  onDone: (replies: RoundReply[]) => void;
+}) {
+  const [at, setAt] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [replies, setReplies] = useState<number[]>([]);
+
+  const round = rounds[at];
+  const answered = picked !== null;
+  const correct = picked === round.answer;
+  const last = at + 1 >= rounds.length;
+
+  function pick(i: number) {
+    if (answered) return;
+    setPicked(i);
+    setReplies([...replies, i]);
+    onRound(i === round.answer);
+  }
+
+  function next() {
+    if (last) {
+      onDone(replies);
+      return;
+    }
+    setAt(at + 1);
+    setPicked(null);
+  }
+
+  return (
+    <div className="game-panel" key={at}>
+      <Counter at={at} of={rounds.length} />
+      <p className="game-title mt-2">{title}</p>
+      <p className="game-sentence mt-4">{round.question}</p>
+      <ListenButton text={round.question} />
+      <div className="mt-4 grid gap-2">
+        {round.options.map((option, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => pick(i)}
+            disabled={answered}
+            className={`game-option ${answered && i === round.answer ? "game-option-yes" : ""}`}
+            aria-pressed={answered && i === picked}
+          >
+            {answered && i === round.answer ? `✓ ${option}` : option}
+          </button>
+        ))}
+      </div>
+      {answered && (
+        <>
+          <div className={`game-verdict ${correct ? "game-verdict-yes" : "game-verdict-soft"}`}>
+            <p className="game-verdict-head">{correct ? "Yes!" : `The story says: ${round.options[round.answer]}`}</p>
+            <p className="game-verdict-why">{round.why}</p>
+          </div>
+          <button onClick={next} className="game-button mt-4">
+            {last ? "Finish" : "Next"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Tap the things from the story in the order they happened. */
+function Order({
+  rounds,
+  title,
+  onRound,
+  onDone,
+}: {
+  rounds: OrderRound[];
+  title: string;
+  onRound: (right: boolean) => void;
+  onDone: (replies: RoundReply[]) => void;
+}) {
+  const [at, setAt] = useState(0);
+  const [placed, setPlaced] = useState<number[]>([]);
+  const [checked, setChecked] = useState(false);
+  const [replies, setReplies] = useState<string[][]>([]);
+
+  const round = rounds[at];
+  const last = at + 1 >= rounds.length;
+  const pile = shuffle(
+    round.events.map((text, i) => ({ text, i })),
+    round.events.join("|"),
+  );
+  const built = placed.map((p) => pile[p].text);
+  const full = placed.length === round.events.length;
+  const correct = built.join("\n") === round.events.join("\n");
+
+  function check() {
+    setChecked(true);
+    setReplies([...replies, built]);
+    onRound(correct);
+  }
+
+  function next() {
+    if (last) {
+      onDone(replies);
+      return;
+    }
+    setAt(at + 1);
+    setPlaced([]);
+    setChecked(false);
+  }
+
+  return (
+    <div className="game-panel" key={at}>
+      <Counter at={at} of={rounds.length} />
+      <p className="game-title mt-2">{title}</p>
+      <p className="game-hint mt-2">Tap what happened first, then next.</p>
+
+      <ol className="mt-4 grid gap-2">
+        {(checked ? round.events : built).map((text, slot) => (
+          <li key={slot} className={`game-option ${checked ? "game-option-yes" : ""}`}>
+            {slot + 1}. {text}
+          </li>
+        ))}
+      </ol>
+
+      {!checked && (
+        <div className="mt-3 grid gap-2">
+          {pile.map((tile, p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPlaced(placed.includes(p) ? placed.filter((x) => x !== p) : [...placed, p])}
+              className={`game-option ${placed.includes(p) ? "game-tile-used" : ""}`}
+            >
+              {tile.text}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {checked && (
+        <div className={`game-verdict ${correct ? "game-verdict-yes" : "game-verdict-soft"}`}>
+          <p className="game-verdict-head">{correct ? "Yes, that's the story!" : "This is how the story goes:"}</p>
+          <p className="game-verdict-why">{round.why}</p>
+        </div>
+      )}
+
+      {checked ? (
+        <button onClick={next} className="game-button mt-4">
+          {last ? "Finish" : "Next"}
+        </button>
+      ) : (
+        <div className="mt-4 flex gap-3">
+          {placed.length > 0 && (
+            <button onClick={() => setPlaced([])} className="game-button game-button-no">
+              Start again
+            </button>
+          )}
+          <button onClick={check} disabled={!full} className="game-button">
+            Done
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * "What would you do?" Every option is kind. The kindest one is shown, with
+ * why, whichever the child picked: there is nothing to lose here.
+ */
+function Kindness({
+  rounds,
+  title,
+  onRound,
+  onDone,
+}: {
+  rounds: KindRound[];
+  title: string;
+  onRound: (right: boolean) => void;
+  onDone: (replies: RoundReply[]) => void;
+}) {
+  const [at, setAt] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [replies, setReplies] = useState<number[]>([]);
+
+  const round = rounds[at];
+  const answered = picked !== null;
+  const best = picked === round.best;
+  const last = at + 1 >= rounds.length;
+
+  function pick(i: number) {
+    if (answered) return;
+    setPicked(i);
+    setReplies([...replies, i]);
+    onRound(i === round.best);
+  }
+
+  function next() {
+    if (last) {
+      onDone(replies);
+      return;
+    }
+    setAt(at + 1);
+    setPicked(null);
+  }
+
+  return (
+    <div className="game-panel" key={at}>
+      <Counter at={at} of={rounds.length} />
+      <p className="game-title mt-2">{title}</p>
+      <p className="game-sentence mt-4">{round.situation}</p>
+      <ListenButton text={round.situation} />
+      <div className="mt-4 grid gap-2">
+        {round.options.map((option, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => pick(i)}
+            disabled={answered}
+            className={`game-option ${answered && i === round.best ? "game-option-yes" : ""}`}
+            aria-pressed={answered && i === picked}
+          >
+            {answered && i === round.best ? `★ ${option}` : option}
+          </button>
+        ))}
+      </div>
+      {answered && (
+        <>
+          <div className="game-verdict game-verdict-yes">
+            <p className="game-verdict-head">{best ? "That's the kindest!" : "That's kind. Even kinder:"}</p>
+            {!best && <p className="game-verdict-why">{round.options[round.best]}</p>}
+            <p className="game-verdict-why">{round.why}</p>
+          </div>
+          <button onClick={next} className="game-button mt-4">
+            {last ? "Finish" : "Next"}
+          </button>
+        </>
       )}
     </div>
   );

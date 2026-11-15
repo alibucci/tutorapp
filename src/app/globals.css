@@ -2126,3 +2126,29 @@ textarea.field { line-height: var(--leading-normal); }
   opacity: 0.7;
 }
 .game-recording { background: #b91c1c !important; color: #fff !important; }
+
+/* Read and answer: a story read and heard before the games about it. Big type,
+   short lines, the pictures side by side on a wide screen. */
+.game-read-pictures {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+.game-read-picture {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.06);
+}
+.game-minecraft .game-read-picture { border-radius: 0; border: 3px solid #000; }
+.game-read-text p {
+  font-size: 1.375rem;
+  line-height: 1.6;
+  max-width: 34ch;
+}
+.game-read-text p + p { margin-top: var(--space-3); }
+.game-closing { font-size: 1.125rem; font-weight: 700; text-align: center; }
+/* The right answer shown after a miss in a story question: calm blue, never red. */
+.game-minecraft .game-verdict-soft { background: #3b5b8a; }
+.game-palette .game-verdict-soft { background: #dbe7f6; color: #1e3a5f; }

@@ -7,7 +7,7 @@ import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
 import { gameFonts } from "@/lib/fonts";
 import { type GameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
 import { PracticeGame } from "@/components/PracticeGame";
-import { MicButton } from "@/components/SpokenAnswer";
+import { ListenButton, MicButton } from "@/components/SpokenAnswer";
 import type { VoiceProps, VoiceState } from "@/components/VoiceCheck";
 import {
   ADJECTIVES_TASK,
@@ -16,6 +16,8 @@ import {
   type Exercise,
   type ExerciseResult,
   type HomeworkAnswers,
+  type ReadAndAnswer,
+  type ReadPage,
   type RoundReply,
 } from "@/lib/types";
 
@@ -31,6 +33,7 @@ function pointsOnOffer(exercises: Exercise[] | undefined): number {
 }
 
 type Step =
+  | { type: "read"; page: ReadPage }
   | { type: "game"; exercise: Exercise }
   | { type: "task"; task: (typeof TASKS)[number] };
 
@@ -55,6 +58,7 @@ export function HomeworkGame({
   results,
   preview,
   voiceCheck,
+  read,
 }: {
   lessonId: string;
   /** Empty when this homework is games only. */
@@ -75,6 +79,8 @@ export function HomeworkGame({
   preview?: boolean;
   /** Pronunciation checks: whether offered to this learner, and their answer. */
   voiceCheck?: { offered: boolean; agreed: boolean };
+  /** A text to read and listen to before the games, which ask about it. */
+  read?: ReadAndAnswer;
 }) {
   const [voiceState, setVoiceState] = useState<VoiceState>(
     !voiceCheck?.offered || preview ? "off" : voiceCheck.agreed ? "on" : "ask",
@@ -100,7 +106,9 @@ export function HomeworkGame({
         };
   // Games first - they are quick and they warm up the words the picture task
   // then asks the child to use.
+  // A text to read comes before everything: the games are about it.
   const steps: Step[] = [
+    ...(read?.pages ?? []).map((page) => ({ type: "read" as const, page })),
     ...(exercises ?? []).map((exercise) => ({ type: "game" as const, exercise })),
     ...(imageSrc ? TASKS.map((task) => ({ type: "task" as const, task })) : []),
   ];
@@ -192,6 +200,7 @@ export function HomeworkGame({
   const current = step >= 1 && step <= steps.length ? steps[step - 1] : null;
   const task = current?.type === "task" ? current.task : null;
   const game = current?.type === "game" ? current.exercise : null;
+  const page = current?.type === "read" ? current.page : null;
   const done = step > steps.length;
   const completed = done ? steps.length : Math.max(0, step - 1);
   const maxPoints = pointsOnOffer(exercises);
@@ -302,7 +311,11 @@ export function HomeworkGame({
           <div className="game-panel">
             <p className="game-title">{style.words.heading ?? "New quest!"}</p>
             <p className="game-text mt-3">
-              {style.plain
+              {read?.pages.length
+                ? `First a story to read and listen to. Then ${exercises?.length ?? 0} short ${
+                    (exercises?.length ?? 0) === 1 ? "game" : "games"
+                  } about it.`
+                : style.plain
                 ? `${steps.length} ${steps.length === 1 ? "task" : "tasks"}, a few minutes each.`
                 : <>
                     {exercises?.length
@@ -322,6 +335,36 @@ export function HomeworkGame({
             <button onClick={() => go(1)} className="game-button mt-5">
               {style.words.start}
             </button>
+          </div>
+        )}
+
+        {page && (
+          <div className="game-panel game-read" key={`read-${step}`}>
+            {page.heading && <p className="game-title">{page.heading}</p>}
+            {page.pictures.length > 0 && (
+              <div className="game-read-pictures mt-3">
+                {page.pictures.map((p) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- small static drawings
+                  <img key={p.src} src={p.src} alt={p.alt} className="game-read-picture" />
+                ))}
+              </div>
+            )}
+            <ListenButton text={page.paragraphs.join(" ")} label="Listen" />
+            <div className="game-read-text mt-3">
+              {page.paragraphs.map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+            </div>
+            <div className="mt-5 flex gap-3">
+              {step > 1 && (
+                <button onClick={() => go(step - 1)} className="game-button game-button-small">
+                  ←
+                </button>
+              )}
+              <button onClick={() => go(step + 1)} className="game-button">
+                Next
+              </button>
+            </div>
           </div>
         )}
 
@@ -417,6 +460,9 @@ export function HomeworkGame({
             </span>
           </div>
         )}
+        {done && read?.closing && (
+          <p className="game-tip game-closing">{read.closing}</p>
+        )}
         {done && (
           <div className="game-panel">
             <p className="game-text">
@@ -486,7 +532,7 @@ export function HomeworkGame({
           <ol className={`game-hotbar ${style.plain ? "sr-only" : ""}`}>
             {steps.map((s, i) => (
               <li
-                key={s.type === "game" ? `g${i}` : s.task.id}
+                key={s.type === "task" ? s.task.id : `${s.type[0]}${i}`}
                 className={`game-slot ${step === i + 1 ? "game-slot-on" : ""} ${
                   i < completed ? "game-slot-done" : ""
                 }`}

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { homeworkFor } from "@/lib/access";
 import { LIMIT, readJson } from "@/lib/http";
+import { recordStoryResult } from "@/lib/christianity";
 import { noticeHomeworkDone } from "@/lib/notices";
 import { updateLesson } from "@/lib/store";
 import { answered, saidRight } from "@/lib/speaking";
 import {
-  EXERCISE_KINDS,
+  ALL_EXERCISE_KINDS,
   type Exercise,
   type Pronounced,
   type RoundAnswer,
@@ -15,7 +16,7 @@ import { VOICE_PASS, voiceSummary } from "@/lib/voice";
 
 type Params = { params: Promise<{ id: string }> };
 
-const KINDS = EXERCISE_KINDS;
+const KINDS = ALL_EXERCISE_KINDS;
 
 /** What a learner said or typed, kept to a sensible length. */
 function spoken(reply: RoundReply): string | null {
@@ -78,6 +79,35 @@ function mark(
     if (said === null) return null;
     return { asked: target, answered: said || "(nothing)", right: saidRight(target, said) };
   }
+  if (exercise.kind === "questions" || exercise.kind === "recall") {
+    const round = exercise.rounds[index];
+    if (!round || typeof reply !== "number") return null;
+    return {
+      asked: round.question,
+      answered: round.options[reply] ?? "(nothing)",
+      right: reply === round.answer,
+    };
+  }
+  if (exercise.kind === "order") {
+    const round = exercise.rounds[index];
+    if (!round || !Array.isArray(reply)) return null;
+    const given = reply.map(String);
+    return {
+      asked: round.events.join(" → "),
+      answered: given.join(" → "),
+      right: given.join("\n") === round.events.join("\n"),
+    };
+  }
+  if (exercise.kind === "kindness") {
+    // Every option is a kind one; "right" is whether it was the kindest.
+    const round = exercise.rounds[index];
+    if (!round || typeof reply !== "number") return null;
+    return {
+      asked: round.situation,
+      answered: round.options[reply] ?? "(nothing)",
+      right: reply === round.best,
+    };
+  }
   if (exercise.kind === "speak") {
     const round = exercise.rounds[index];
     const said = spoken(reply);
@@ -85,6 +115,7 @@ function mark(
     // No one right answer: a real attempt in English is what counts.
     return { asked: round.question, answered: said || "(nothing)", right: answered(said) };
   }
+  if (exercise.kind !== "catch") return null;
   const round = exercise.rounds[index];
   if (!round || typeof reply !== "boolean") return null;
   return {
@@ -129,10 +160,12 @@ export async function POST(request: Request, { params }: Params) {
   const right = rounds.filter((r) => r.right).length;
 
   const before = found.lesson;
+  let firstPlay = false;
   const after = await updateLesson(id, (current) => {
     const homework = current.homework;
     if (!homework?.sentAt) return null;
     const previous = (homework.results ?? []).find((r) => r.kind === kind);
+    firstPlay = !previous;
     const rest = (homework.results ?? []).filter((r) => r.kind !== kind);
     return {
       homework: {
@@ -155,6 +188,12 @@ export async function POST(request: Request, { params }: Params) {
     };
   });
   noticeHomeworkDone(before, after);
+  // A programme homework moves the learner's place, on the first play only.
+  if (after && firstPlay) {
+    await recordStoryResult(after, kind, right, exercise.rounds.length).catch((e) =>
+      console.error("[christianity] progress", e),
+    );
+  }
 
   return NextResponse.json({ right, total: exercise.rounds.length });
 }

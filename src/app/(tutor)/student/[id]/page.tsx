@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { ChristianityPanel } from "@/components/ChristianityPanel";
 import { ExtraHomework } from "@/components/ExtraHomework";
+import { PROGRAMME, christianityOpenTo, moduleOf, nextStory } from "@/lib/christianity";
 import { canScoreVoice } from "@/lib/pronounce";
 import { hasVoiceConsent, mayScoreVoice } from "@/lib/voice";
 import { notFound } from "next/navigation";
@@ -29,7 +31,10 @@ export default async function StudentPage({
   const { id } = await params;
   const found = await studentFor(id);
   if (!found) notFound();
-  const { student } = found;
+  const { student, session } = found;
+  const christianityOpen = await christianityOpenTo(session);
+  const christianity = moduleOf(student);
+  const upNext = christianity?.enabled ? nextStory(christianity) : null;
 
   const [lessons, reports] = await Promise.all([
     listLessons(id),
@@ -119,7 +124,9 @@ export default async function StudentPage({
                       <span className="block truncate font-semibold">{lesson.title}</span>
                       <span className="block t-small t-muted">
                         {DATE.format(new Date(lesson.createdAt))} ·{" "}
-                        {lesson.kind === "practice"
+                        {lesson.module
+                          ? "Christianity"
+                          : lesson.kind === "practice"
                           ? "extra homework"
                           : lesson.mode === "classroom"
                             ? "in the room"
@@ -150,7 +157,34 @@ export default async function StudentPage({
         parent={hasParent(student)}
       />
 
-      {!student.archivedAt && <ExtraHomework studentId={student.id} studentName={student.name} />}
+      {!student.archivedAt && (
+        <ExtraHomework
+          studentId={student.id}
+          studentName={student.name}
+          christianity={
+            christianityOpen && christianity?.enabled
+              ? {
+                  next: upNext?.card.title ?? null,
+                  reference: upNext?.card.reference,
+                  review: upNext?.review?.title,
+                  approved: Boolean(upNext?.card.approved),
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {christianityOpen && !student.archivedAt && (
+        <ChristianityPanel
+          studentId={student.id}
+          studentName={student.name}
+          enabled={Boolean(christianity?.enabled)}
+          parentAskedAt={christianity?.parentAskedAt || undefined}
+          passed={christianity?.passed.length ?? 0}
+          total={PROGRAMME.length}
+          next={nextStory(christianity)?.card.title ?? null}
+        />
+      )}
 
 
       {hasParent(student) && <ReportsPanel student={student} reports={reports} />}

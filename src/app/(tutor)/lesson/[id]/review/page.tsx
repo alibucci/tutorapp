@@ -11,6 +11,7 @@ import { moveOptions } from "@/lib/moveLesson";
 import { styleFor } from "@/lib/gameStyles";
 import { hasParent } from "@/lib/profile";
 import { canDrawPictures } from "@/lib/imageGen";
+import { PROGRAMME, cardById } from "@/lib/christianity";
 import { INTERRUPTION_LABEL, promptLabel } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,9 @@ export default async function ReviewPage({
   // Extra homework has no lesson behind it: no summary, debrief or parent
   // message - only the games.
   const practice = lesson.kind === "practice";
+  // A Bible story from the programme: the story the system picked.
+  const story = cardById(lesson.module?.storyId);
+  const recapOf = cardById(lesson.module?.reviewOf);
 
   const homeworkSent = Boolean(lesson.homework?.sentAt);
   const messageSent = Boolean(lesson.parentMessage?.copiedAt);
@@ -60,7 +64,7 @@ export default async function ReviewPage({
             {student && <span className="font-normal t-muted"> · {student.name}</span>}
           </h1>
           <p className="t-small t-muted">
-            {practice ? "Extra homework" : lesson.mode === "classroom" ? "In the room" : "Online"}
+            {story ? `Christianity · ${story.reference}` : practice ? "Extra homework" : lesson.mode === "classroom" ? "In the room" : "Online"}
             {!practice && lesson.recordedMs
               ? ` · ${Math.max(1, Math.round(lesson.recordedMs / 60000))} min`
               : ""}
@@ -123,7 +127,23 @@ export default async function ReviewPage({
       {/* Phone: one column in step order. Desktop: what to read on the
           left, what to do on the right. */}
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-start">
-      {practice ? (
+      {story ? (
+        <section className="card card-pad space-y-2">
+          <p className="t-eyebrow">Christianity · story {story.order + 1} of {PROGRAMME.length}</p>
+          <p className="font-semibold">
+            {story.title} <span className="font-normal t-muted">· {story.reference}</span>
+          </p>
+          <p className="t-small">
+            Today&rsquo;s rule: <span className="font-semibold">{story.value.rule}</span>
+          </p>
+          {recapOf && <p className="t-small t-muted">Starts with a short recap of &ldquo;{recapOf.title}&rdquo;, which was not passed.</p>}
+          {!story.approved && (
+            <p className="note note-warn">
+              This story&rsquo;s card is not approved yet. You can preview it, but it cannot be sent.
+            </p>
+          )}
+        </section>
+      ) : practice ? (
         <section className="card card-pad space-y-1">
           <p className="t-eyebrow">What you asked for</p>
           <p>{lesson.request}</p>
@@ -154,7 +174,7 @@ export default async function ReviewPage({
         />
       )}
 
-      {parent && !practice && (
+      {parent && (!practice || story) && (
         <div id="parent" className="scroll-mt-20">
           <ParentMessagePanel key={student.id} lesson={lesson} />
         </div>
