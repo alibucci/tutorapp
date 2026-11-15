@@ -7,12 +7,14 @@ export function AppHeader({
   context,
   action,
   accountHref,
+  helpHref,
   homeHref = "/",
 }: {
   name: string;
   context?: string;
   action?: { href: string; label: string };
   accountHref?: string;
+  helpHref?: string;
   homeHref?: string;
 }) {
   return (
@@ -42,6 +44,11 @@ export function AppHeader({
                 {action.label}
               </Link>
             </span>
+          )}
+          {helpHref && (
+            <Link href={helpHref} className="btn btn-ghost btn-sm">
+              Help
+            </Link>
           )}
           <SignOut name={name} accountHref={accountHref} />
         </div>

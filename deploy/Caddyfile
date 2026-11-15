@@ -16,7 +16,21 @@ aloudli.com, www.aloudli.com {
 		max_size 6MB
 	}
 
-	reverse_proxy 127.0.0.1:3000
+	# Help films: Caddy streams them itself (byte ranges, no app in the way),
+	# but only after the app says the request comes from a signed-in tutor.
+	# A new cut gets a new file name, so a long private cache is safe.
+	handle /media/* {
+		forward_auth 127.0.0.1:3000 {
+			uri /api/auth/media
+		}
+		header Cache-Control "private, max-age=31536000, immutable"
+		root * /opt/tutorapp
+		file_server
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
 
 	# The app sets no third-party requests of its own, so the policy can be
 	# strict. `unsafe-inline` on styles is what Next's streamed CSS needs.
