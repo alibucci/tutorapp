@@ -22,9 +22,9 @@ export default async function HelpPage() {
           Start with the whole lesson cycle; the rest are one function each.
         </p>
         <nav aria-label="On this page" className="mt-4 flex flex-wrap gap-2">
-          <a href="#cycle" className="tag">The lesson cycle</a>
+          <a href="#cycle" className="tag tag-quiet">The lesson cycle</a>
           {HELP_FILMS.map((f) => (
-            <a key={f.id} href={`#${f.id.toLowerCase()}`} className="tag">
+            <a key={f.id} href={`#${f.id.toLowerCase()}`} className="tag tag-quiet">
               {f.title}
             </a>
           ))}
