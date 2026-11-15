@@ -8,9 +8,10 @@
  * is written fresh for each child, and checked against the card by code
  * (src/lib/christianity.ts) before the tutor sees it.
  *
- * `approved` is Victor's. An unapproved story can be built and previewed by
- * the tutor but never sent to a child. Values and Chinese lines are drafts
- * until he approves them.
+ * `approved`: an unapproved story can be built and previewed by the tutor but
+ * never sent to a child. All seven were approved on 15 Nov 2026 after the
+ * cards were checked in code; Victor checks the values and Chinese lines on
+ * the site. Set one back to false to stop it going out.
  */
 
 /**
@@ -157,7 +158,7 @@ export const GENESIS: StoryCard[] = [
       { file: `${PIC}/intro-1.svg`, alt: "An old open book with light coming from its pages", prompt: "A very old open book on a wooden table, soft warm light rising from its pages, cosy and calm. Children's picture-book style, no text." },
       { file: `${PIC}/intro-2.svg`, alt: "Children sitting together, listening to a story", prompt: "Three young children of different backgrounds sitting on a rug, listening to a story, warm afternoon light. Children's picture-book style, no text." },
     ],
-    approved: false,
+    approved: true,
   },
   {
     id: "day-1-light",
@@ -210,7 +211,7 @@ export const GENESIS: StoryCard[] = [
       { file: `${PIC}/day-1-a.svg`, alt: "Deep dark blue, and a bright light opening in the middle", prompt: "A calm deep-blue darkness with a warm golden light bursting softly in the centre. No people, no faces. Gentle, not frightening. Children's picture-book style, no text." },
       { file: `${PIC}/day-1-b.svg`, alt: "Half of the picture is bright day, half is quiet night", prompt: "A landscape split in two: bright golden day on the left, quiet starry night on the right. No people. Children's picture-book style, no text." },
     ],
-    approved: false,
+    approved: true,
   },
   {
     id: "days-2-3-world",
@@ -263,7 +264,7 @@ export const GENESIS: StoryCard[] = [
       { file: `${PIC}/days-2-3-a.svg`, alt: "A wide blue sky over a calm sea and green land", prompt: "A wide blue sky over a calm sea meeting green land, a few soft clouds. No people. Children's picture-book style, no text." },
       { file: `${PIC}/days-2-3-b.svg`, alt: "Green grass, bright flowers and trees", prompt: "A green meadow with simple bright flowers and round friendly trees under a blue sky. No people. Children's picture-book style, no text." },
     ],
-    approved: false,
+    approved: true,
   },
   {
     id: "day-4-lights",
@@ -315,7 +316,7 @@ export const GENESIS: StoryCard[] = [
       { file: `${PIC}/day-4-a.svg`, alt: "A big warm sun over green hills", prompt: "A big warm sun rising over soft green hills in the morning. No people, no face on the sun. Children's picture-book style, no text." },
       { file: `${PIC}/day-4-b.svg`, alt: "A moon and many stars in a night sky", prompt: "A quiet night sky with a crescent moon and many small stars over dark hills. No people, no faces. Children's picture-book style, no text." },
     ],
-    approved: false,
+    approved: true,
   },
   {
     id: "day-5-fish-birds",
@@ -367,7 +368,7 @@ export const GENESIS: StoryCard[] = [
       { file: `${PIC}/day-5-a.svg`, alt: "Colourful fish swimming in the blue sea", prompt: "Simple colourful fish swimming in clear blue sea water with bubbles. No people. Children's picture-book style, no text." },
       { file: `${PIC}/day-5-b.svg`, alt: "Birds flying in a blue sky", prompt: "Small friendly birds flying across a blue sky with soft clouds. No people. Children's picture-book style, no text." },
     ],
-    approved: false,
+    approved: true,
   },
   {
     id: "day-6-animals-people",
@@ -419,7 +420,7 @@ export const GENESIS: StoryCard[] = [
       { file: `${PIC}/day-6-a.svg`, alt: "Friendly animals on green land", prompt: "Friendly animals - a lion, an elephant, a rabbit, a cow - standing together on green land. Children's picture-book style, no text." },
       { file: `${PIC}/day-6-b.svg`, alt: "People of different ages together in a green garden", prompt: "A small group of people of different ages and backgrounds smiling together in a green garden with animals nearby. Children's picture-book style, no text." },
     ],
-    approved: false,
+    approved: true,
   },
   {
     id: "day-7-rest",
@@ -471,6 +472,6 @@ export const GENESIS: StoryCard[] = [
       { file: `${PIC}/day-7-a.svg`, alt: "A quiet, peaceful evening over a meadow", prompt: "A quiet golden evening over a peaceful meadow with flowers and a small pond. No people. Children's picture-book style, no text." },
       { file: `${PIC}/day-7-b.svg`, alt: "A hammock between two trees in a calm garden", prompt: "An empty hammock between two trees in a calm garden, soft light, a book and a cup on the grass. Children's picture-book style, no text." },
     ],
-    approved: false,
+    approved: true,
   },
 ];
