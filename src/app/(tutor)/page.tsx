@@ -13,6 +13,7 @@ import { requireSession } from "@/lib/auth";
 import { styleFor } from "@/lib/gameStyles";
 import { recentActivity, timeAgo } from "@/lib/feed";
 import { homeworkDone } from "@/lib/homework";
+import { hasParent } from "@/lib/profile";
 import { listGroupLessons, listLessons, listStudents } from "@/lib/store";
 import type { Lesson } from "@/lib/types";
 
@@ -32,7 +33,7 @@ type Todo = {
 };
 
 /** The one thing each recent lesson is still waiting for, if anything. */
-function todoFor(lesson: Lesson, name: string): Todo | null {
+function todoFor(lesson: Lesson, name: string, parent: boolean): Todo | null {
   const base = `/lesson/${lesson.id}`;
   if (lesson.kind === "practice") {
     return lesson.homework?.sentAt
@@ -92,7 +93,8 @@ function todoFor(lesson: Lesson, name: string): Todo | null {
       icon: <ImageIcon />,
     };
   }
-  if (lesson.parentMessage && !lesson.parentMessage.copiedAt) {
+  // An adult has nobody to send it to; the review page hides it for them too.
+  if (parent && lesson.parentMessage && !lesson.parentMessage.copiedAt) {
     return {
       href: `${base}/review#parent`,
       title: `Message ${name}'s parent`,
@@ -128,11 +130,11 @@ function groupTodo(lesson: Lesson): Todo | null {
   return null;
 }
 
-function recentTodos(lessons: Lesson[], names: Map<string, string>): Todo[] {
+function recentTodos(lessons: Lesson[], names: Map<string, string>, adults: Set<string>): Todo[] {
   const cutoff = Date.now() - TODO_WINDOW_MS;
   return lessons
     .filter((l) => new Date(l.createdAt).getTime() > cutoff)
-    .map((l) => todoFor(l, names.get(l.studentId) ?? "your student"))
+    .map((l) => todoFor(l, names.get(l.studentId) ?? "your student", !adults.has(l.studentId)))
     .filter((t): t is Todo => t !== null);
 }
 
@@ -153,12 +155,13 @@ export default async function Home() {
     listStudents(session.id, "archived"),
   ]);
   const names = new Map(students.map((s) => [s.id, s.name]));
+  const adults = new Set(students.filter((s) => !hasParent(s)).map((s) => s.id));
   const lessons = (await listLessons()).filter((l) => names.has(l.studentId));
 
   const groups = (await listGroupLessons()).filter((l) => names.has(l.studentId));
   const todos = [
     ...groups.map(groupTodo).filter((t): t is Todo => t !== null),
-    ...recentTodos(lessons, names),
+    ...recentTodos(lessons, names, adults),
   ];
   const activity = recentActivity(lessons, students);
 
