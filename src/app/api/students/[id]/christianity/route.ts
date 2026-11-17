@@ -1,21 +1,10 @@
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
-import {
-  StoryNotBuilt,
-  buildStoryHomework,
-  christianityOpenTo,
-  moduleOf,
-  nextStory,
-  setModule,
-} from "@/lib/christianity";
+import { christianityOpenTo, setModule } from "@/lib/christianity";
 import { LIMIT, readJson } from "@/lib/http";
-import { createLesson, updateLesson } from "@/lib/store";
-import { DEFAULT_LANGUAGE } from "@/lib/types";
+import { startNextAfter, startNextStory } from "@/lib/programmes";
 
 type Params = { params: Promise<{ id: string }> };
-
-/** One build per learner at a time: a second tap joins the first. */
-const running = new Map<string, Promise<Response>>();
 
 /**
  * Switch the module on or off for this learner. On needs `parentAsked`: the
@@ -34,13 +23,15 @@ export async function PATCH(request: Request, { params }: Params) {
   }
   const result = await setModule(found.student, body.on, body.parentAsked === true);
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
+  // Switched on: the first story (or the one due) is built and sent by itself.
+  if (body.on && result.student) startNextAfter(result.student);
   return NextResponse.json(result.student?.modules?.christianity ?? null);
 }
 
 /**
- * Build the next story's homework. The system picks the story; the tutor
- * never picks a number. Nothing is made unless the text passes the checks:
- * on failure the tutor is told and there is no half-built homework to send.
+ * Build the next story and send it now. The system picks the story; the tutor
+ * never picks a number. Stories also go out by themselves (programmes.ts):
+ * this is for "now" rather than when the last one is finished.
  */
 export async function POST(_request: Request, { params }: Params) {
   const { id } = await params;
@@ -48,49 +39,13 @@ export async function POST(_request: Request, { params }: Params) {
   if (!found || found.student.archivedAt || !(await christianityOpenTo(found.session))) {
     return NextResponse.json({ error: "No such student." }, { status: 404 });
   }
-  const state = moduleOf(found.student);
-  if (!state?.enabled) {
-    return NextResponse.json({ error: "Christianity is not switched on for this learner." }, { status: 400 });
-  }
-  const next = nextStory(state);
-  if (!next) {
+  const result = await startNextStory(found.student);
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  if (!result.value) {
     return NextResponse.json(
       { error: "That's all for now: every story in the programme has been done." },
       { status: 409 },
     );
   }
-
-  let job = running.get(id);
-  if (!job) {
-    job = (async () => {
-      try {
-        const built = await buildStoryHomework(found.student, next.card, next.review);
-        const now = new Date().toISOString();
-        const lesson = await createLesson({
-          title: next.card.title,
-          kind: "practice",
-          request: `Christianity · ${next.card.title} (${next.card.reference})`,
-          module: {
-            id: "christianity",
-            storyId: next.card.id,
-            ...(next.review && { reviewOf: next.review.id }),
-          },
-          studentId: found.student.id,
-          mode: "online",
-          capture: "tutor",
-          language: DEFAULT_LANGUAGE,
-          startedAt: now,
-          endedAt: now,
-        });
-        await updateLesson(lesson.id, { homework: built.homework, parentMessage: built.parentMessage });
-        return NextResponse.json({ id: lesson.id });
-      } catch (e) {
-        console.error("[christianity] build", e);
-        const message = e instanceof StoryNotBuilt ? e.message : "Could not build it. Try again.";
-        return NextResponse.json({ error: message }, { status: 502 });
-      }
-    })().finally(() => running.delete(id));
-    running.set(id, job);
-  }
-  return (await job).clone();
+  return NextResponse.json({ id: result.value });
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
-import { buildExercises } from "@/lib/exercises";
+import { runAutoHomework } from "@/lib/autoHomework";
 import { LIMIT, readJson } from "@/lib/http";
 import { createLesson, updateLesson } from "@/lib/store";
 import { DEFAULT_LANGUAGE } from "@/lib/types";
@@ -15,9 +15,8 @@ const MAX = 300;
  * 20". It lives as a lesson with nothing recorded, so sending it, the
  * learner's screen, the scores and the notices all work as for any homework.
  *
- * The games are built straight away, which takes half a minute. If that
- * fails the homework is still there, and the tutor builds them again from
- * its page.
+ * The games are built and sent straight away, which takes half a minute. If
+ * that fails the homework is still there, and its page tries again.
  */
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
@@ -51,14 +50,8 @@ export async function POST(request: Request, { params }: Params) {
     endedAt: now,
   });
 
-  try {
-    const exercises = await buildExercises(lesson, found.student);
-    if (exercises.length === 0) throw new Error("No usable games.");
-    await updateLesson(lesson.id, { homework: { focus: asked, exercises } });
-    return NextResponse.json({ id: lesson.id, built: true });
-  } catch (e) {
-    console.error("[practice]", e);
-    await updateLesson(lesson.id, { homework: { focus: asked } });
-    return NextResponse.json({ id: lesson.id, built: false });
-  }
+  // The tip is the tutor's own request until they change it.
+  await updateLesson(lesson.id, { homework: { focus: asked } });
+  const result = await runAutoHomework(lesson.id);
+  return NextResponse.json({ id: lesson.id, built: result.ok && Boolean(result.value?.exercises?.length) });
 }

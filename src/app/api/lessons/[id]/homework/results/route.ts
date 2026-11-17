@@ -3,6 +3,7 @@ import { homeworkFor } from "@/lib/access";
 import { LIMIT, readJson } from "@/lib/http";
 import { recordStoryResult } from "@/lib/christianity";
 import { noticeHomeworkDone } from "@/lib/notices";
+import { onHomeworkDone } from "@/lib/programmes";
 import { updateLesson } from "@/lib/store";
 import { answered, saidRight } from "@/lib/speaking";
 import {
@@ -200,6 +201,8 @@ export async function POST(request: Request, { params }: Params) {
       console.error("[christianity] progress", e),
     );
   }
+  // A programme item finished: the next one is built and sent by itself.
+  onHomeworkDone(before, after);
 
   return NextResponse.json({ right, total });
 }

@@ -2,6 +2,7 @@ import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { homeworkFor } from "@/lib/access";
 import { noticeHomeworkDone } from "@/lib/notices";
+import { onHomeworkDone } from "@/lib/programmes";
 import { updateLesson } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -67,5 +68,6 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Already handed in." }, { status: 409 });
   }
   noticeHomeworkDone(before, after);
+  onHomeworkDone(before, after);
   return NextResponse.json({ ok: true });
 }

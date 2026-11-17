@@ -1,6 +1,7 @@
 import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
+import { autoHomeworkAfter } from "@/lib/autoHomework";
 import { updateLesson } from "@/lib/store";
 import { z } from "zod";
 
@@ -105,5 +106,9 @@ export async function PATCH(request: Request, { params }: Params) {
   if (found.lesson.startedAt) delete patch.startedAt;
 
   const lesson = await updateLesson(id, patch);
+  // The debrief is in: the summary, the games and sending them follow by
+  // themselves, whether or not the tutor opens the review page. Autosaves of
+  // the spoken debrief carry only its transcript, so they do not start this.
+  if (lesson && patch.debrief?.length) autoHomeworkAfter(id);
   return NextResponse.json(lesson);
 }

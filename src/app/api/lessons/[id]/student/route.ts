@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { lessonFor, studentFor } from "@/lib/access";
 import { LIMIT, readJson } from "@/lib/http";
 import { whyCannotMove } from "@/lib/moveLesson";
+import { autoHomeworkAfter } from "@/lib/autoHomework";
 import { deleteImage, deleteReport, listReports, updateLesson } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -76,5 +77,7 @@ export async function PUT(request: Request, { params }: Params) {
       .map((r) => deleteReport(r.id)),
   );
 
+  // Written again for the right child, and sent to them.
+  autoHomeworkAfter(id);
   return NextResponse.json(moved);
 }

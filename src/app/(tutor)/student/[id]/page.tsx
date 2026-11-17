@@ -183,6 +183,7 @@ export default async function StudentPage({
           passed={christianity?.passed.length ?? 0}
           total={PROGRAMME.length}
           next={nextStory(christianity)?.card.title ?? null}
+          failed={christianity?.failed?.error}
         />
       )}
 

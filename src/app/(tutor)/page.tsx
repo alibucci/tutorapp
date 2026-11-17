@@ -12,7 +12,7 @@ import {
 import { requireSession } from "@/lib/auth";
 import { styleFor } from "@/lib/gameStyles";
 import { recentActivity, timeAgo } from "@/lib/feed";
-import { homeworkDone } from "@/lib/homework";
+import { homeworkDone, sendsItself } from "@/lib/homework";
 import { hasParent } from "@/lib/profile";
 import { listGroupLessons, listLessons, listStudents } from "@/lib/store";
 import type { Lesson } from "@/lib/types";
@@ -32,19 +32,34 @@ type Todo = {
   icon: React.ReactNode;
 };
 
+/**
+ * Homework that has not gone out, when that needs the tutor: they took it
+ * back, or the automatic build and send failed. On its way otherwise - nothing
+ * to do.
+ */
+function notSent(lesson: Lesson, name: string, what: string): Todo | null {
+  const href = `/lesson/${lesson.id}/review#homework`;
+  // From before homework sent itself: the tutor sends it, as it always was.
+  if (!sendsItself(lesson)) {
+    return { href, title: `Send ${name} their ${what}`, detail: `${lesson.title} · check it, then send`, kind: "warn", icon: <ImageIcon /> };
+  }
+  if (lesson.homework?.takenBackAt) {
+    return { href, title: `Send ${name} their ${what}`, detail: `${lesson.title} · you took it back`, kind: "warn", icon: <ImageIcon /> };
+  }
+  if (lesson.autoFailed) {
+    return { href, title: `${name}'s ${what} did not go out`, detail: `${lesson.title} · try again`, kind: "warn", icon: <ImageIcon /> };
+  }
+  return null;
+}
+
 /** The one thing each recent lesson is still waiting for, if anything. */
 function todoFor(lesson: Lesson, name: string, parent: boolean): Todo | null {
   const base = `/lesson/${lesson.id}`;
   if (lesson.kind === "practice") {
-    return lesson.homework?.sentAt
-      ? null
-      : {
-          href: `${base}/review#homework`,
-          title: lesson.module ? `Send ${name} their Bible story` : `Send ${name} their extra homework`,
-          detail: `${lesson.title} · check ${lesson.module ? "the story" : "the games"} first`,
-          kind: "warn",
-          icon: <BookIcon />,
-        };
+    if (lesson.homework?.sentAt) return null;
+    // Extra homework and programme stories go out by themselves; only a
+    // failure or a take-back needs the tutor.
+    return notSent(lesson, name, lesson.module ? "story" : "extra homework");
   }
   if (lesson.kind === "intro" && lesson.debrief.length === 0) {
     const begun = lesson.debriefTranscript.length > 0;
@@ -85,13 +100,8 @@ function todoFor(lesson: Lesson, name: string, parent: boolean): Todo | null {
     };
   }
   if (lesson.summary && !lesson.homework?.sentAt) {
-    return {
-      href: `${base}/review#homework`,
-      title: `Send ${name} their homework`,
-      detail: `${lesson.title} · build games and preview`,
-      kind: "warn",
-      icon: <ImageIcon />,
-    };
+    const todo = notSent(lesson, name, "homework");
+    if (todo) return todo;
   }
   // An adult has nobody to send it to; the review page hides it for them too.
   if (parent && lesson.parentMessage && !lesson.parentMessage.copiedAt) {
@@ -161,6 +171,16 @@ export default async function Home() {
   const groups = (await listGroupLessons()).filter((l) => names.has(l.studentId));
   const todos = [
     ...groups.map(groupTodo).filter((t): t is Todo => t !== null),
+    // A programme's next item could not be built and sent by itself.
+    ...students
+      .filter((s) => s.modules?.christianity?.enabled && s.modules.christianity.failed)
+      .map((s): Todo => ({
+        href: `/student/${s.id}`,
+        title: `The next story for ${s.name} did not go out`,
+        detail: "send it from their page",
+        kind: "warn",
+        icon: <BookIcon />,
+      })),
     ...recentTodos(lessons, names, adults),
   ];
   const activity = recentActivity(lessons, students);

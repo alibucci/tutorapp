@@ -72,7 +72,7 @@ export function ExtraHomework({
         <p className="font-semibold">Extra homework</p>
         <p className="t-small t-muted mt-1">
           Say what {studentName} should practise, and the games are made from
-          that - in {studentName}&rsquo;s look. You check them before sending.
+          that - in {studentName}&rsquo;s look - and sent straight away.
         </p>
       </div>
       {christianity && (
@@ -114,15 +114,19 @@ export function ExtraHomework({
             <p className="note">That&rsquo;s all for now: {studentName} has had every story in the programme.</p>
           )}
           {christianity.next && !christianity.approved && (
-            <p className="hint">This story&rsquo;s card is not approved yet: you can build and preview it, not send it.</p>
+            <p className="hint">This story&rsquo;s card is not approved yet, so it cannot be sent.</p>
           )}
+          <p className="hint">
+            Stories go out by themselves: the next one is built and sent when {studentName} finishes the last.
+            This sends it now.
+          </p>
           {error && <p className="note note-warn">{error}</p>}
           <button
             onClick={() => void makeStory()}
             disabled={busy || !christianity.next}
             className="btn btn-primary btn-block"
           >
-            {busy ? `Writing the story… ${seconds}s` : "Build"}
+            {busy ? `Writing the story… ${seconds}s` : "Send the next story now"}
           </button>
           {busy && <p className="hint">Usually under a minute. The page opens when it is ready.</p>}
         </div>

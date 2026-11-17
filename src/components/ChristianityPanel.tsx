@@ -17,6 +17,7 @@ export function ChristianityPanel({
   passed,
   total,
   next,
+  failed,
 }: {
   studentId: string;
   studentName: string;
@@ -26,6 +27,8 @@ export function ChristianityPanel({
   total: number;
   /** The next story's title, or null at the end of the programme. */
   next: string | null;
+  /** Why the next story did not go out by itself, if it did not. */
+  failed?: string;
 }) {
   const router = useRouter();
   const [asked, setAsked] = useState(false);
@@ -81,7 +84,15 @@ export function ChristianityPanel({
           <button onClick={() => void save(false)} disabled={busy} className="btn btn-quiet btn-block">
             {busy ? "Saving…" : "Switch off"}
           </button>
-          <p className="hint">Switching off keeps {studentName}&rsquo;s place for later.</p>
+          {failed && (
+            <p className="note note-warn">
+              The next story could not be built and sent by itself: {failed}. Use &ldquo;Send the next story now&rdquo; under Extra homework.
+            </p>
+          )}
+          <p className="hint">
+            Each story is built and sent by itself when {studentName} finishes the one before.
+            Switching off keeps {studentName}&rsquo;s place for later.
+          </p>
         </>
       ) : (
         <>

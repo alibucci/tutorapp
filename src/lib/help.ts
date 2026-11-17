@@ -81,15 +81,15 @@ export const CORE_CHAPTERS: CoreChapter[] = [
   {
     id: "C7", title: "Build the homework", at: 98,
     steps: [
-      "In \"Homework\" click \"Build games\". The games are made from today's mistakes, in the student's own look.",
-      "Edit the \"Tip\" in the child's own words.",
-      "Click \"Preview what … will see\" to play it exactly as the child will.",
+      "After the debrief the games are built by themselves from today's mistakes, in the student's own look, and sent to the student.",
+      "Edit the \"Tip\" in the child's own words if you like.",
+      "\"Preview what … will see\" plays it exactly as the child does. Not right? \"Build different ones\" before they start.",
     ],
   },
   {
     id: "C8", title: "Send and see results", at: 125,
     steps: [
-      "Click \"Send to …\". The tag reads \"Sent · waiting\".",
+      "Nothing to click: once the games are built the tag reads \"Sent · waiting\".",
       "When the student has finished it reads \"Handed in\", with a score per game. \"See the answers\" shows every answer.",
     ],
   },
@@ -139,8 +139,8 @@ export const HELP_FILMS: HelpFilm[] = [
     why: "Practice on exactly what you ask for, without a lesson.",
     steps: [
       "On the student's page, under \"Extra homework\", describe it in your own words - for example \"adding and taking away up to 20\".",
-      "Click \"Make homework\". The games open in the student's own look.",
-      "\"Preview what … will see\", then \"Send to …\".",
+      "Click \"Make homework\". The games are built in the student's own look and sent straight away.",
+      "\"Preview what … will see\" shows what they got.",
     ],
     tip: "Sums and counting are made by code, so every answer is right and stays within your limit.",
   },
@@ -189,7 +189,7 @@ export const HELP_FILMS: HelpFilm[] = [
     why: "Rebuild, take back or reset homework.",
     steps: [
       "Not happy with the games? \"Build different ones\".",
-      "Sent too soon? \"Take back\".",
+      "Want to hold it? \"Take back\" - then it waits until you send it yourself.",
       "Want a second go after it was handed in? \"Let … do it again\", then \"Clear and hand back\".",
     ],
     tip: "\"Let … do it again\" clears the scores.",
@@ -242,7 +242,7 @@ export const HELP_FILMS: HelpFilm[] = [
       "On a new student's page, under \"Tell the app about …\", choose the language and click \"Record a note\".",
       "Click \"Start\" and answer five short questions out loud, or \"Type it instead\".",
       "Fix any word the recogniser got wrong and click \"Save note\".",
-      "The summary and the note home are written; \"Build games\" makes the first practice.",
+      "The summary and the note home are written, and the first practice games are built and sent by themselves.",
     ],
   },
   {

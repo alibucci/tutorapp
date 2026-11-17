@@ -1,8 +1,7 @@
 import { LIMIT, readForm, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
-import { cardById } from "@/lib/christianity";
-import { sentStyle, styleFor } from "@/lib/gameStyles";
+import { markSent } from "@/lib/autoHomework";
 import { deleteImage, saveImage, updateLesson } from "@/lib/store";
 import type { Homework } from "@/lib/types";
 
@@ -74,7 +73,10 @@ export async function POST(request: Request, { params }: Params) {
   return NextResponse.json(lesson?.homework);
 }
 
-/** Change the focus line, send it to the child, or take it back. */
+/**
+ * Change the tip, take it back, or send again what was taken back. The first
+ * send happens by itself once the games are built (see autoHomework).
+ */
 export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
   const found = await lessonFor(id);
@@ -124,22 +126,13 @@ export async function PATCH(request: Request, { params }: Params) {
     }
     if (typeof body.focus === "string") next.focus = body.focus.trim().slice(0, 300);
     if (body.send === true) {
-      if (!next.imageFile && !next.exercises?.length) {
-        problem = { error: "Add a picture or build the games before sending.", status: 400 };
+      // Sending again what the tutor took back, or a programme story.
+      const result = markSent({ ...current, homework: next }, found.student);
+      if ("error" in result) {
+        problem = result;
         return null;
       }
-      // A story reaches a child only once its card is approved.
-      if (current.module && !cardById(current.module.storyId)?.approved) {
-        problem = {
-          error: "This story's card is not approved yet, so it cannot be sent. You can still preview it.",
-          status: 409,
-        };
-        return null;
-      }
-      next.sentAt ??= new Date().toISOString();
-      // The look it goes out in stays with it: a profile changed next week
-      // changes the next homework, not this one.
-      next.style ??= sentStyle(styleFor(found.student));
+      return { homework: result.homework, autoFailed: undefined };
     }
     if (body.send === false) {
       if (next.answers) {
@@ -148,6 +141,8 @@ export async function PATCH(request: Request, { params }: Params) {
       }
       delete next.sentAt;
       delete next.style;
+      // Taken back by hand: from now on it is the tutor's to send.
+      next.takenBackAt = new Date().toISOString();
     }
     return { homework: next };
   });

@@ -146,6 +146,11 @@ export type Lesson = {
   /** Short note for the parent, sent by the tutor over WeChat. */
   parentMessage?: ParentMessage;
   homework?: Homework;
+  /**
+   * The automatic summary - games - send did not get through. Cleared when it
+   * does; the tutor's home screen shows it as something to retry.
+   */
+  autoFailed?: { at: string; error: string };
   /** Set once the tutor has accepted this lesson's changes to the student
    *  model. Nothing reaches the student before that. */
   skillsAppliedAt?: string;
@@ -283,6 +288,11 @@ export type ModuleState = {
   passed: string[];
   /** A story not passed: the next homework starts with a short recap of it. */
   review?: string;
+  /**
+   * The next story could not be built and sent by itself. Cleared when one
+   * goes out; the tutor's home screen shows it as something to retry.
+   */
+  failed?: { at: string; error: string };
 };
 
 /** What a programme homework is, fixed when it is built. */
@@ -572,8 +582,13 @@ export type Homework = {
   scene?: string;
   /** Games built from this lesson's mistakes, for the tutor to check. */
   exercises?: Exercise[];
-  /** The child sees nothing until the tutor sends it. */
+  /** When it went to the child - by itself, once built, or by the tutor. */
   sentAt?: string;
+  /**
+   * The tutor took it back. From then on it is theirs to send: the server
+   * never sends it again by itself.
+   */
+  takenBackAt?: string;
   answers?: HomeworkAnswers;
   /** One entry per game the child finished. */
   results?: ExerciseResult[];

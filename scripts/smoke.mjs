@@ -2,8 +2,8 @@
  * End-to-end check of the server path, against a running dev server.
  *
  * Covers everything that does not need a browser: sign-in, tenant isolation,
- * consent driving capture, the model calls, the tutor's two approval
- * gates, and what a family can and cannot see. Costs a few cents in DeepSeek
+ * consent driving capture, the model calls, homework going out by itself,
+ * the tutor's approval gates, and what a family can and cannot see. Costs a few cents in DeepSeek
  * usage because the model calls are real - that is the point of it.
  *
  *   npm run dev          # in one terminal
@@ -440,6 +440,27 @@ function picture(bytes) {
   const childKey = keys.studentKey;
   const img = (key) => anon(`/api/lessons/${lessonA.id}/homework/image?key=${key}`);
 
+  // Homework goes out by itself once the debrief is in: summary, games, send.
+  const autoStarted = Date.now();
+  let auto;
+  while (Date.now() - autoStarted < 240_000) {
+    auto = (await a(`/api/lessons/${lessonA.id}`)).json;
+    if (auto?.homework?.sentAt || auto?.autoFailed) break;
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  console.log(`  (games built and sent by themselves in ${((Date.now() - autoStarted) / 1000).toFixed(1)}s after the summary)`);
+  check("after the debrief the homework is built and sent by itself",
+    Boolean(auto?.homework?.sentAt && auto?.homework?.exercises?.length), auto?.autoFailed?.error);
+  check("the child sees it without the tutor sending it",
+    (await anon(`/s/${childKey}/quest/${lessonA.id}`)).status === 200);
+
+  // Taken back, it is the tutor's: the server never sends it again by itself.
+  const back = await a(`/api/lessons/${lessonA.id}/homework`, patch({ send: false }));
+  check("the tutor can take it back", Boolean(back.json?.takenBackAt) && !back.json?.sentAt, back.text.slice(0, 120));
+  await a(`/api/lessons/${lessonA.id}/homework/auto`, { method: "POST" });
+  check("homework taken back is not sent again by itself",
+    !(await a(`/api/lessons/${lessonA.id}`)).json.homework?.sentAt);
+
   check("a non-JPEG picture is refused",
     (await a(`/api/lessons/${lessonA.id}/homework`, picture(Buffer.from("GIF89a-not-a-jpeg")))).status === 415);
   check("tutor B cannot add homework to tutor A's lesson",
@@ -448,7 +469,7 @@ function picture(bytes) {
   check("the tutor uploads a picture", Boolean(up.json?.imageFile), up.text.slice(0, 120));
   check("the focus is prefilled from the summary", typeof up.json?.focus === "string");
 
-  check("the child cannot see homework before it is sent", (await img(childKey)).status === 404);
+  check("the child cannot see homework taken back", (await img(childKey)).status === 404);
   check("the child's page shows no quest before it is sent",
     !(await anon(`/s/${childKey}`)).text.includes("Describe the picture"));
 

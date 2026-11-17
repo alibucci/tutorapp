@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { GameStylePicker } from "@/components/GameStylePicker";
-import { homeworkDone, scored } from "@/lib/homework";
+import { homeworkDone, scored, sendsItself } from "@/lib/homework";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type Lesson } from "@/lib/types";
 
 /** Longest side of a stored picture. Plenty for a phone screen. */
@@ -85,11 +85,14 @@ export function HomeworkPanel({
   const finished = homeworkDone(homework);
   const [confirmReopen, setConfirmReopen] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  // Homework goes out by itself, programme stories too. Once the tutor takes
+  // it back, sending it is theirs again.
+  const waiting = sendsItself(lesson) && !sent && !finished && !homework?.takenBackAt;
 
   // Drawing and building take from a few seconds to a minute or two; count
   // it out loud.
   useEffect(() => {
-    if (busy !== "draw" && busy !== "games") return;
+    if (busy !== "draw" && busy !== "games" && busy !== "auto") return;
     const timer = window.setInterval(() => setSeconds((n) => n + 1), 1000);
     return () => window.clearInterval(timer);
   }, [busy]);
@@ -110,6 +113,34 @@ export function HomeworkPanel({
     }
     router.refresh();
   }
+
+  /** Join the server's own run (or start one): summary, games, send. */
+  async function sendByItself() {
+    setSeconds(0);
+    setBusy("auto");
+    setError(null);
+    const result = await api(
+      `/api/lessons/${lesson.id}/homework/auto`,
+      { method: "POST" },
+      "Could not make the homework. Try again.",
+    );
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
+  // Once per page load, so a failure does not turn into a retry loop.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current || !waiting) return;
+    autoStarted.current = true;
+    void sendByItself();
+    // a one-shot on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function draw() {
     setBusy("draw");
@@ -177,7 +208,7 @@ export function HomeworkPanel({
       <div className="flex items-center justify-between gap-4">
         <h2 className="t-title">Homework</h2>
         <span className={`tag ${finished ? "tag-done" : sent ? "tag-info" : "tag-warn"}`}>
-          {finished ? "Handed in" : sent ? "Sent · waiting" : "Not sent"}
+          {finished ? "Handed in" : sent ? "Sent · waiting" : waiting ? "On its way" : "Not sent"}
         </span>
       </div>
 
@@ -232,7 +263,7 @@ export function HomeworkPanel({
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <p className="t-eyebrow">{story ? "Tasks about the story" : "Practice games"}</p>
-            {!finished && exercises.length > 0 && (
+            {!finished && exercises.length > 0 && !homework?.results?.length && (
               <button
                 onClick={() => void buildGames()}
                 disabled={busy !== null}
@@ -243,7 +274,22 @@ export function HomeworkPanel({
             )}
           </div>
 
-          {exercises.length === 0 ? (
+          {exercises.length === 0 && waiting ? (
+            busy === "auto" || !error ? (
+              <div className="rounded-[var(--radius)] bg-accent-soft p-4 text-center space-y-1">
+                <p className="font-semibold">
+                  {lesson.kind === "practice" ? "Building the games" : `Building games from ${studentName}'s mistakes`}… {seconds}s
+                </p>
+                <p className="t-small t-muted">
+                  They go to {studentName} by themselves when they are ready. You can leave this page.
+                </p>
+              </div>
+            ) : (
+              <button onClick={() => void sendByItself()} disabled={busy !== null} className="btn btn-soft btn-block">
+                Try again
+              </button>
+            )
+          ) : exercises.length === 0 ? (
             <button
               onClick={() => void buildGames()}
               disabled={busy !== null}
@@ -336,9 +382,27 @@ export function HomeworkPanel({
               })}
             </ul>
           )}
-          {exercises.length > 0 && !sent && (
+          {exercises.length > 0 && sent && !finished && !homework?.results?.length && (
             <p className="hint">
-              {story
+              {story ? (
+                <>
+                  Sent by itself - the story is retold by the model from a fixed card, and checked
+                  against it. Not right? Take it back.
+                </>
+              ) : (
+                <>
+                  Sent by itself - the words come from{" "}
+                  {lesson.kind === "practice" ? "what you asked for" : "this lesson"}, written by the
+                  model. Not right? Build different ones before {studentName} starts, or take it back.
+                </>
+              )}
+            </p>
+          )}
+          {exercises.length > 0 && !sent && !waiting && (
+            <p className="hint">
+              {homework?.takenBackAt && !story
+                ? "You took it back. Change what you like, then send it again."
+                : story
                 ? "Use Preview to check it before you send - the story is retold by the model from a fixed card, and checked against it, but read it yourself."
                 : <>
                     Use Preview to check it before you send - the words come from{" "}
@@ -462,7 +526,7 @@ export function HomeworkPanel({
             </a>
             <p className="hint">
               Opens {studentName}&rsquo;s screen in this theme. Nothing you tap
-              there is saved, and they cannot see it until you send it.
+              there is saved{sent ? "." : ", and they cannot see it until it is sent."}
             </p>
           </div>
         )}
@@ -486,6 +550,18 @@ export function HomeworkPanel({
             >
               Take back
             </button>
+          ) : waiting ? (
+            busy === "auto" ? (
+              exercises.length > 0 && (
+                <p className="t-small t-muted text-center">Sending to {studentName}…</p>
+              )
+            ) : error ? (
+              exercises.length > 0 && (
+                <button onClick={() => void sendByItself()} disabled={busy !== null} className="btn btn-primary btn-lg btn-block">
+                  Try again
+                </button>
+              )
+            ) : null
           ) : (
             <button
               onClick={() => void patch({ focus, send: true }, "send")}

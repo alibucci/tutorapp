@@ -1,5 +1,17 @@
 import type { Homework, Lesson } from "./types";
 
+/**
+ * Homework has gone out by itself since this release. Lessons made before it
+ * keep the old way - the tutor sends - so opening an old lesson never sends
+ * something a tutor chose to hold back.
+ */
+export const AUTO_SINCE = "2026-11-17T21:00:00.000Z"; // 18 Nov, 02:00 in UTC+5
+
+/** Whether this lesson's homework is one that goes out by itself. */
+export function sendsItself(lesson: Pick<Lesson, "createdAt">): boolean {
+  return lesson.createdAt >= AUTO_SINCE;
+}
+
 /** XP a finished quest is worth, and how much a level takes. */
 export const XP_PER_QUEST = 30;
 export const XP_PER_LEVEL = 90;
