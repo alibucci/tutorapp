@@ -1033,7 +1033,8 @@ function Kindness({
     if (answered) return;
     setPicked(i);
     setReplies([...replies, i]);
-    onRound(i === round.best);
+    // Not a point either way: there is nothing to lose here.
+    onRound(false);
   }
 
   function next() {
@@ -1068,7 +1069,9 @@ function Kindness({
       {answered && (
         <>
           <div className="game-verdict game-verdict-yes">
-            <p className="game-verdict-head">{best ? "That's the kindest!" : "That's kind. Even kinder:"}</p>
+            {/* Neutral words: not every rule is about kindness ("we listen
+                carefully and ask questions"). */}
+            <p className="game-verdict-head">{best ? "Yes!" : "Good choice. Here is one more idea:"}</p>
             {!best && <p className="game-verdict-why">{round.options[round.best]}</p>}
             <p className="game-verdict-why">{round.why}</p>
           </div>

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { HomeworkGame } from "@/components/HomeworkGame";
 import { homeworkFor } from "@/lib/access";
-import { cardById } from "@/lib/christianity";
+import { cardById, storyStyle } from "@/lib/christianity";
 import { fromSent, styleFor } from "@/lib/gameStyles";
 import { homeworkDone, homeworkImageUrl } from "@/lib/homework";
 import { canScoreVoice } from "@/lib/pronounce";
@@ -24,15 +24,19 @@ export async function QuestPage({
   if (!homework.imageFile && !homework.exercises?.length) notFound();
   // A story whose card is not approved is for the tutor's preview only.
   const programme = found.lesson.module;
-  if (programme && !found.tutor && !cardById(programme.storyId)?.approved) notFound();
+  const card = programme ? cardById(programme.storyId) : undefined;
+  if (programme && !found.tutor && !card?.approved) notFound();
+  // As it was sent; before that, as it would be sent now. A Bible story keeps
+  // the colours but not the theme's words.
+  const look = homework.style ? fromSent(homework.style) : styleFor(found.student);
+  const style = card ? storyStyle(look, card) : look;
 
   return (
     <HomeworkGame
       lessonId={lessonId}
       imageSrc={homeworkImageUrl(found.lesson, linkKey) ?? undefined}
       focus={homework.focus}
-      // As it was sent; before that, as it would be sent now.
-      style={homework.style ? fromSent(homework.style) : styleFor(found.student)}
+      style={style}
       linkKey={linkKey}
       backHref={backHref}
       answered={homework.answers}

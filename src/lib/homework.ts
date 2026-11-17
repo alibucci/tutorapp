@@ -28,13 +28,22 @@ export function homeworkDone(homework: Homework | undefined): boolean {
   return gamesDone && pictureDone;
 }
 
+/**
+ * Whether a game's result is a score. "What would you do?" is not: every
+ * option in it is a kind one, so it never counts for or against the child -
+ * results saved before that rule (a real right/total) are left out as well.
+ */
+export function scored(result: { kind: string; total: number }): boolean {
+  return result.kind !== "kindness" && result.total > 0;
+}
+
 /** How the games went, added up. `total` of 0 means there were none. */
 export function gameScore(homework: Homework | undefined): {
   right: number;
   total: number;
   percent: number;
 } {
-  const results = homework?.results ?? [];
+  const results = (homework?.results ?? []).filter(scored);
   const right = results.reduce((n, r) => n + r.right, 0);
   const total = results.reduce((n, r) => n + r.total, 0);
   return { right, total, percent: total ? Math.round((right / total) * 100) : 0 };
@@ -50,7 +59,7 @@ export function progressByTopic(
 ): { topic: string; right: number; total: number; percent: number }[] {
   const byTopic = new Map<string, { right: number; total: number }>();
   for (const lesson of lessons) {
-    for (const result of lesson.homework?.results ?? []) {
+    for (const result of (lesson.homework?.results ?? []).filter(scored)) {
       const at = byTopic.get(result.topic) ?? { right: 0, total: 0 };
       // The first attempt, always: a child replaying from memory should not
       // make the picture look better than what they actually knew.

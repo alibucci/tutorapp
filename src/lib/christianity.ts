@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { GENESIS, NEVER_ANYWHERE, PASS_SHARE, type StoryCard, type StoryQuestion } from "@/content/christianity/genesis";
-import { interestsOf } from "./exercises";
 import { MODEL_FAST, complete } from "./llm";
-import { describeLearner } from "./profile";
 import { getTutor, updateStudent } from "./store";
 import type { Session } from "./auth";
+import type { GameStyle } from "./gameStyles";
 import type {
   Exercise,
   Homework,
@@ -120,10 +119,28 @@ function has(text: string, word: string): boolean {
   return new RegExp(`(^|[^a-z])${pattern}`, "i").test(text);
 }
 
-/** A whole word, with an "s" or "es" on the end allowed. */
+/**
+ * A whole word, with the usual endings allowed: "kill" finds "killed",
+ * "die" finds "died", "pray" finds "prayed" and "praying". Still whole-word,
+ * so "sin" does not find "sing" or "since", "die" not "diet", "saint" not
+ * "faint".
+ */
 function hasWord(text: string, word: string): boolean {
   const pattern = escape(word.toLowerCase()).replace(/\s+/g, "\\s+");
-  return new RegExp(`(^|[^a-z])${pattern}(s|es)?([^a-z]|$)`, "i").test(text);
+  return new RegExp(`(^|[^a-z])${pattern}(s|es|ed|d|ing)?([^a-z]|$)`, "i").test(text);
+}
+
+/** The text's sentences, as written. */
+function sentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])["”]?\s+/)
+    .map((x) => x.trim())
+    .filter((x) => /[a-z]/i.test(x));
+}
+
+/** A sentence for comparing: lower case, no punctuation or extra spaces. */
+function plain(sentence: string): string {
+  return sentence.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
 }
 
 export function wordCount(paragraphs: string[]): number {
@@ -204,13 +221,18 @@ no other meaning and no moral of your own. Every fact must be in your text in
 plain words - the words on the card, or as close to them as English allows.
 
 How it is told:
-- The first sentence says where the story comes from: "This is a story from the
-  Bible." Christians' beliefs are said as theirs ("Christians believe..."). The
-  story itself is then told from inside, simply: "God said: Let there be light!"
+- The very first sentence is exactly: "This is a story from the Bible."
+  Nothing comes before it. Christians' beliefs are said as theirs ("Christians
+  believe..."). The story itself is then told from inside, simply: "God said:
+  Let there be light!"
 - English for a beginner (A1): short sentences, the most common words. At most
-  two words the child is meeting for the first time.
-- Warm and calm. A gentle question to start is welcome ("Can you close your
-  eyes? What can you see?").
+  two words the child is meeting for the first time, and only words that are
+  in the story ("Bible" is never one of them).
+- Warm and calm. A gentle question is welcome after the first sentence ("Can
+  you close your eyes? What can you see?").
+- Never repeat a sentence: every sentence is said once.
+- Today's rule is not in the story. It is only in the "What would you do?"
+  situations.
 - 80 to 120 words in all, in two to four short paragraphs.
 - Nothing about punishment, fear, hell or sin. No prayers, rites, church
   details or anything only some Christians believe. No living people, no
@@ -220,8 +242,8 @@ How it is told:
 home, nursery, friends, toys - about TODAY'S RULE only. Never about God, the
 Bible or believing. All three options are kind and polite; one is the kindest
 (best), and "why" says in one short line why it is kindest. None is silly, rude
-or bad. The child's interests may colour the situations; they never change the
-story.
+or bad. The situations come from ordinary child life only: home, nursery,
+friends, toys, a grown-up. Nothing from games, films or hobbies.
 
 "sayIt" is one short sentence copied word for word from your story.`;
 
@@ -236,10 +258,21 @@ function describeCard(card: StoryCard): string {
   ].join("\n");
 }
 
-function userPrompt(student: Student, interests: string, card: StoryCard, review?: StoryCard, problems?: string[]): string {
+/**
+ * Who the story is for: name, age and level only. Not their interests or the
+ * tutor's note about them - those made "What would you do?" situations that
+ * did not fit the rule ("sing a happy dance song while getting dressed").
+ */
+function learnerLine(student: Student): string {
+  const p = student.profile ?? {};
+  return [`Learner: ${student.name}`, p.age ? `Age: ${p.age}` : "Age: a young child", p.level ? `English level: ${p.level}` : ""]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function userPrompt(student: Student, card: StoryCard, review?: StoryCard, problems?: string[]): string {
   return [
-    describeLearner(student.name, student.profile),
-    interests ? `What they are into (for the situations only): ${interests}` : "",
+    learnerLine(student),
     "",
     describeCard(card),
     review
@@ -257,6 +290,27 @@ function userPrompt(student: Student, interests: string, card: StoryCard, review
 function problemsWith(retold: Retold, card: StoryCard, review?: StoryCard): string[] {
   const text = retold.paragraphs.join("\n");
   const problems: string[] = [];
+  // The frame comes first, before any question or anything else.
+  const frame = card.facts.find((f) => f.frame);
+  const first = sentences(text)[0] ?? "";
+  if (frame && !frame.check.every((entry) => (Array.isArray(entry) ? entry.some((e) => has(first, e)) : has(first, entry)))) {
+    problems.push(`The very first sentence must be: "This is a story from the Bible." It is now: "${first}"`);
+  }
+  // No sentence twice, word for word.
+  const seen = new Set<string>();
+  const twice = new Set<string>();
+  for (const line of sentences(text)) {
+    const key = plain(line);
+    if (key.split(" ").length < 3) continue;
+    if (seen.has(key)) twice.add(line);
+    seen.add(key);
+  }
+  for (const line of twice) problems.push(`This sentence is there twice; say it once: "${line}"`);
+  // New words: really in the story, and never "Bible" itself.
+  for (const w of retold.newWords) {
+    if (hasWord(w, "bible")) problems.push(`"${w}" is not a new word to list; leave "Bible" out of the new words.`);
+    else if (!hasWord(text, w.trim())) problems.push(`The new word "${w}" is not in the story; list only words the story uses.`);
+  }
   for (const fact of missingFacts(text, card)) problems.push(`This fact is missing or not said plainly: "${fact}"`);
   const bad = forbiddenIn(text, card);
   if (bad.length) problems.push(`The story uses words it must not: ${bad.join(", ")}`);
@@ -336,7 +390,6 @@ export async function buildStoryHomework(
   card: StoryCard,
   review?: StoryCard,
 ): Promise<StoryHomework> {
-  const interests = await interestsOf(student);
   let problems: string[] = [];
   let retold: Retold | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -344,7 +397,7 @@ export async function buildStoryHomework(
     try {
       candidate = await complete({
         system: SYSTEM,
-        user: userPrompt(student, interests, card, review, problems),
+        user: userPrompt(student, card, review, problems),
         schema: Retelling,
         schemaName: "Story",
         maxTokens: 6000,
@@ -427,6 +480,32 @@ export async function buildStoryHomework(
       read: { pages, closing: card.value.closing, newWords: retold.newWords, checks },
     },
     parentMessage: parentMessageFor(student, card),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// How the child sees it
+// ---------------------------------------------------------------------------
+
+/**
+ * A Bible story keeps the learner's colours but none of their theme's words:
+ * no "Animal Dance Party homework", no "You danced with the animals!" at the
+ * end of a story. The name is the story's title; the last word is its value.
+ */
+export function storyStyle(style: GameStyle, card: StoryCard): GameStyle {
+  return {
+    ...style,
+    name: card.title,
+    words: {
+      heading: card.title,
+      start: "Start",
+      step: "Part",
+      reward: "points",
+      submit: "Check",
+      cheer: "Well done!",
+      // The value itself is the line under it (read.closing), said once.
+      done: "You finished today's story.",
+    },
   };
 }
 

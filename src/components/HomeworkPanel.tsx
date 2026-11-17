@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { GameStylePicker } from "@/components/GameStylePicker";
-import { homeworkDone } from "@/lib/homework";
+import { homeworkDone, scored } from "@/lib/homework";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type Lesson } from "@/lib/types";
 
 /** Longest side of a stored picture. Plenty for a phone screen. */
@@ -265,7 +265,10 @@ export function HomeworkPanel({
                   <li key={exercise.kind} className="rounded-[var(--radius)] bg-sunken p-3">
                     <div className="flex items-center justify-between gap-3">
                       <span className="t-small font-semibold">{exercise.title}</span>
-                      {result ? (
+                      {result && !scored(result) ? (
+                        // "What would you do?": no score, only that it was played.
+                        <span className="tag tag-done">Done</span>
+                      ) : result ? (
                         <span className="flex items-center gap-2">
                           {(result.attempts ?? 1) > 1 && (
                             <span className="t-caption t-muted">
@@ -297,23 +300,34 @@ export function HomeworkPanel({
                           <span className="hidden group-open:inline">Hide</span>
                         </summary>
                         <ul className="mt-2 space-y-1.5">
-                          {result.rounds.map((round, i) => (
-                            <li
-                              key={i}
-                              className={`rounded-[var(--radius-sm)] px-3 py-2 t-small ${
-                                round.right ? "bg-live-soft" : "bg-warn-soft"
-                              }`}
-                            >
-                              <span className="block t-muted">{round.asked}</span>
-                              <span
-                                className={`block font-semibold ${
-                                  round.right ? "text-live" : "text-warn"
+                          {result.rounds.map((round, i) =>
+                            round.kindest !== undefined ? (
+                              // Every option was kind: what they chose, not a mark.
+                              <li key={i} className="rounded-[var(--radius-sm)] bg-sunken px-3 py-2 t-small">
+                                <span className="block t-muted">{round.asked}</span>
+                                <span className="block font-semibold">{round.answered}</span>
+                                <span className="block t-caption t-muted">
+                                  {round.kindest ? "Chose the kindest" : "A kind choice, not the kindest"}
+                                </span>
+                              </li>
+                            ) : (
+                              <li
+                                key={i}
+                                className={`rounded-[var(--radius-sm)] px-3 py-2 t-small ${
+                                  round.right ? "bg-live-soft" : "bg-warn-soft"
                                 }`}
                               >
-                                {round.right ? "✓" : "✗"} {round.answered}
-                              </span>
-                            </li>
-                          ))}
+                                <span className="block t-muted">{round.asked}</span>
+                                <span
+                                  className={`block font-semibold ${
+                                    round.right ? "text-live" : "text-warn"
+                                  }`}
+                                >
+                                  {round.right ? "✓" : "✗"} {round.answered}
+                                </span>
+                              </li>
+                            ),
+                          )}
                         </ul>
                       </details>
                     ) : null}

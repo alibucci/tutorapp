@@ -1,4 +1,4 @@
-import { gameScore, homeworkDone, homeworkImageUrl, progressByTopic } from "@/lib/homework";
+import { gameScore, homeworkDone, homeworkImageUrl, progressByTopic, scored } from "@/lib/homework";
 import { listLessons, listReports } from "@/lib/store";
 import {
   EXERCISE_LABEL,
@@ -227,7 +227,7 @@ function HomeworkHistory({
 
               {(homework.results ?? []).length > 0 && (
                 <div className="space-y-2.5 px-4 pt-3">
-                  {(homework.results ?? []).map((r) => {
+                  {(homework.results ?? []).filter(scored).map((r) => {
                     const percent = r.total ? Math.round((r.right / r.total) * 100) : 0;
                     return (
                       <div key={r.kind}>

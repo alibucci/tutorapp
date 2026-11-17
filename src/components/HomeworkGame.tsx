@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
 import { gameFonts } from "@/lib/fonts";
 import { type GameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
+import { scored } from "@/lib/homework";
 import { PracticeGame } from "@/components/PracticeGame";
 import { ListenButton, MicButton } from "@/components/SpokenAnswer";
 import type { VoiceProps, VoiceState } from "@/components/VoiceCheck";
@@ -28,8 +29,9 @@ const TASKS = [
 ];
 /** A point per round answered right first time, so the most on offer is the
  *  number of rounds. Picture tasks are not scored - there is no right answer. */
+/** Rounds that can score. "What would you do?" has no wrong answer, so none. */
 function pointsOnOffer(exercises: Exercise[] | undefined): number {
-  return (exercises ?? []).reduce((n, e) => n + e.rounds.length, 0);
+  return (exercises ?? []).filter((e) => e.kind !== "kindness").reduce((n, e) => n + e.rounds.length, 0);
 }
 
 type Step =
@@ -126,7 +128,7 @@ export function HomeworkGame({
   /** Rounds answered right first time, across the whole quest. */
   // Opening a finished quest shows what was scored before, not a zero.
   const [points, setPoints] = useState(() =>
-    finished ? (results ?? []).reduce((n, r) => n + r.right, 0) : 0,
+    finished ? (results ?? []).filter(scored).reduce((n, r) => n + r.right, 0) : 0,
   );
   /** Bumped on a replay so the game starts from a clean slate. */
   const [replay, setReplay] = useState(0);
@@ -477,7 +479,7 @@ export function HomeworkGame({
                     <span>{EXERCISE_LABEL[s.kind]}</span>
                     <span className="flex items-center gap-3">
                       <span className="game-score-n">
-                        {s.right}/{s.total}
+                        {scored(s) ? `${s.right}/${s.total}` : "Done"}
                       </span>
                       <button
                         onClick={() => playAgain(s.kind)}

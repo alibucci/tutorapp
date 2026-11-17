@@ -99,13 +99,15 @@ function mark(
     };
   }
   if (exercise.kind === "kindness") {
-    // Every option is a kind one; "right" is whether it was the kindest.
+    // Every option is a kind one, so every answer is right. Which one, and
+    // whether it was the kindest, is kept for the tutor - not as a score.
     const round = exercise.rounds[index];
     if (!round || typeof reply !== "number") return null;
     return {
       asked: round.situation,
       answered: round.options[reply] ?? "(nothing)",
-      right: reply === round.best,
+      right: true,
+      kindest: reply === round.best,
     };
   }
   if (exercise.kind === "speak") {
@@ -157,7 +159,11 @@ export async function POST(request: Request, { params }: Params) {
   const rounds = replies
     .map((reply, i) => mark(exercise, i, reply, found.lesson.homework?.voice))
     .filter((r): r is RoundAnswer => r !== null);
-  const right = rounds.filter((r) => r.right).length;
+  // "What would you do?" is not a score: kept with a total of 0, so no sum
+  // anywhere (notices, home rows, progress) counts it for or against the child.
+  const unscored = kind === "kindness";
+  const right = unscored ? 0 : rounds.filter((r) => r.right).length;
+  const total = unscored ? 0 : exercise.rounds.length;
 
   const before = found.lesson;
   let firstPlay = false;
@@ -176,7 +182,7 @@ export async function POST(request: Request, { params }: Params) {
             kind,
             topic: exercise.topic,
             right,
-            total: exercise.rounds.length,
+            total,
             finishedAt: new Date().toISOString(),
             rounds,
             attempts: (previous?.attempts ?? 0) + 1,
@@ -190,10 +196,10 @@ export async function POST(request: Request, { params }: Params) {
   noticeHomeworkDone(before, after);
   // A programme homework moves the learner's place, on the first play only.
   if (after && firstPlay) {
-    await recordStoryResult(after, kind, right, exercise.rounds.length).catch((e) =>
+    await recordStoryResult(after, kind, right, total).catch((e) =>
       console.error("[christianity] progress", e),
     );
   }
 
-  return NextResponse.json({ right, total: exercise.rounds.length });
+  return NextResponse.json({ right, total });
 }

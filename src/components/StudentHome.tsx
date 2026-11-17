@@ -81,10 +81,12 @@ export async function StudentHome({
             >
               <span>
                 <span className="game-entry-kicker">
-                  {style.plain ? "Homework" : `${style.name} homework`}
+                  {lesson.module ? "Bible story" : style.plain ? "Homework" : `${style.name} homework`}
                 </span>
                 <span className="game-entry-title">
-                  {lesson.homework?.imageFile
+                  {lesson.module
+                    ? lesson.title
+                    : lesson.homework?.imageFile
                     ? "Describe the picture"
                     : style.plain
                       ? `${lesson.homework?.exercises?.length ?? 0} ${

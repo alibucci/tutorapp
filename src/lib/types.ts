@@ -533,6 +533,11 @@ export type RoundAnswer = {
   /** What the child answered. */
   answered: string;
   right: boolean;
+  /**
+   * "What would you do?" only: whether the child picked the kindest of the
+   * kind options. Shown to the tutor, never scored (`right` is always true).
+   */
+  kindest?: boolean;
 };
 
 /** How one game went. Written when the child finishes it. */
