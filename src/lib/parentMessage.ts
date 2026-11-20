@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MODEL, MODEL_FAST, complete } from "./llm";
 import { quoteLine } from "./parentLines";
+import { hasParent } from "./profile";
 import { getTutor } from "./store";
 import { renderLesson } from "./summarize";
 import type { Lesson, ParentMessage, Student } from "./types";
@@ -35,8 +36,10 @@ straight after a lesson.
 - What the lesson covered, one thing the child did well, one thing still being
   worked on - in plain words, no grammar terms a parent would not use.
 - If there is a simple thing the parent could do at home, say it.
-- If the tutor said what comes next, mention it in one short clause, no
-  promises about dates.
+- What comes next: only from the tutor's answer to "What should happen next
+  lesson?". If they answered it, mention it in one short clause, no promises
+  about dates. If that answer is missing or empty, do not say anything about
+  the next lesson or "next time" - not even guessed from the struggles.
 - If you are told what the parent asked for, mention it in one sentence only
   when the lesson and the debrief show a step towards it - say what happened,
   not "as you wished". Otherwise say nothing about it. Never promise a result.
@@ -160,8 +163,11 @@ export async function writeParentMessage(
   lesson: Lesson,
   student: Student,
 ): Promise<ParentMessage> {
-  const candidates = (await quoteOpenTo(student.tutorId)) ? quoteCandidates(lesson) : [];
-  const wish = student.profile?.parentWish?.trim();
+  // An adult learner has no parent: their message is never shown, so it gets
+  // neither a quote nor a wish.
+  const parent = hasParent(student);
+  const candidates = parent && (await quoteOpenTo(student.tutorId)) ? quoteCandidates(lesson) : [];
+  const wish = parent ? student.profile?.parentWish?.trim() : undefined;
 
   const user = [
     renderLesson(lesson, student),
