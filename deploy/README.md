@@ -64,8 +64,7 @@ WantedBy=multi-user.target
 
 ## TLS is required, not optional
 
-`getUserMedia` and the speech recogniser both refuse to run outside a secure
-context. On plain HTTP the app has **no microphone at all**, and the browser
+`getUserMedia` refuses to run outside a secure context. On plain HTTP the app has **no microphone at all**, and the browser
 gives the tutor nothing to act on — it simply never starts.
 
 `Caddyfile` here handles certificates by itself. Point the domain at the box,
@@ -134,6 +133,7 @@ Layout on the server:
 /opt/tutorapp/
   .env.local          secrets, never shipped
   data/               lessons, never shipped
+  media/help/         Help films, served by Caddy to signed-in tutors only
   releases/<stamp>/   one extracted bundle each
   current -> releases/<stamp>
 ```
@@ -150,10 +150,11 @@ systemctl restart tutorapp
 cannot reach the box from a machine that can build, and it is slower and more
 fragile.
 
-## Backups## Backups
+## Backups
 
-`data/` is lesson recordings, transcripts and notes about children, on one disk
-with no replication.
+`data/` is transcripts, homework and notes about children (no audio), on one
+disk with no replication. The nightly job is installed on the live server in
+`/etc/cron.d/tutorapp-backup`; to set it up on a new one:
 
 ```bash
 cp deploy/backup.sh /opt/tutorapp/deploy/

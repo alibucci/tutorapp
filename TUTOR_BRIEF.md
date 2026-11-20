@@ -1,20 +1,40 @@
 # Before you record a lesson
 
-Read once. Two minutes, and it decides how good everything downstream is.
+Read this once; it takes two minutes. Short films of every step are on the
+**Help** page in the app.
 
-## Check which mode you are in
+## First time only
 
-The lesson screen tells you at the top, before you press record:
+Change your password at **Your account**: tap your name in the top corner. Whoever
+set up your account knows the one-time password.
 
-- **"Recording your voice only"** — the student is not on the tape. Everything
-  the system learns about them comes from what *you* say out loud.
-- **"Recording both voices"** — you hold written consent for this child, and the
-  microphone picks up both of you.
+## Check the banner before you press record
 
-If that banner says something you did not expect, stop and fix it before the
-lesson rather than after.
+The top of the lesson screen says what will be recorded:
 
-## The one habit
+- **"Your voice only, and no live transcript"**: this parent has not consented.
+  Nothing from the lesson is kept, so **your debrief is the whole record**.
+- **"Both voices, with a live transcript"**: you hold written consent. The
+  transcript and your debrief work together.
+- **Group lesson**: everyone is transcribed only if every parent consented.
+  Otherwise the debrief asks three questions about each child.
+
+If the banner says something you did not expect, fix it before the lesson.
+
+## Setting up (30 seconds)
+
+1. **Pick the right child and the right language** when you create the lesson:
+   English or Chinese. Started under the wrong child? The lesson can be moved
+   to the right one afterwards.
+2. **Pick the microphone** and watch the level bar move when you speak. With
+   both voices, put the microphone between you and keep the threshold low.
+   Raising it to "clean up" the sound cuts the child out.
+3. **Keep the screen on.** If it goes dark, the recording pauses and tells you;
+   tap to carry on.
+
+To test a new phone or laptop, open **/check** on it.
+
+## During the lesson
 
 **Say the mistake out loud before you correct it.**
 
@@ -24,92 +44,51 @@ lesson rather than after.
 | "Try again." | "You've got the sign backwards on the second term." |
 | "Good." | "Good — you found the common denominator without me this time." |
 
-In tutor-only mode this is the difference between a useful record and an empty
-one: if you fix a mistake silently — a gesture, a tap on the page, a look — the
-system never learns it happened. Your lesson was fine; the record of it is
-blank.
+- **Name what you start:** "Right, fractions with different denominators."
+- **Say when something changed:** "That's the first time you've done that
+  alone." This is how progress reaches the parent's weekly note.
+- **In a group, call the child by name** when you ask them something. That is
+  how the app works out who answered.
 
-Even with both voices recorded it is still worth doing. It is better teaching,
-which is why it does not feel like extra work.
+Text appears a few seconds after each piece of speech, not word by word. A weak
+connection is fine; pieces that fail are sent again.
 
-## Three smaller things
+## The debrief, straight after
 
-- **Name what you're starting.** "Right, fractions with different denominators."
-  One sentence at each new topic and the summary knows what was covered.
-- **Say when something changed.** "That's the first time you've done that
-  unaided." This is how progress reaches the parent's weekly note.
-- **Don't correct the transcript in your head.** The recogniser will mangle
-  words. Ignore it during the lesson; fix the debrief afterwards.
+Five questions with no time limit. Talk or type, before you speak to anyone
+else.
 
-## First time only
+Be blunt. **Nobody sees the debrief but you**: not the child, not the parent.
+That is why it is the most valuable minute in the system. Where the transcript
+and your debrief disagree, the app believes you.
 
-Change your password at **Your account** — the link is your name in the top
-corner. You were given a one-time password by whoever set up your account, and
-they still know it.
+## What happens next
 
-## Setting up (30 seconds)
+The homework builds and sends itself. You don't have to do anything for it.
+On the review page you can:
 
-1. Pick the right **microphone**. Watch the level bar move when you speak before
-   you start. In tutor-only mode a headset is best. With both voices, put the
-   microphone between you and keep the gate threshold low — raising it to "clean
-   up" the sound will cut the student out.
-2. Pick the right **language** when you create the lesson. The wrong one means a
-   useless transcript and there is no recovering it afterwards.
-3. Check the **live transcript** produces words in the first minute. If it is
-   blank, stop and fix it. The recording itself is never kept, so the
-   transcript is all there is.
-4. **Keep the screen on.** If it goes dark the recording pauses and tells you.
+1. **Read the summary.** Below it, untick any wrong topic changes and apply the
+   rest. The child's goals change only when you apply.
+2. **Check the homework.** Until the child starts, you can build different
+   games, change the tip or preview it. If you take it back, it stays with you
+   until you send it again.
+3. **Send the parent message.** Tap **Copy Chinese** and paste it into WeChat.
+   To change it, edit the English; the Chinese is translated again.
 
-If you want to check a new laptop or phone before a real lesson, open **/check**
-on it. It tests the microphone and the transcript in about thirty seconds.
+**Once a week**, edit and approve the parent note. Until you approve it, the
+parent sees nothing.
 
-## If something goes wrong mid-lesson
-
-- **"This recording was interrupted"** — the screen went off or another app
-  took the microphone. Tap continue. Then be more thorough than usual in the
-  debrief, because it is now the better record of what happened.
-
-## The debrief
-
-Sixty seconds, straight after the lesson, before you talk to anyone else. Five
-prompts, they advance on their own.
-
-Be blunt. **Nobody sees this but you** — not the student, not the parent. It is
-the highest-value minute in the whole system precisely because it is private, so
-say what you would say to a colleague, not what you would write in a report.
-
-Where the transcript and your debrief disagree, the system believes your
-debrief.
-
-## Afterwards
-
-The review page opens straight after the debrief and starts writing on its own
-(about 15 seconds). Then three steps, top to bottom:
-
-1. **Summary** — read it. Below it, the proposed changes to the student's
-   topics: untick anything wrong and apply the rest. Until you do, the
-   student's page does not change.
-2. **Homework** — add a picture (a scene with something going on), check the
-   focus line, and tap **Send**. The student describes the picture, says what
-   happens next, and gives three adjectives, as a game in their style. Their
-   answers appear in the same place.
-3. **Message to the parent** — tap **Copy Chinese** and paste it into WeChat. To
-   change it, edit the English; the Chinese is translated again from it.
-
-And:
-- **Once a week**, draft the parent note, edit it, and approve it. Until you
-  approve, the parent sees nothing.
-
-If a draft says something you would not say yourself, change it or delete it.
-You were in the room; the model was not.
+If anything says something you would not say yourself, change it. You were in
+the room; the model was not.
 
 ## What reaches whom
 
 | | Sees |
 |---|---|
-| **You** | everything — transcript, summary, all of it. No audio is kept. |
-| **Student** | homework **after you send it**, and topics to work on **after you apply** |
-| **Parent** | one weekly note, **after you approve**, plus the message you paste into WeChat |
+| **You** | everything: transcript, summary, debrief. No audio is kept. |
+| **Child** | homework, which goes out by itself; goals, once you apply them |
+| **Parent** | the weekly note, once you approve it, and the message you paste into WeChat |
 
 The child and the parent share one sign-in, which you create on the student's
-page (**Family sign-in**). Inside there are two tabs, one for each of them.
+page (**Family sign-in**). It has a tab for each of them. Private links work
+too, for families who won't keep a password.

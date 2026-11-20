@@ -1,273 +1,159 @@
 # Status
 
-Read this before `README.md`. The README explains how the system is built.
-This says where it actually is, what was decided, and what is still open.
+Where aloudli actually is: what works, what was decided, what is still open.
+How it is built is in [README.md](README.md).
 
-Last updated: 2026-09-27
+Last updated: 2026-11-20 (code at `d263308`)
 
 ---
 
 ## The short version
 
-The whole pipeline exists and runs end to end. **No real lesson has ever gone
-through it**, but as of 28 September every layer has been proven separately:
+aloudli is live at aloudli.com, on a Hong Kong server that mainland China can
+reach, and real lessons have gone through it since early October. Several
+decisions below were changed by what those lessons showed.
 
-- the server path, by an automated run with real model calls (94 checks, all
-  passing — `npm run smoke`)
-- the capture path, by hand on macOS via `/check`: microphone, the gate running
-  in the AudioWorklet, the Opus recorder, wake lock, and a live transcript in
-  Safari
-
-What has not been done is the two joined together — one lesson, recorded,
-debriefed and reviewed by a person.
-
-Treat it as ready to pilot, not ready to ship.
+Since 18 November the app does the work after a lesson by itself: once the
+tutor's debrief is in, the server writes the summary, builds the homework and
+sends it to the child. Everything that reaches a **parent** still goes through
+the tutor.
 
 ---
 
-## What the thing does
-
-A tutor records a lesson. The microphone captures the tutor, and — only where
-the parent has given written consent — the student as well. Straight afterwards
-the tutor spends sixty seconds answering five prompts about what happened.
-
-Three different things come out of that one recording:
-
-| Audience | Gets | Cadence |
-|---|---|---|
-| Tutor | a diagnostic write-up, and proposed updates to the student's topics | per lesson |
-| Student | two or three things to work on, and what they've already beaten | continuous |
-| Parent | one honest note about whether this is working | weekly |
-
-The insight it is built on: **corrections are the teaching signal.** A tutor
-already says "you added the denominators, they stay the same" out loud. That
-sentence is a complete diagnostic record of a misconception, generated for free
-during normal teaching. The sixty-second debrief adds the part a transcript
-cannot capture — the tutor's own judgement about what mattered.
-
----
-
-## How data moves
+## What happens after a lesson
 
 ```
-  lesson audio ──► live transcript ──┐
-                                     ├──► summary (per lesson, for the tutor)
-  60-second debrief ─────────────────┘         │
-                                               ▼
-                                     proposed topic changes
-                                               │
-                                     [TUTOR TICKS THEM OFF]
-                                               │
-                                               ▼
-                                    the student's topic model
-                                        │              │
-                                        ▼              ▼
-                              student's page     weekly parent note
-                                                       │
-                                            [TUTOR EDITS AND APPROVES]
-                                                       │
-                                                       ▼
-                                                 parent's page
+  lesson clips ──► server transcription ──┐
+                                          ├──► summary + parent message
+  debrief (spoken or typed) ──────────────┘          │
+                                                     ├──► homework, built and SENT by itself
+                                                     │
+                                                     ├──► proposed topic changes
+                                                     │         [TUTOR APPLIES THEM]
+                                                     │
+                                                     └──► parent message
+                                                               [TUTOR COPIES IT INTO WECHAT]
+
+  a week of lessons ──► draft parent note ──► [TUTOR EDITS AND APPROVES] ──► parent's page
 ```
 
-The two bracketed steps are the point of the design. Nothing an AI produces
-reaches a child or a parent without the person who was in the room signing off.
-The per-lesson gate is a few ticks; the weekly one is about thirty seconds.
+Lessons created before `AUTO_SINCE` (`src/lib/homework.ts`, 18 Nov 02:00
+UTC+5) keep the old manual way, so opening an old lesson never sends homework
+a tutor held back. When an automatic step fails, it shows as a to-do on the
+tutor's home screen.
 
 ---
 
-## What works, and how well we know it
+## What exists
 
-### Verified with real requests
+| Area | State |
+|---|---|
+| One-to-one lessons | Online or in the room. English or Chinese. |
+| Group lessons | In the room, about three children, one recording. Each child gets their own lesson, built only from their own lines (`groupLesson.ts`). |
+| Transcription | On the server (Deepgram Nova-3, or Qwen3-ASR as the fallback). Pieces of 8–25 s go up while the lesson runs and retry on a weak connection. Audio is never stored. |
+| Debrief | Five prompts with no clock. Spoken or typed. Group lessons: three questions per child. |
+| Homework | Games built from the lesson's mistakes. The kinds depend on the learner's profile (`profile.ts`, `exercises.ts`). Also: extra homework from the tutor's own words, number homework made by code (`sums.ts`), and an optional picture. |
+| Programmes | Bible stories (`christianity.ts`). A tutor switches them on per learner, and only when the parent asked. Then they run one after another. Which tutors see them: `CHRISTIANITY_TUTORS`. |
+| Pronunciation checks | SpeechSuper. Adults only, and the learner must agree themselves. |
+| Families | One sign-in shared by the child and the parent, plus private links that can be rotated. |
+| Tutor notices | A feed on the home screen, plus Telegram and email (Resend; sent only to an address the tutor confirmed). |
+| Help | A Help page for tutors with how-to films and the same steps in writing (`help.ts`). |
+| Admin | The superadmin creates, suspends and resets tutors. |
+| Other | Moving a lesson started under the wrong child, archiving a student, themes made from a description of the learner. |
 
-- **Access control.** Two tutors were created, each with a student. Tutor B was
-  then pointed at every one of tutor A's URLs by direct id: student record,
-  student page, reports, lesson, review page, homework and sign-ins. All returned
-  404. Anonymous users are redirected from every page and get 403 from every
-  API. A suspended tutor cannot sign in; a password reset invalidates the old
-  one.
-- **Consent drives capture, and cannot be forged.** A request that explicitly
-  asked for `capture: "both"` on a student with no consent on file still got
-  `tutor`. The server derives it from the stored record and ignores the client.
-- **The model calls.** Run for real against DeepSeek on a realistic
-  fractions lesson. Output was good: the summary separated the surface mistake
-  ("adds the denominators") from the root cause ("doesn't picture a fraction as
-  part of a whole"), and picked up a topic that appeared only in the transcript
-  and not in the debrief. The whole run cost about three cents.
-- **Family links.** Work without signing in, which is the point. A wrong key
-  gives 404. An unapproved weekly note is invisible to the parent and visible to
-  the tutor.
-- **No leakage to families.** Checked the rendered student page for the tutor's
-  internal reasoning field, raw status values, and diagnostic language. Clean.
-- **No recordings kept.** There is no audio upload route any more; the recorder
-  drops every chunk on the device.
-- **Parent message.** Written in English and Chinese alongside the summary; an
-  edited English message is translated again, and regenerating the summary
-  does not overwrite the tutor's edit.
-- **Homework.** Only JPEGs are accepted (checked by bytes). The child sees
-  nothing until the tutor sends it; the picture needs the child's link or the
-  family sign-in - a wrong key or the parent's link get 404. Answers
-  need three adjectives and can be handed in once.
-- **Family sign-in.** One username for the child and the parent; it opens both
-  pages. It works as a phone types it (capitalised, trailing space). A family
-  session cannot reach any tutor page or API, nor another family's homework. A
-  reset or a removal signs out every device at once.
-- **What a tutor may write.** Consent cannot be forged, a lesson's capture mode
-  cannot be set from outside, a lesson cannot be reassigned to another student
-  and its summary cannot be planted. Consent is granted through its own action
-  with a server-stamped time, and can be withdrawn. Family links can be
-  replaced, and the old ones stop working.
-- **Account security.** A tutor can change the password they were issued; the
-  old one stops working and every other session of theirs is signed out while
-  the tab they are in stays. Suspending a tutor kills their live session on the
-  next request rather than when the cookie expires. Repeated failed logins
-  against one account are throttled.
+---
 
-### Written, never run against real hardware
+## How well we know it
 
-None of this can be tested without a browser, a microphone and a person:
+**Automated.** `npm run smoke` drives the whole server path with real model
+calls. It has about 190 checks: access control, consent, every model call,
+the approval gates, homework, family sign-ins and pronunciation consent. It
+was not re-run for this update.
 
-Verified by hand on macOS through `/check`, which is not the same as verified
-during a lesson:
+**Tested in real use.** Recording and transcription on phones in China,
+including a weak connection. The debrief on an iPhone. Live testing of the Bible
+stories by Viktor. The bugs these surfaced are fixed (see the commits from
+October and November).
 
-- Microphone capture and device selection — **works**
-- The gate in the AudioWorklet — **works**; the level meter is driven by
-  messages from the worklet, so a moving bar proves the whole audio graph
-- The Opus recorder and wake lock APIs — **available**
-- The live transcript — **works in Safari** (Apple's engine). A Chromium build
-  that is not Chrome or Edge fails with a misleading `network` error.
+**Not proven yet:**
 
-Still untouched:
-
-- Threshold, hold time and gain ramp under real room conditions
-- Auto-pause when the screen goes off, and manual pause and resume
-- Interruption logging
-- Every form and button, as an actual click rather than an API call
-- Anything at all on a phone
-
-### Never attempted
-
-- A real lesson, start to finish
-- Speaker labelling on a real transcript — the test used clean invented dialogue,
-  and real speech recognition output is much messier
-- A parent reading a real note
-- Any deployment
+- Who-said-what in a real group lesson. The only test was a 64-second recording
+  in which everyone was called by name, one at a time. Its labels were never
+  checked against who really spoke.
+- Automatic homework at scale, with nobody looking at it before the child does.
+- A parent reading weekly notes over several weeks.
 
 ---
 
 ## Decisions already made
 
-These are settled. Reopening them costs more than it saves, unless something new
-turns up in the pilot.
+These are settled. Reopening one costs more than it saves, unless real lessons
+show something new.
 
 | Decision | Why |
 |---|---|
-| **One-to-one lessons only** | In a group, attributing an inferred struggle to a specific child is guesswork. The model is made to answer "unclear", and you cannot build a personal report on "unclear". |
-| **Recording the student is opt-in, per student** | Requires written consent. Without it the system falls back to tutor-only and still works — the teammate who pushed back on this was right. |
-| **Tutor-only is a real mode, not a degraded one** | It loses the student's exact wording, response latency and anything about pronunciation. It keeps everything else. |
-| **The tutor approves everything** | Two gates, per lesson and per week. An AI mishearing "almost didn't get it" as "didn't get it" would otherwise reach a parent, who would take it out on the child. |
-| **The debrief stays private forever** | It works *because* it is private. If a tutor knew a parent would read it, they would start recording PR instead of an honest assessment, and the highest-value signal in the system would disappear. |
-| **Parent notes are weekly, not per lesson** | Per lesson is noisy, turns every session into a verdict, and sends single-lesson model errors straight to a parent. A week averages both out and shows trajectory, which is what a parent is actually asking about. |
-| **Student and parent see different things** | A child needs two or three things to do. A parent needs to know whether their money is working. Same data, different question. |
-| **Parent tone: explicit strengths, growth framing for gaps** | A report of pure negatives is a churn machine; a report of pure positives is useless and a parent can tell. |
-| **Sessions are re-checked against the store on every request** | A signed cookie proves who issued it, not that the account is still good. Suspending someone has to take effect now. The cost is one small file read on requests that mostly read the store anyway. |
-| **Audio streams while the lesson runs** | It used to be held in the tab and sent as one file at the end: a crashed tab lost everything, and the tutor waited through an upload at the moment they were trying to leave. Chunks go out in order and a lost one is reported rather than hidden. |
-| **No transcript at all in tutor-only mode** | Found on the first real lesson. The Web Speech API grabs the microphone itself and cannot be given the gated stream, so its transcript held the student's words while the audio file did not. Storing a child's speech on the strength of a guarantee that only ever covered the audio was the wrong way round, so the transcript goes until server-side recognition reads the gated file instead. |
-| **Debrief answers are tagged, not timed** | The first real debrief put all five answers in the last field. Slicing by timestamp assumed `t` was when words were spoken; it is when the recogniser handed them over, which on a continuous minute is all at the end. Each utterance now carries the prompt that was on screen when it began. |
-| **Links, not accounts, for families** | A nine-year-old with a password is a support queue. A leaked link is worth one approved weekly note, and it can be rotated. |
-| **Superadmin creates tutors; tutors create their own students** | Trusting a tutor is a real decision and belongs to you. Adding a student is operational — gating it would leave a tutor stuck mid-lesson. |
-| **Speaker labelling from the text, not the acoustics** | Two people in a closed room: who asks and who answers is usually obvious from the dialogue. Costs nothing, needs no on-device model, no voice enrolment. Acoustic matching is the fallback if this proves unreliable. |
-| **DeepSeek, not a foreign provider** | Data residency. All four calls go through one file, so switching again is one file. |
-| **English throughout** | Interface and model output. The speech-recognition language stays configurable — you cannot recognise Russian with an English recogniser. |
-| **Pilot before more code** | Nothing about quality is knowable from here. |
+| **Homework sends itself** (since 18 Nov) | The tutor should not have to build and send homework. They keep the corrections: build different games before the child starts, take it back (after that, only the tutor sends it), edit the tip. |
+| **Anything for a parent goes through the tutor** | An AI mishearing "almost didn't get it" as "didn't get it" would reach a parent, who would take it out on the child. The weekly note needs approval; the WeChat message is copied by hand. |
+| **Topic changes are applied by the tutor** | They drive what the child sees as their goals. |
+| **The debrief stays private forever** | It works because it is private. If tutors wrote for parents, the most valuable input in the system would turn into PR. |
+| **Recording the student is opt-in, per student** | It needs written consent. A group lesson records every child's voice only if every family consented. |
+| **Without consent: the tutor's voice and no transcript** | The gate cuts by loudness, not by who is speaking, so a transcript could pick up the child. The debrief is the whole record. |
+| **Audio is never stored** | Each piece is held in memory for one request to the recogniser, then dropped. Only text is kept. |
+| **Transcription on the server, not in the browser** | The browser's recogniser depended on the browser: Chrome sends audio to Google, which mainland China cannot reach. Recording in the browser and recognising on the server works the same everywhere. |
+| **Group lessons are in the room, about three children** | Who said what comes from the text: the tutor calls a child by name, the model labels the lines that follow, and the tutor checks the labels. Voice-based separation was tried: Deepgram merged three speakers into one or two. |
+| **Debrief answers are tagged by prompt, not sliced by time** | The first real debrief put all five answers in the last field: timestamps mark when the recogniser answered, not when the words were said. |
+| **Parent notes are weekly, not per lesson** | Per lesson is noisy and sends single-lesson model errors straight to a parent. A week shows trajectory. |
+| **Families: one sign-in, child and parent together** | A family shares one phone and one WeChat. A username, not an email, because a child has none. Private links stay for families who will not keep a password. |
+| **Pronunciation checks only for adults who agree themselves** | A voice is sensitive, and the recording goes to Hong Kong. Never a child, never on a tutor's say-so. |
+| **Number homework is made by code** | The model only reads the request. A child marked wrong for a right answer stops trusting the game. |
+| **Sessions are re-checked on every request** | Suspending a tutor or resetting a password has to take effect now, not when the cookie expires. |
+| **Superadmin creates tutors; tutors create students** | Trusting a tutor is a decision for the superadmin. Adding a student is routine, and a tutor should not get stuck mid-lesson. |
+| **DeepSeek for text** | Data residency. All calls go through `llm.ts`. |
+| **English interface; lessons in English or Chinese** | The interface and the model's output are in English. The parent message is in English and Chinese. |
+| **Hong Kong VPS; releases are built on the dev machine** | Hong Kong needs no ICP filing. Building on the server failed five different ways. See [deploy/README.md](deploy/README.md). |
 
 ---
 
 ## Known gaps
 
-Not bugs — things deliberately not built yet, in rough priority order.
+In rough order of priority.
 
-1. **Nothing is delivered anywhere.** A parent has to open a link and remember to
-   do so. Without WeChat or email, the parent page is a dead end. This is the
-   first thing to build after the pilot.
-2. **The consent document is not recorded.** The app stores a name and a date.
-   The actual signed paperwork lives wherever you put it.
-3. **One machine, files on disk.** No migrations, no second instance.
-   `src/lib/store.ts` is the only file that knows this. Backups are handled by
-   `deploy/backup.sh`, but only once someone installs the cron entry and points
-   `BACKUP_REMOTE` somewhere off the box.
-4. **The transcript leaves the device.** Where it goes depends on the browser:
-   Chrome and Edge send audio to Google, Safari sends it to Apple. **Verified
-   working in Safari on macOS**, which matters because it removes the Google
-   dependency from the critical path. Neither engine is on-device, so a
-   deployment with hard data-residency rules still needs a local or self-hosted
-   recogniser.
-5. **Level is not identity.** The gate cuts by loudness. A loud child near the
-   microphone crosses it. Fine in a closed room with two people; not a guarantee
-   anywhere else.
-6. **iOS kills recording on screen lock.** No browser API prevents it. Wake Lock
-   helps until the tutor presses the lock button. A native shell is the only
-   real fix if phones become the primary device.
-7. **The tutor has no lesson plan.** The app extracts and never gives anything
-   back into the room. Feeding the student's topics into a pre-lesson screen is
-   cheap — the data is already collected — and is the agreed next feature.
+1. **Nothing is pushed to parents.** The tutor pastes the message into WeChat by
+   hand, and the weekly note waits for the parent to open their page. Tutors do
+   get notices.
+2. **The Help films show the old manual homework.** Chapters "Build the
+   homework" and "Send and see results" predate 18 November. The re-shoot list is
+   in `~/Desktop/aloudli-film/notes/REFILM-auto-homework.md`.
+3. **Bible story building often hits the token limit** (`christianity.ts`,
+   `maxTokens: 6000`). Raising it was offered. Not done, because the code is
+   Viktor's.
+4. **Group labelling is untested on messy speech.** Children answering without
+   being called, or talking over each other.
+5. **The signed consent document is not stored.** The app keeps only a name and
+   a date.
+6. **One machine, files on disk.** No database, no second instance;
+   `src/lib/store.ts` is the only file that knows this. Backups run nightly from
+   `/etc/cron.d/tutorapp-backup` and `npm run backup:pull` copies the latest
+   one to a second machine. This document does not record whether
+   `BACKUP_REMOTE` (an automatic offsite copy) is set on the server.
+7. **The transcript leaves the region.** Deepgram is a US service. Qwen3-ASR
+   (Alibaba) is the option for keeping the audio with a Chinese provider.
+8. **Level is not identity.** The gate cuts by loudness, so a loud child near
+   the microphone gets through.
+9. **iOS stops recording when the screen locks.** The wake lock helps until the
+   tutor presses the lock button. Only a native app would fix this.
+10. **No lesson plan for the tutor.** The app collects everything that would
+    feed a pre-lesson screen, but gives nothing back to use in the room.
 
 ---
 
 ## Open questions
 
-- **Does the speech recogniser work on site, in the language lessons are taught
-  in?** Everything depends on this and it has not been checked.
-- **Will a tutor actually do the debrief?** If they skip it, the system loses its
-  best input. It is the one behaviour the pilot must observe honestly.
-- **Would a tutor send a generated parent note without editing it?** That is the
-  real test of whether the tone is right.
-- **Where does this get deployed, and does the data have to stay in one
-  jurisdiction?** Affects hosting, the model provider, and the transcript.
-
----
-
-## Checking it yourself
-
-```bash
-npm run dev          # one terminal
-npm run smoke        # another
-```
-
-`smoke` drives the whole server path against the running app: sign-in, tenant
-isolation, consent, every model call, both approval gates, homework, family
-sign-ins, and what a family
-can and cannot see. It makes real DeepSeek requests, so it costs a few cents and
-takes about a minute — that is deliberate, a mocked run would prove nothing. It
-deletes the records it creates. **94 checks, all passing as of this writing.**
-
-For the browser half, open **`/check`** on the device that will actually record.
-It reports secure context, microphone access, the AudioWorklet, the gate module,
-the recorder, speech recognition and wake lock — then lets you test the mic and
-run the recogniser in your language. That last test is the important one: if no
-words appear, there is no transcript, and nothing downstream has anything to
-read.
-
-To record from a phone, the page must be served over HTTPS — a LAN address over
-plain HTTP cannot touch a microphone at all, and the browser gives no visible
-reason. Use `npm run dev:https`.
-
-## Trying it
-
-```bash
-npm install
-cp .env.example .env.local   # DEEPSEEK_API_KEY, SESSION_SECRET, and the two SUPERADMIN_ values
-npm run dev
-```
-
-Sign in at `/login` with the superadmin credentials from `.env.local`, create a
-tutor, and use the one-time password it shows you. As that tutor, add a student
-and start a lesson.
-
-To see the family pages without recording anything, open a student from the
-tutor's home page — the **Links** section has a copy button for the student's
-page and the parent's page.
-
-`TUTOR_BRIEF.md` is what to hand an actual tutor before their first recording.
-It is short and it matters: in tutor-only mode, a correction made silently is a
-correction the system never learns about.
+- **Does automatic homework hold up?** Watch how often tutors take homework
+  back or rebuild it. That is the measure.
+- **Do tutors still do the debrief once homework no longer waits for them?**
+  The debrief is the best input in the system.
+- **Do tutors send the parent message and the weekly note without editing
+  them?** That is the real test of whether the tone is right.
+- **Do the who-said-what labels hold in a real group?** The tutor's
+  corrections on the check screen will show it.
