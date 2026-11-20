@@ -59,6 +59,7 @@ feature is hidden, not broken. `.env.example` lists every key and what it does.
 | `SPEECHSUPER_APP_KEY` + `SPEECHSUPER_SECRET_KEY` | pronunciation checks for adults |
 | `HOMEWORK_PICTURE_AI=on` + `DASHSCOPE_API_KEY` | drawn homework pictures (off by default) |
 | `CHRISTIANITY_TUTORS` | which tutors see the Bible-story programme |
+| `PARENT_QUOTE_TUTORS` | which tutors' parent messages quote the child (tried with Victor first) |
 
 All data lives in `data/` as JSON files plus images. The folder is gitignored
 and is the only storage. `src/lib/store.ts` is the only file that knows this,
@@ -149,7 +150,12 @@ What still waits for the tutor:
 - **Topic changes** (`skills.ts`). They are proposed per lesson. The tutor
   unticks wrong ones and applies the rest. The child's goals change only then.
 - **The parent message.** The tutor copies it into WeChat. Editing the English
-  re-translates the Chinese.
+  re-translates the Chinese. Code, not the model, adds two fixed lines
+  (`parentLines.ts`). One is the child's own words: the model only picks a
+  number from the child's labelled lines (`quoteCandidates`), and code copies
+  that line from the transcript. The other is the parent-page link, added at
+  copy time only once an approved weekly note exists, and never stored. The
+  parent's wish (`profile.parentWish`) reaches only this message.
 - **The weekly note** (`parentReport.ts`). The parent's page shows nothing until
   the tutor approves it. Weeks follow `REPORT_TIMEZONE`.
 

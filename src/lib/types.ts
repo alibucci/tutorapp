@@ -90,6 +90,12 @@ export type ParentMessage = {
   /** When the tutor last copied it - the closest we get to "sent". */
   copiedAt?: string;
   model: string;
+  /**
+   * The child's own words, word for word from the transcript, when the
+   * message carries a line quoting them (see parentLines.ts). Cleared when the
+   * tutor deletes that line from the English.
+   */
+  quote?: string;
 };
 
 export type Lesson = {
@@ -320,6 +326,12 @@ export type StudentProfile = {
   shortTasks?: boolean;
   /** Overrides the look the age would pick. */
   look?: "game" | "plain";
+  /**
+   * What the parent asked for, in the tutor's words: "wants more speaking".
+   * Read only by the message to the parent; the homework never sees it, and
+   * neither the parent nor the child is shown it.
+   */
+  parentWish?: string;
 };
 
 export type CustomStyle = {

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
 import { keepParentLine } from "@/lib/christianity";
 import { MODEL } from "@/lib/llm";
-import { translateParentMessage } from "@/lib/parentMessage";
+import { keepQuote, translateParentMessage } from "@/lib/parentMessage";
 import { updateLesson } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -49,7 +49,10 @@ export async function PUT(request: Request, { params }: Params) {
   try {
     // A programme homework keeps its checked Chinese line about the story,
     // whatever the edit did to the rest.
-    const kept = keepParentLine(found.lesson, text, await translateParentMessage(text));
+    const line = keepParentLine(found.lesson, text, await translateParentMessage(text));
+    // The child's words: kept with their Chinese line while they are still in
+    // the English, forgotten once the tutor deletes them.
+    const kept = keepQuote(found.lesson.parentMessage?.quote, found.student.name, line.en, line.zh);
     const now = new Date().toISOString();
     const lesson = await updateLesson(id, {
       parentMessage: {
@@ -58,6 +61,7 @@ export async function PUT(request: Request, { params }: Params) {
         generatedAt: found.lesson.parentMessage?.generatedAt ?? now,
         editedAt: now,
         model: MODEL,
+        ...(kept.quote && { quote: kept.quote }),
       },
     });
     return NextResponse.json(lesson?.parentMessage);

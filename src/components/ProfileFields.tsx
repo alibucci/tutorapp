@@ -1,6 +1,6 @@
 "use client";
 
-import { ABOUT_MAX, GOALS, LEVELS, PLAIN_FROM_AGE } from "@/lib/profile";
+import { ABOUT_MAX, ADULT_AGE, GOALS, LEVELS, PARENT_WISH_MAX, PLAIN_FROM_AGE } from "@/lib/profile";
 import type { StudentProfile } from "@/lib/types";
 
 /** The profile as a form holds it: every field a string or a tick. */
@@ -11,6 +11,7 @@ export type ProfileDraft = {
   about: string;
   shortTasks: boolean;
   look: string;
+  parentWish: string;
 };
 
 export function draftOf(profile: StudentProfile | undefined): ProfileDraft {
@@ -21,10 +22,15 @@ export function draftOf(profile: StudentProfile | undefined): ProfileDraft {
     about: profile?.about ?? "",
     shortTasks: Boolean(profile?.shortTasks),
     look: profile?.look ?? "",
+    parentWish: profile?.parentWish ?? "",
   };
 }
 
-/** What the server is sent: empty fields left out. */
+/**
+ * What the server is sent: empty fields left out - except the parent's wish,
+ * which is always sent, so emptying it clears it. A profile without the field
+ * keeps the wish already saved (see PATCH /api/students/[id]).
+ */
 export function profileOf(draft: ProfileDraft) {
   return {
     ...(draft.age.trim() && { age: Number(draft.age) }),
@@ -33,6 +39,7 @@ export function profileOf(draft: ProfileDraft) {
     ...(draft.about.trim() && { about: draft.about.trim() }),
     ...(draft.shortTasks && { shortTasks: true }),
     ...(draft.look && { look: draft.look }),
+    parentWish: draft.parentWish.trim(),
   };
 }
 
@@ -99,6 +106,23 @@ export function ProfileFields({
           details or diagnoses: use the switch below instead.
         </span>
       </label>
+
+      {!(Number(draft.age) >= ADULT_AGE) && (
+        <label className="block">
+          <span className="label">What the parent asked for (optional)</span>
+          <input
+            value={draft.parentWish}
+            onChange={(e) => set({ parentWish: e.target.value })}
+            maxLength={PARENT_WISH_MAX}
+            placeholder="e.g. Wants more speaking"
+            className="field"
+          />
+          <span className="hint">
+            Only the message to the parent uses this, and only when a lesson
+            shows a step towards it. Nobody in the family sees it here.
+          </span>
+        </label>
+      )}
 
       <label className="flex items-start gap-3">
         <input

@@ -36,6 +36,7 @@ export const PLAIN_FROM_AGE = 14;
 export const ADULT_AGE = 18;
 
 export const ABOUT_MAX = 400;
+export const PARENT_WISH_MAX = 200;
 
 export function lookFor(profile: StudentProfile | undefined): "game" | "plain" {
   if (profile?.look) return profile.look;
@@ -86,6 +87,9 @@ export function readProfile(input: unknown): StudentProfile | null {
   }
   if (raw.shortTasks === true) profile.shortTasks = true;
   if (raw.look === "game" || raw.look === "plain") profile.look = raw.look;
+  if (typeof raw.parentWish === "string" && raw.parentWish.trim()) {
+    profile.parentWish = raw.parentWish.trim().slice(0, PARENT_WISH_MAX);
+  }
   return profile;
 }
 

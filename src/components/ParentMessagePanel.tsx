@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CopyIcon } from "@/components/ui";
+import { parentLinkLine } from "@/lib/parentLines";
 import type { Lesson } from "@/lib/types";
 
 /**
@@ -12,8 +13,18 @@ import type { Lesson } from "@/lib/types";
  * Chinese first, because that is what gets sent. The English underneath is the
  * source: the tutor edits that, and the Chinese is translated from it again, so
  * the tutor never has to write or check Chinese by hand.
+ *
+ * The link to the parent's page is added only as it is copied, never stored:
+ * a new pair of links would leave a stored one dead.
  */
-export function ParentMessagePanel({ lesson }: { lesson: Lesson }) {
+export function ParentMessagePanel({
+  lesson,
+  parentLink,
+}: {
+  lesson: Lesson;
+  /** Absent when the child has no working parent link (adult, archived). */
+  parentLink?: { key: string; ready: boolean };
+}) {
   const router = useRouter();
   const message = lesson.parentMessage;
   const [draft, setDraft] = useState(message?.en ?? "");
@@ -22,6 +33,8 @@ export function ParentMessagePanel({ lesson }: { lesson: Lesson }) {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [tab, setTab] = useState<"zh" | "en">("zh");
+  // On when the page has something to show: an approved weekly note.
+  const [withLink, setWithLink] = useState(Boolean(parentLink?.ready));
 
   if (!message) return null;
 
@@ -59,6 +72,16 @@ export function ParentMessagePanel({ lesson }: { lesson: Lesson }) {
   }
 
   const text = tab === "zh" ? message.zh : message.en;
+  const addLink = Boolean(parentLink?.ready && withLink);
+
+  function withLinkLine(body: string): string {
+    if (!addLink || !parentLink) return body;
+    const line = parentLinkLine(`${window.location.origin}/p/${parentLink.key}`);
+    return `${body.trim()}\n\n${tab === "zh" ? line.zh : line.en}`;
+  }
+  // The child's words, still in the message: the speaker was labelled by a
+  // model, so the tutor is asked to check them.
+  const quoteShown = Boolean(message.quote && message.en.includes(message.quote));
 
   return (
     <section className="space-y-3">
@@ -129,9 +152,33 @@ export function ParentMessagePanel({ lesson }: { lesson: Lesson }) {
               >
                 {text}
               </p>
+              {tab === "en" && quoteShown && (
+                <p className="t-small t-muted">
+                  Check that this was said by the child. You can delete the line.
+                </p>
+              )}
+              {parentLink && (
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={addLink}
+                    disabled={!parentLink.ready}
+                    onChange={(e) => setWithLink(e.target.checked)}
+                    className="mt-1 h-5 w-5 shrink-0"
+                  />
+                  <span>
+                    <span className="block font-medium">Add the link to the parent page</span>
+                    <span className="hint">
+                      {parentLink.ready
+                        ? "Added at the end as you copy it."
+                        : "The page has nothing to show yet."}
+                    </span>
+                  </span>
+                </label>
+              )}
               <div className="flex gap-2">
                 <button
-                  onClick={() => void copy(tab, text)}
+                  onClick={() => void copy(tab, withLinkLine(text))}
                   className="btn btn-primary btn-lg flex-1"
                 >
                   <CopyIcon />

@@ -12,6 +12,7 @@ import { styleFor } from "@/lib/gameStyles";
 import { hasParent } from "@/lib/profile";
 import { canDrawPictures } from "@/lib/imageGen";
 import { PROGRAMME, cardById } from "@/lib/christianity";
+import { listReports } from "@/lib/store";
 import { INTERRUPTION_LABEL, promptLabel } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,16 @@ export default async function ReviewPage({
     ...(parent ? [{ href: "#parent", label: "Parent", done: messageSent }] : []),
   ];
   const next = steps.findIndex((s) => !s.done);
+  // The parent's page shows approved weekly notes and nothing else: before the
+  // first one, a link would open an empty page. An archived child's links no
+  // longer open at all.
+  const parentLink =
+    parent && !student.archivedAt
+      ? {
+          key: student.parentKey,
+          ready: (await listReports(student.id)).some((r) => r.approvedAt),
+        }
+      : undefined;
 
   return (
     <div className="stack-lg">
@@ -176,7 +187,7 @@ export default async function ReviewPage({
 
       {parent && (!practice || story) && (
         <div id="parent" className="scroll-mt-20">
-          <ParentMessagePanel key={student.id} lesson={lesson} />
+          <ParentMessagePanel key={student.id} lesson={lesson} parentLink={parentLink} />
         </div>
       )}
       </div>

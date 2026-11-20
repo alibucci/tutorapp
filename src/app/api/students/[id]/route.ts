@@ -76,6 +76,12 @@ export async function PATCH(request: Request, { params }: Params) {
     if (!profile) {
       return NextResponse.json({ error: "Check the age, level and goal." }, { status: 400 });
     }
+    // The profile is replaced whole, so a form that does not know about the
+    // parent's wish (a tab opened before it existed) would wipe it. Only a
+    // form that sends the field, empty or not, may change it.
+    const sent = body.profile as Record<string, unknown>;
+    const wish = found.student.profile?.parentWish;
+    if (wish && !("parentWish" in sent)) profile.parentWish = wish;
     patch.profile = profile;
   }
 
