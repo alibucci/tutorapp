@@ -51,7 +51,10 @@ To test a new phone or laptop, open **/check** on it.
   how the app works out who answered.
 
 Text appears a few seconds after each piece of speech, not word by word. A weak
-connection is fine; pieces that fail are sent again.
+connection is fine; pieces that fail are sent again. **No internet at all** is
+fine too: the lesson is kept on this device and sent by itself once the
+internet is back (a note at the top of the app says how many lessons are
+waiting). Do the debrief once you are online.
 
 ## The debrief, straight after
 

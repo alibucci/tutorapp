@@ -99,7 +99,8 @@ show something new.
 | **The debrief stays private forever** | It works because it is private. If tutors wrote for parents, the most valuable input in the system would turn into PR. |
 | **Recording the student is opt-in, per student** | It needs written consent. A group lesson records every child's voice only if every family consented. |
 | **Without consent: the tutor's voice and no transcript** | The gate cuts by loudness, not by who is speaking, so a transcript could pick up the child. The debrief is the whole record. |
-| **Audio is never stored** | Each piece is held in memory for one request to the recogniser, then dropped. Only text is kept. |
+| **Audio is never stored on our server** | Each piece is held in memory for one request to the recogniser, then dropped. Only text is kept. |
+| **…but it waits on the tutor's device when there is no internet** (agreed 20 Nov) | Pieces of a consented lesson stay in that browser until their text is back, then are deleted; 3 hours and 7 days at most. Without it, a lesson with no internet is lost. |
 | **Transcription on the server, not in the browser** | The browser's recogniser depended on the browser: Chrome sends audio to Google, which mainland China cannot reach. Recording in the browser and recognising on the server works the same everywhere. |
 | **Group lessons are in the room, about three children** | Who said what comes from the text: the tutor calls a child by name, the model labels the lines that follow, and the tutor checks the labels. Voice-based separation was tried: Deepgram merged three speakers into one or two. |
 | **Debrief answers are tagged by prompt, not sliced by time** | The first real debrief put all five answers in the last field: timestamps mark when the recogniser answered, not when the words were said. |
@@ -119,10 +120,8 @@ show something new.
 
 In rough order of priority.
 
-**Lesson plans, not built yet** (spec 20 Nov, release order 7-9):
-   recording with no network that sends later (agreed 20 Nov: kept only in
-   the tutor's browser, 7 days and 3 hours at most, deleted once transcribed)
-   and school textbooks (scenario 2). **Plan pictures are off**: the server
+**Content-plan spec, not built:** school textbooks (scenario 2, a separate
+   release by the spec). **Plan pictures are off**: the server
    has no DashScope key, and the local key is refused by the image model
    (`AccessDenied.Unpurchased`); slides use emoji until Victor gives one.
 

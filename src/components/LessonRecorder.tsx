@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -9,6 +11,7 @@ import { useClipTranscriber } from "@/hooks/useClipTranscriber";
 import { useTutorRecorder } from "@/hooks/useTutorRecorder";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { INTERRUPTION_LABEL, type Lesson, type TranscriptSegment } from "@/lib/types";
+import { clearLive, deleteEnd, listPieces, markLive, saveEnd } from "@/lib/offlineAudio";
 
 /** How often a running lesson's transcript is copied to the server. */
 const AUTOSAVE_MS = 10_000;
@@ -76,7 +79,15 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
   const isGroup = lesson.kind === "group";
   // Pieces that fail go again by themselves every half minute, while the
   // lesson carries on, rather than piling up for the end.
-  const speech = useClipTranscriber(lesson.language, { lines: isGroup, autoRetry: true });
+  // Pieces that cannot be sent are kept on this device until they can be -
+  // only where the transcript is allowed at all.
+  const speech = useClipTranscriber(lesson.language, {
+    lines: isGroup,
+    autoRetry: true,
+    keepFor: capturesStudent ? lesson.id : undefined,
+  });
+  /** The end could not be saved: it is kept on this device and goes later. */
+  const [keptEnd, setKeptEnd] = useState(false);
   const rec = useTutorRecorder({
     gate,
     // The screen went off: what was said up to now goes off to be read.
@@ -100,6 +111,20 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     // one-shot on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pieces this device kept from an earlier visit go with this page's retries;
+  // while it is open, the background sender leaves this lesson to it.
+  useEffect(() => {
+    if (!capturesStudent) return;
+    void listPieces(lesson.id).then((pieces) => speech.adopt(pieces)).catch(() => {});
+    markLive(lesson.id);
+    const beat = window.setInterval(() => markLive(lesson.id), 5000);
+    return () => {
+      window.clearInterval(beat);
+      clearLive(lesson.id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturesStudent, lesson.id]);
 
   const recording = rec.state === "recording";
   const paused = rec.state === "paused";
@@ -142,8 +167,9 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     // A piece the gate never opened for is room noise or silence: there is
     // nothing in it to read, and sending it would only be paid for.
     const heard = heardRef.current;
+    const length = lessonMs() - t;
     const ended = rec.endClip().then((clip) => {
-      if (clip && heard) void speech.send(clip, t);
+      if (clip && heard) void speech.send(clip, t, undefined, 0, length);
     });
     // A recorder the phone has frozen may never say it stopped; the lesson
     // must still be able to end.
@@ -265,14 +291,31 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         // nothing to clean
       }
       setUnsaved(false);
+      // Saved after all: nothing left to send later.
+      void deleteEnd(lesson.id);
       void wakeLock.release();
       router.push(`/lesson/${lesson.id}/debrief`);
     } catch {
       setUnsaved(true);
-      setSaveError(
-        "Could not save the end of the lesson - probably the connection. Nothing is lost: try again when you have signal.",
-      );
       setSaving(false);
+      // No internet: the end and the text so far wait on this device, and go
+      // by themselves once it is back - this page can be closed.
+      const kept = transcribes
+        ? await saveEnd({
+            lessonId: lesson.id,
+            title: lesson.title,
+            transcript,
+            endedAt: new Date().toISOString(),
+            ...(rec.openMs > 0 && { recordedMs: Math.round(rec.openMs) }),
+            interruptions: rec.interruptions,
+          })
+        : false;
+      setKeptEnd(kept);
+      setSaveError(
+        kept
+          ? "No internet, so the lesson is kept on this device. It is sent by itself when the internet is back - you can close this page. Do the debrief once you are online."
+          : "Could not save the end of the lesson - probably the connection. Nothing is lost: try again when you have signal.",
+      );
     }
   }
 
@@ -509,13 +552,20 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
 
       <section className="flex flex-wrap items-center gap-3">
         {unsaved ? (
-          <button
-            onClick={() => void finishSave(speech.segmentsRef.current)}
-            disabled={saving}
-            className="btn btn-primary btn-lg"
-          >
-            {saving ? "Saving…" : "Try saving again"}
-          </button>
+          <>
+            <button
+              onClick={() => void finishSave(speech.segmentsRef.current)}
+              disabled={saving}
+              className="btn btn-primary btn-lg"
+            >
+              {saving ? "Saving…" : "Try saving again"}
+            </button>
+            {keptEnd && (
+              <Link href="/" className="btn btn-quiet btn-lg">
+                Done for now
+              </Link>
+            )}
+          </>
         ) : interrupted || finishing || rec.state === "stopped" ? (
           // Stopped: this take is over. Starting again here would record a
           // second lesson over the end of the first.
@@ -591,7 +641,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
         onCancel={() => setConfirmingRestart(false)}
       />
 
-      {saveError && <p className="note note-warn">{saveError}</p>}
+      {saveError && <p className={`note ${keptEnd ? "note-accent" : "note-warn"}`}>{saveError}</p>}
 
       {finishing && (
         <div className="note note-quiet space-y-2">
@@ -621,7 +671,9 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
               `${speech.failed.length === 1 ? "One part" : `${speech.failed.length} parts`} of the lesson could not be transcribed: ${speech.failed[0].error} `}
             {speech.pending.length > 0 &&
               `${speech.pending.length === 1 ? "One part is" : `${speech.pending.length} parts are`} still on the way. `}
-            The audio is still on this page, but only until you leave it.
+            {speech.failed.length > 0 && speech.failed.every((f) => f.savedId !== undefined)
+              ? "They are kept on this device and sent by themselves when the internet is back (kept 7 days at most). You can finish now."
+              : "The audio is still on this page, but only until you leave it."}
           </p>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => void retryAndFinish()} className="btn btn-primary">
@@ -670,6 +722,7 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
           <p className="t-caption">
             {speech.failed.length} {speech.failed.length === 1 ? "part" : "parts"} could not be
             sent yet - probably the connection. Trying again every half minute; keep going.
+            {speech.failed.some((f) => f.savedId !== undefined) && " They are kept on this device until they are sent."}
           </p>
         )}
       </section>

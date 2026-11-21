@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { OfflineSync } from "@/components/OfflineSync";
 import { requireSession } from "@/lib/auth";
 import { plansOpenTo } from "@/lib/tutorList";
 
@@ -24,7 +25,10 @@ export default async function TutorLayout({
         helpHref="/help"
         links={(await plansOpenTo(session.id)) ? [{ href: "/plans", label: "Plans" }] : []}
       />
-      <div className="page page-wide flex-1 py-8">{children}</div>
+      <div className="page page-wide flex-1 py-8">
+        <OfflineSync />
+        {children}
+      </div>
     </>
   );
 }

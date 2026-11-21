@@ -8,7 +8,9 @@ From that, aloudli makes three different things for three people:
 - **the parent** gets a short message (English and Chinese, ready for WeChat)
   and one honest note a week.
 
-Audio is never stored; only text is kept. Homework goes to the child by itself.
+Audio is never stored on our server; only text is kept. The one exception is
+on the tutor's own device: pieces of a lesson that could not be sent wait
+there until they can be (see Recording). Homework goes to the child by itself.
 Nothing reaches a parent until the tutor approves it.
 
 ## Docs
@@ -118,6 +120,17 @@ failed pieces retry by themselves, at most two go at once, and the transcript
 is also kept on the device until the server has it. `src/lib/speech.ts` is the
 only file that knows the provider: Deepgram Nova-3, or Qwen3-ASR. The audio
 exists only in memory for one request.
+
+**No internet** (`offlineAudio.ts`, `OfflineSync.tsx`). Each piece of a
+consented lesson is kept in the browser's IndexedDB before it is sent and
+deleted the moment its text is back, so a dropped connection or a closed tab
+loses nothing. With no internet at all the lesson records as usual; the end
+of the lesson waits on the device too. On any of the tutor's pages, once the
+internet is back, the pieces are transcribed, their text is added to the
+lesson (`POST /api/lessons/[id]/transcript`, never replacing what is there),
+and only then is the audio deleted. At most 3 hours and 7 days are kept; a
+note says how many lessons are waiting. A recorder page still open on a
+lesson sends its own pieces and the background sender leaves it alone.
 
 **Phones.** A wake lock keeps the screen on while recording. If the screen
 goes off anyway, the recording pauses rather than running unwatched.

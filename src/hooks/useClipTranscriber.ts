@@ -1,10 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { deletePiece, savePiece, type StoredPiece } from "@/lib/offlineAudio";
 import { toSpeechWav } from "@/lib/wav";
 import type { TranscriptSegment } from "@/lib/types";
 
-type Failed = { tag?: string; t: number; clip: Blob; error: string; tries: number };
+type Failed = {
+  tag?: string;
+  t: number;
+  clip: Blob;
+  error: string;
+  tries: number;
+  /** Length of the piece, ms. */
+  ms: number;
+  /** Kept on this device (offlineAudio.ts) under this id, until it is sent. */
+  savedId?: number;
+};
 
 /** One upload, at most. A slow phone moves a piece in well under this. */
 const UPLOAD_MS = 90_000;
@@ -61,18 +72,23 @@ function within<T>(promise: Promise<T>, ms: number, message: string): Promise<T>
  *
  * A clip that fails is kept in memory, not dropped, and while `autoRetry` is
  * on it is sent again every half minute; the tutor can always retry it by
- * hand. Nothing is stored anywhere else.
+ * hand. With `keepFor` (a lesson whose transcript is allowed), a failed piece
+ * is also kept on this device, so a closed tab or a lesson with no internet
+ * loses nothing; it is deleted there the moment its text comes back.
  */
 export function useClipTranscriber(
   language: string,
   {
     lines = false,
     autoRetry = false,
+    keepFor,
   }: {
     /** Ask for each sentence separately: a group lesson credits them one by one. */
     lines?: boolean;
     /** Send failed pieces again by themselves, every half minute. */
     autoRetry?: boolean;
+    /** The lesson whose failed pieces may be kept on this device. */
+    keepFor?: string;
   } = {},
 ) {
   const [segments, setSegmentsState] = useState<TranscriptSegment[]>([]);
@@ -155,6 +171,10 @@ export function useClipTranscriber(
       let type = (clip.type || "audio/webm").split(";")[0];
       let lastError: Error = new Error("Transcription failed.");
       for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+        // No connection at all: fail now rather than wait out the time limits.
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          throw new Error("No internet. The piece waits until it is back.");
+        }
         try {
           return await post(body, type);
         } catch (e) {
@@ -184,9 +204,14 @@ export function useClipTranscriber(
   );
 
   const sendOne = useCallback(
-    async (clip: Blob, t: number, tag?: string, tries = 0) => {
+    async (clip: Blob, t: number, tag?: string, tries = 0, ms = 25_000, savedId?: number) => {
       if (clip.size === 0) return;
       setPending((p) => [...p, tag]);
+      // Kept on the device before it is sent, so a tab closed mid-upload
+      // loses nothing; deleted the moment its text is back.
+      if (keepFor && savedId === undefined) {
+        savedId = (await savePiece({ lessonId: keepFor, language, lines, t, tag, ms, blob: clip })) ?? undefined;
+      }
       try {
         await takeSlot();
         let body: Awaited<ReturnType<typeof deliver>>;
@@ -195,6 +220,8 @@ export function useClipTranscriber(
         } finally {
           giveSlot();
         }
+        // Its text is here: the copy kept on the device goes.
+        if (savedId !== undefined) void deletePiece(savedId);
         if (body.lines) {
           const added = body.lines.map((line) => ({ t: t + line.at, text: line.text, tag }));
           setSegments((prev) => [...prev, ...added].sort((a, b) => a.t - b.t));
@@ -208,7 +235,7 @@ export function useClipTranscriber(
         );
       } catch (e) {
         const error = e instanceof Error ? e.message : "Transcription failed.";
-        setFailed((f) => [...f, { tag, t, clip, error, tries: tries + 1 }]);
+        setFailed((f) => [...f, { tag, t, clip, error, tries: tries + 1, ms, savedId }]);
       } finally {
         setPending((p) => {
           const i = p.indexOf(tag);
@@ -216,12 +243,12 @@ export function useClipTranscriber(
         });
       }
     },
-    [deliver, takeSlot, giveSlot, setSegments, setFailed],
+    [deliver, takeSlot, giveSlot, setSegments, setFailed, keepFor, language, lines],
   );
 
   const send = useCallback(
-    (clip: Blob, t: number, tag?: string, tries = 0): Promise<void> => {
-      const job = sendOne(clip, t, tag, tries);
+    (clip: Blob, t: number, tag?: string, tries = 0, ms?: number, savedId?: number): Promise<void> => {
+      const job = sendOne(clip, t, tag, tries, ms, savedId);
       inFlightRef.current.add(job);
       void job.finally(() => inFlightRef.current.delete(job));
       return job;
@@ -245,7 +272,7 @@ export function useClipTranscriber(
       const again = failedRef.current.filter((f) => f.tries < maxTries);
       if (!again.length) return;
       setFailed(failedRef.current.filter((f) => f.tries >= maxTries));
-      for (const f of again) void send(f.clip, f.t, f.tag, f.tries);
+      for (const f of again) void send(f.clip, f.t, f.tag, f.tries, f.ms, f.savedId);
     },
     [send, setFailed],
   );
@@ -267,7 +294,26 @@ export function useClipTranscriber(
     [setSegments],
   );
 
+  /**
+   * Take back pieces this device kept from an earlier visit (the tab closed,
+   * the phone died): they wait as failed ones and go with the next retry.
+   */
+  const adopt = useCallback(
+    (pieces: StoredPiece[]) => {
+      const known = new Set(failedRef.current.map((f) => f.savedId));
+      const fresh = pieces.filter((p) => p.id !== undefined && !known.has(p.id));
+      if (!fresh.length) return;
+      setFailed((f) => [
+        ...f,
+        ...fresh.map((p) => ({ tag: p.tag, t: p.t, clip: p.blob, error: "Waiting for the internet.", tries: 0, ms: p.ms, savedId: p.id })),
+      ]);
+    },
+    [setFailed],
+  );
+
   const reset = useCallback(() => {
+    // Thrown away on purpose: the device's copies go too.
+    for (const f of failedRef.current) if (f.savedId !== undefined) void deletePiece(f.savedId);
     setSegments([]);
     setFailed([]);
   }, [setSegments, setFailed]);
@@ -283,5 +329,6 @@ export function useClipTranscriber(
     retry: () => retry(),
     restore,
     reset,
+    adopt,
   };
 }
