@@ -1,6 +1,8 @@
 import { renderDeck } from "./deck";
 import { PLAIN_STYLE, styleFor } from "./gameStyles";
 import { studentsOf } from "./plans";
+import { promises as fs } from "fs";
+import path from "path";
 import { readPlanImage } from "./store";
 import type { LessonPlan, PlanCard } from "./types";
 
@@ -23,7 +25,18 @@ export async function deckFor(plan: LessonPlan, card: PlanCard, pack: boolean): 
       if (data) inline.set(name, `data:${TYPES[name.split(".").pop() ?? ""] ?? "image/png"};base64,${data.toString("base64")}`);
     }
   }
+  // Ready-made drawings (the Bible stories) live in public/: linked online,
+  // written into the file offline.
+  const art = new Map<string, string>();
+  if (pack) {
+    for (const p of new Set(materials.slides.map((s) => s.art).filter((a): a is string => Boolean(a)))) {
+      if (!/^\/christianity\/[\w-]+\.svg$/.test(p)) continue;
+      const data = await fs.readFile(path.join(process.cwd(), "public", p)).catch(() => null);
+      if (data) art.set(p, `data:image/svg+xml;base64,${data.toString("base64")}`);
+    }
+  }
   return renderDeck({
+    artSrc: (p) => (pack ? art.get(p) : /^\/christianity\/[\w-]+\.svg$/.test(p) ? p : undefined),
     title: card.topic || "Lesson",
     card,
     slides: materials.slides,

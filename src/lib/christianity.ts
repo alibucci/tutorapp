@@ -533,7 +533,8 @@ function parentMessageFor(student: Student, card: StoryCard): ParentMessage {
 
 /** After the tutor edits the English: the line goes back if it was lost. */
 export function keepParentLine(lesson: Lesson, en: string, zh: string): { en: string; zh: string } {
-  const card = cardById(lesson.module?.storyId);
+  // A programme homework, or a story told in a live lesson.
+  const card = cardById(lesson.module?.storyId ?? lesson.planCard?.storyId);
   if (!card) return { en, zh };
   const line = parentLine(card);
   return {

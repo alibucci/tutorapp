@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { LIMIT, readJson } from "@/lib/http";
 import { cleanSlide } from "@/lib/lessonPlan";
-import { planFor, updateCard } from "@/lib/plans";
+import { planFor, storyCardOpen, studentsOf, updateCard } from "@/lib/plans";
+import { recordLiveStory, storyFor } from "@/lib/storySlides";
 import { deletePlanImage, listPlans, updatePlan } from "@/lib/store";
 import { SLIDE_PARTS, type PlanCard, type Slide } from "@/lib/types";
 import { randomUUID } from "crypto";
@@ -47,6 +48,10 @@ export async function PATCH(request: Request, { params }: Params) {
   const { id, cardId } = await params;
   const found = await planFor(id);
   if (!found) return NextResponse.json({ error: "No such plan." }, { status: 404 });
+  const before = found.plan.cards.find((c) => c.id === cardId);
+  if (before && !(await storyCardOpen(found.plan, before))) {
+    return NextResponse.json({ error: "No such lesson." }, { status: 404 });
+  }
   const raw = await readJson<unknown>(request, LIMIT.medium);
   if (raw instanceof Response) return raw;
   const parsed = CardIn.safeParse(raw);
@@ -93,6 +98,12 @@ export async function PATCH(request: Request, { params }: Params) {
     return patch;
   });
   if (!result) return NextResponse.json({ error: "No such lesson." }, { status: 404 });
+  // A Bible story marked taught moves the children's place in the programme,
+  // the same one the homework follows.
+  const story = storyFor(result.card.story?.storyId);
+  if (story && body.status === "done" && before?.status !== "done") {
+    await recordLiveStory((await studentsOf(result.plan)).students, story);
+  }
   return NextResponse.json(result.card);
 }
 

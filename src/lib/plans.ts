@@ -12,6 +12,7 @@ import {
   updatePlan,
 } from "./store";
 import { drawForCard, dropUnused, picturesOn } from "./planImages";
+import { buildStorySlides, storyFor, storyOpen } from "./storySlides";
 import { plansOpenTo } from "./tutorList";
 import type { LessonPlan, PlanCard, Student, StudentGroup } from "./types";
 
@@ -208,6 +209,10 @@ export async function startBuild(
         const card = plan?.cards.find((c) => c.id === cardId);
         if (!plan || !card) return;
         const { students } = await studentsOf(plan);
+        if (card.story) {
+          await buildStoryCard(plan, card, students);
+          return;
+        }
         const current = card.materials?.slides ?? [];
         const keep = opts.keepEdited === false
           ? []
@@ -276,20 +281,28 @@ export async function cardForLesson(
   tutorId: string,
   ref: unknown,
   who: { studentId?: string; studentIds?: string[] },
-): Promise<{ planId: string; cardId: string } | null> {
+): Promise<{ planId: string; cardId: string; storyId?: string } | null> {
   if (!ref || typeof ref !== "object") return null;
   const { planId, cardId } = ref as { planId?: unknown; cardId?: unknown };
   if (typeof planId !== "string" || typeof cardId !== "string") return null;
   if (!(await plansOpenTo(tutorId))) return null;
   const plan = await getPlan(planId);
   if (!plan || plan.tutorId !== tutorId || plan.archivedAt) return null;
-  if (!plan.cards.some((c) => c.id === cardId)) return null;
+  const card = plan.cards.find((c) => c.id === cardId);
+  if (!card) return null;
   if (who.studentId) {
     if (plan.studentId !== who.studentId) return null;
   } else {
     const group = plan.groupId ? await getGroup(plan.groupId) : null;
     // A child may be away: the lesson's children are some of the group's.
     if (!group || !who.studentIds?.length || !who.studentIds.every((id) => group.studentIds.includes(id))) return null;
+  }
+  if (card.story) {
+    const kids = (await Promise.all((who.studentIds ?? [who.studentId!]).map((id) => getStudent(id)))).filter(
+      (s): s is Student => Boolean(s),
+    );
+    if (!(await storyOpen(tutorId, kids))) return null;
+    return { planId, cardId, storyId: card.story.storyId };
   }
   return { planId, cardId };
 }
@@ -320,4 +333,34 @@ export async function startRedraw(plan: LessonPlan, card: PlanCard, slideId: str
     }),
   );
   return true;
+}
+
+/**
+ * A Bible story card: slides told from the card and checked by code, with the
+ * ready-made drawings. No sheets of the model's, no videos, no pictures drawn.
+ * Only while the track is open for every child the plan is for.
+ */
+async function buildStoryCard(plan: LessonPlan, card: PlanCard, students: Student[]): Promise<void> {
+  const story = storyFor(card.story?.storyId);
+  if (!story || !(await storyOpen(plan.tutorId, students))) {
+    await updateCard(plan.id, card.id, () => ({ building: undefined, buildError: "The Christianity programme is not open for these children." }));
+    return;
+  }
+  const ages = students.map((x) => x.profile?.age).filter((n): n is number => typeof n === "number");
+  const slides = await buildStorySlides(story, ages);
+  await updateCard(plan.id, card.id, () => ({
+    topic: story.title,
+    goal: `Today's good habit: ${story.value.rule}`,
+    words: [],
+    audience: { ages },
+    materials: { slides, sheets: [], videos: [], builtAt: new Date().toISOString() },
+    building: undefined,
+  }));
+}
+
+/** A story card may be seen and used: the track is open for this plan's children. */
+export async function storyCardOpen(plan: LessonPlan, card: PlanCard): Promise<boolean> {
+  if (!card.story) return true;
+  const { students } = await studentsOf(plan);
+  return storyOpen(plan.tutorId, students);
 }

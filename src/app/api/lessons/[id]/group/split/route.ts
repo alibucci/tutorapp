@@ -68,6 +68,9 @@ export async function POST(request: Request, { params }: Params) {
           capture: lesson.capture,
           studentId,
           groupId: lesson.id,
+          // A Bible story: each parent's message carries its line. The plan
+          // itself is checked once, on this group lesson, not per child.
+          ...(lesson.planCard?.storyId && { planCard: lesson.planCard }),
           startedAt: lesson.startedAt,
           endedAt: lesson.endedAt,
           recordedMs: lesson.recordedMs,

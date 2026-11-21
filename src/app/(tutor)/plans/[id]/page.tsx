@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { PlanBoard } from "@/components/plans/PlanBoard";
 import { ChevronLeft } from "@/components/ui";
 import { isBuilding, isSuggesting, planFor, studentsOf } from "@/lib/plans";
+import { PROGRAMME } from "@/lib/christianity";
+import { nextLiveStory, storyOpen } from "@/lib/storySlides";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,11 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
   const { plan } = found;
   const { students, group } = await studentsOf(plan);
   const name = group?.name ?? students[0]?.name ?? "Plan";
+  // The Bible story track: only while the programme is open to this tutor and
+  // switched on for every child here. Otherwise its cards are not shown.
+  const open = await storyOpen(plan.tutorId, students);
+  const shown = open ? plan : { ...plan, cards: plan.cards.filter((c) => !c.story) };
+  const next = open ? nextLiveStory(students) : undefined;
 
   return (
     <div className="stack-lg max-w-3xl">
@@ -28,7 +35,15 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
         </span>
       </header>
       <PlanBoard
-        plan={plan}
+        plan={shown}
+        stories={
+          open
+            ? {
+                next: next ? { id: next.id, title: next.title } : null,
+                all: PROGRAMME.filter((c) => c.approved).map((c) => ({ id: c.id, title: c.title })),
+              }
+            : undefined
+        }
         building={plan.cards.filter(isBuilding).map((c) => c.id)}
         suggesting={isSuggesting(plan)}
       />

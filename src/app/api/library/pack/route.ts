@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const [planId, cardId] = ref.split(":");
     const found = planId && cardId ? await planFor(planId) : null;
     const card = found?.plan.cards.find((c) => c.id === cardId);
-    if (!found || !card) return NextResponse.json({ error: "No such lesson." }, { status: 404 });
+    if (!found || !card || card.story) return NextResponse.json({ error: "No such lesson." }, { status: 404 });
     if (!card.materials?.slides.length) continue;
     lessons.push({ title: card.topic || "Lesson", html: await deckFor(found.plan, card, true) });
     await updateCard(planId, cardId, (c) => ({ packAt: new Date().toISOString(), updatedAt: c.updatedAt }));

@@ -70,19 +70,40 @@ export function CardEditor({
         <>
           {card.buildError && <p className="note note-warn">The last rebuild failed: {card.buildError}</p>}
           <Teach planId={planId} card={card} />
-          <Rebuild
-            edited={edited}
-            busy={busy === "rebuild" || building}
-            onRebuild={(wish, keepEdited) =>
-              call("rebuild", `${base}/build`, { method: "POST", json: { wish, keepEdited } })
-            }
-          />
+          {card.story ? (
+            <section className="card card-pad stack-sm">
+              <h2 className="font-semibold">Bible story</h2>
+              <p className="t-small t-muted">
+                The story is told from its card and checked: every fact there, nothing added, no forbidden word. The
+                questions, the order of events, today&rsquo;s habit and the pictures come from the card as written.
+              </p>
+              <button
+                className="btn btn-quiet self-start"
+                disabled={busy !== null || building}
+                onClick={() => {
+                  if (edited && !window.confirm(`Your changes to ${edited} slides will be replaced. Tell it again?`)) return;
+                  void call("rebuild", `${base}/build`, { method: "POST", json: {} });
+                }}
+              >
+                Tell it again
+              </button>
+            </section>
+          ) : (
+            <Rebuild
+              edited={edited}
+              busy={busy === "rebuild" || building}
+              onRebuild={(wish, keepEdited) =>
+                call("rebuild", `${base}/build`, { method: "POST", json: { wish, keepEdited } })
+              }
+            />
+          )}
           <SlidesEditor
             // Reset from the server when the words change (a rewrite, a save),
             // not when a picture lands: unsaved typing must survive that.
             key={materials.builtAt + materials.slides.map((x) => x.id + x.title + (x.text ?? "") + (x.editedAt ?? "")).join("|")}
             slides={materials.slides}
-            group={group}
+            group={group && !card.story}
+            story={Boolean(card.story)}
             busy={building ? "building" : busy}
             onSave={(slides) => call("slides", base, { method: "PATCH", json: { slides } })}
             onAsk={(slideId, wish) => call("slide:" + slideId, `${base}/build`, { method: "POST", json: { slideId, wish } })}
@@ -276,6 +297,7 @@ function Rebuild({
 function SlidesEditor({
   slides,
   group,
+  story,
   busy,
   onSave,
   onAsk,
@@ -283,6 +305,8 @@ function SlidesEditor({
 }: {
   slides: Slide[];
   group: boolean;
+  /** A Bible story: no slide is rewritten or drawn by the model on its own. */
+  story: boolean;
   busy: string | null;
   onSave: (slides: unknown[]) => Promise<unknown>;
   onAsk: (slideId: string, wish: string) => Promise<unknown>;
@@ -429,7 +453,11 @@ function SlidesEditor({
                   </button>
                 </>
               )}
-              {onRedraw && d.id && d.picture && !dirty && (
+              {d.art && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={d.art} alt="" className="h-16 w-24 rounded bg-white object-contain" />
+              )}
+              {onRedraw && !story && d.id && d.picture && !dirty && (
                 <button
                   className="btn btn-ghost btn-sm"
                   disabled={busy !== null}
@@ -439,7 +467,7 @@ function SlidesEditor({
                 </button>
               )}
             </div>
-            {d.id && !dirty && <AskSlide busy={busy === "slide:" + d.id} onAsk={(wish) => onAsk(d.id!, wish)} />}
+            {d.id && !dirty && !story && <AskSlide busy={busy === "slide:" + d.id} onAsk={(wish) => onAsk(d.id!, wish)} />}
           </li>
         ))}
       </ol>

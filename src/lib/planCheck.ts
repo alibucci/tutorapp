@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MODEL_FAST, complete } from "./llm";
-import { updateCard } from "./plans";
+import { studentsOf, updateCard } from "./plans";
+import { recordLiveStory, storyFor } from "./storySlides";
 import { getLesson, getPlan, updateLesson, updatePlan } from "./store";
 import { promptLabel, type Lesson, type PlanCard, type PlanCheck } from "./types";
 
@@ -32,7 +33,10 @@ tutor's notes count as much as the transcript, and where there is no
 evidence either way, it is "missed".`;
 
 /** What the plan asked for, as points to tick. */
-export function planPoints(card: Pick<PlanCard, "goal" | "words" | "carried">): string[] {
+export function planPoints(card: Pick<PlanCard, "goal" | "words" | "carried" | "story">): string[] {
+  // A Bible story: what it has to tell, fact by fact, and today's habit.
+  const story = storyFor(card.story?.storyId);
+  if (story) return [...story.facts.filter((f) => !f.frame).map((f) => f.say), card.goal].filter(Boolean);
   return [
     ...(card.goal ? [card.goal] : []),
     ...card.words.map((w) => `the word "${w}"`),
@@ -109,6 +113,9 @@ export async function runPlanCheck(lessonId: string, summaryCovered: string[] = 
       lessonId,
       covered: [...new Set([...(now.covered ?? []), ...check.done, ...check.partial, ...summaryCovered])],
     }));
+    // A story told in the lesson: the homework moves on with it.
+    const story = storyFor(card.story?.storyId);
+    if (story && card.status !== "done") await recordLiveStory((await studentsOf(plan)).students, story);
     return check;
   } catch (e) {
     console.error("[plan check]", e);

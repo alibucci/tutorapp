@@ -138,8 +138,8 @@ export type Lesson = {
   groupLessonIds?: string[];
   /** On a child's lesson: the group lesson it was split from. */
   groupId?: string;
-  /** Taught from this card of a lesson plan. */
-  planCard?: { planId: string; cardId: string };
+  /** Taught from this card of a lesson plan; `storyId` when it is a Bible story. */
+  planCard?: { planId: string; cardId: string; storyId?: string };
   /** What of the plan the lesson reached, read from the recording and debrief. */
   planCheck?: PlanCheck;
   createdAt: string;
@@ -694,6 +694,8 @@ export type Slide = {
   picture?: string;
   /** The drawn picture, a file in data/plan-images. */
   image?: string;
+  /** A ready-made picture from public/ (the Bible stories: never drawn by a model). */
+  art?: string;
   /** For the tutor only: never on the child's screen. */
   notes?: string;
   /**
@@ -774,6 +776,12 @@ export type PlanCard = {
   visibility?: "private" | "shared";
   /** Copied from another card in the library. */
   copiedFrom?: string;
+  /**
+   * A Bible story for a live lesson (the Christianity track). Kept apart from
+   * the ordinary plan: the model never adds one, and it shows only while the
+   * programme is open to the tutor and switched on for every child.
+   */
+  story?: { storyId: string };
   updatedAt: string;
 };
 

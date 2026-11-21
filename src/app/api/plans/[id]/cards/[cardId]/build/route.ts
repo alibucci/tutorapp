@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { LIMIT, readJson } from "@/lib/http";
-import { isBuilding, planFor, remakeSlide, startBuild, startRedraw } from "@/lib/plans";
+import { isBuilding, planFor, remakeSlide, startBuild, startRedraw, storyCardOpen } from "@/lib/plans";
 
 type Params = { params: Promise<{ id: string; cardId: string }> };
 
@@ -15,12 +15,20 @@ export async function POST(request: Request, { params }: Params) {
   const { id, cardId } = await params;
   const found = await planFor(id);
   const card = found?.plan.cards.find((c) => c.id === cardId);
-  if (!found || !card) return NextResponse.json({ error: "No such lesson." }, { status: 404 });
+  if (!found || !card || !(await storyCardOpen(found.plan, card))) {
+    return NextResponse.json({ error: "No such lesson." }, { status: 404 });
+  }
   const body = await readJson<{ wish?: unknown; keepEdited?: unknown; slideId?: unknown; redraw?: unknown }>(
     request,
     LIMIT.small,
   );
   if (body instanceof Response) return body;
+
+  // A Bible story is told from its card and checked as a whole: no slide is
+  // rewritten or drawn on its own.
+  if (card.story && typeof body.slideId === "string") {
+    return NextResponse.json({ error: "A Bible story is rebuilt as a whole, from its card." }, { status: 409 });
+  }
 
   // A new picture for one slide.
   if (body.redraw === true && typeof body.slideId === "string") {

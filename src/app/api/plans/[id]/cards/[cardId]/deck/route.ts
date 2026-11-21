@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { deckFor, packFileName } from "@/lib/deckFor";
-import { planFor, updateCard } from "@/lib/plans";
+import { planFor, storyCardOpen, updateCard } from "@/lib/plans";
 
 type Params = { params: Promise<{ id: string; cardId: string }> };
 
@@ -14,7 +14,9 @@ export async function GET(request: Request, { params }: Params) {
   const { id, cardId } = await params;
   const found = await planFor(id);
   const card = found?.plan.cards.find((c) => c.id === cardId);
-  if (!found || !card) return NextResponse.json({ error: "No such lesson." }, { status: 404 });
+  if (!found || !card || !(await storyCardOpen(found.plan, card))) {
+    return NextResponse.json({ error: "No such lesson." }, { status: 404 });
+  }
   if (!card.materials?.slides.length) {
     return NextResponse.json({ error: "This lesson has no slides yet." }, { status: 409 });
   }

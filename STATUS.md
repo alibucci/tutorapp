@@ -58,7 +58,7 @@ tutor's home screen.
 | Families | One sign-in shared by the child and the parent, plus private links that can be rotated. |
 | Tutor notices | A feed on the home screen, plus Telegram and email (Resend; sent only to an address the tutor confirmed). |
 | Help | A Help page for tutors with how-to films and the same steps in writing (`help.ts`). |
-| Lesson plans | Saved groups, a plan per child or group, one lesson on a topic or a month of them, slides with tutor-only notes, printable sheets, video searches, an offline file, a check of the lesson against its plan, a personal library. Only for `LESSON_PLANS_TUTORS` (Victor first). |
+| Lesson plans | Saved groups, a plan per child or group, one lesson on a topic or a month of them, slides with tutor-only notes, printable sheets, video searches, an offline file, a check of the lesson against its plan, a personal library, Bible stories for live lessons (same cards and checks as the homework), a harder step on group slides. Only for `LESSON_PLANS_TUTORS` (Victor first). |
 | Admin | The superadmin creates, suspends and resets tutors. |
 | Other | Moving a lesson started under the wrong child, archiving a student, themes made from a description of the learner. |
 
@@ -120,8 +120,8 @@ show something new.
 In rough order of priority.
 
 **Lesson plans, not built yet** (spec 20 Nov, release order 7-9):
-   recording with no network that sends later (needs Victor's decision on
-   keeping audio on the device), the Christianity track for live lessons,
+   recording with no network that sends later (agreed 20 Nov: kept only in
+   the tutor's browser, 7 days and 3 hours at most, deleted once transcribed)
    and school textbooks (scenario 2). **Plan pictures are off**: the server
    has no DashScope key, and the local key is refused by the image model
    (`AccessDenied.Unpurchased`); slides use emoji until Victor gives one.

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MODEL, MODEL_FAST, complete } from "./llm";
+import { keepParentLine } from "./christianity";
 import { quoteLine } from "./parentLines";
 import { hasParent } from "./profile";
 import { renderLesson } from "./summarize";
@@ -183,9 +184,16 @@ export async function writeParentMessage(
       : undefined;
   const line = quote ? quoteLine(student.name, quote) : null;
 
-  return {
+  const withQuote = {
     en: line ? `${parsed.en.trim()}\n\n${line.en}` : parsed.en,
     zh: line ? `${parsed.zh.trim()}\n\n${line.zh}` : parsed.zh,
+  };
+  // A Bible story told in the lesson: the checked line about the story and
+  // its habit, added by code, as on the programme's homework.
+  const story = keepParentLine(lesson, withQuote.en, withQuote.zh);
+  return {
+    en: story.en,
+    zh: story.zh,
     generatedAt: new Date().toISOString(),
     model: MODEL,
     ...(quote && { quote }),

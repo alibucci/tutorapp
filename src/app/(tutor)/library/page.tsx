@@ -23,7 +23,8 @@ export default async function LibraryPage() {
   for (const plan of plans) {
     const name = await planName(plan);
     for (const card of plan.cards) {
-      if (!card.materials?.slides.length) continue;
+      // Bible stories stay out of the library (and its shared future).
+      if (!card.materials?.slides.length || card.story) continue;
       rows.push({
         planId: plan.id,
         cardId: card.id,

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { CardEditor } from "@/components/plans/CardEditor";
 import { ChevronLeft } from "@/components/ui";
 import { picturesOn } from "@/lib/planImages";
-import { isBuilding, planFor, studentsOf } from "@/lib/plans";
+import { isBuilding, planFor, storyCardOpen, studentsOf } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export default async function PlanCardPage({ params }: { params: Promise<{ id: s
   const { id, cardId } = await params;
   const found = await planFor(id);
   const card = found?.plan.cards.find((c) => c.id === cardId);
-  if (!found || !card) notFound();
+  if (!found || !card || !(await storyCardOpen(found.plan, card))) notFound();
   const { students, group } = await studentsOf(found.plan);
   const index = found.plan.cards.findIndex((c) => c.id === cardId);
 

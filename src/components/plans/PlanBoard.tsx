@@ -24,10 +24,13 @@ export function PlanBoard({
   plan,
   building,
   suggesting,
+  stories,
 }: {
   plan: LessonPlan;
   building: string[];
   suggesting: boolean;
+  /** The Bible story track, where it is open for these children. */
+  stories?: { next: { id: string; title: string } | null; all: { id: string; title: string }[] };
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(plan.suggestError ?? null);
@@ -147,6 +150,10 @@ export function PlanBoard({
           <span className="hint">Topics in order, none they have had before. Slides are made when you open a lesson.</span>
         </form>
       </section>
+
+      {stories && <StoryTrack stories={stories} busy={busy !== null} onAdd={(storyId) =>
+        void call("story", `/api/plans/${plan.id}/cards`, { method: "POST", json: { mode: "story", storyId } })
+      } />}
 
       {suggesting && <p className="note note-accent">Planning the month - this takes a minute or so.</p>}
       {error && <p className="note note-warn">{error}</p>}
@@ -344,6 +351,7 @@ function CardRow({
           <span className="t-small t-muted">{index + 1}.</span>
           <span className="font-semibold">{card.topic || "Untitled"}</span>
           {isToday && <span className="tag tag-info">Next</span>}
+          {card.story && <span className="tag tag-quiet">Bible story</span>}
           {card.status !== "planned" && (
             <span className={`tag ${done ? "tag-done" : "tag-quiet"}`}>{STATUS_LABEL[card.status]}</span>
           )}
@@ -384,5 +392,51 @@ function CardRow({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The Christianity track, kept apart from the ordinary lessons: the model never
+ * adds a story, the tutor does. The next one follows the programme, the same
+ * place the homework uses.
+ */
+function StoryTrack({
+  stories,
+  busy,
+  onAdd,
+}: {
+  stories: { next: { id: string; title: string } | null; all: { id: string; title: string }[] };
+  busy: boolean;
+  onAdd: (storyId: string) => void;
+}) {
+  const [other, setOther] = useState("");
+  return (
+    <section className="card card-pad stack-sm">
+      <h2 className="font-semibold">Bible story for a live lesson</h2>
+      <p className="t-small t-muted">
+        Told from the same story cards as the homework, and checked the same way. Telling one in a lesson moves the
+        homework on too.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {stories.next ? (
+          <button className="btn btn-primary" disabled={busy} onClick={() => onAdd(stories.next!.id)}>
+            Add the next story: {stories.next.title}
+          </button>
+        ) : (
+          <span className="t-small">All the stories are done.</span>
+        )}
+        <select className="field w-auto" value={other} onChange={(e) => setOther(e.target.value)} aria-label="Another story">
+          <option value="">Another story…</option>
+          {stories.all.map((s) => (
+            <option key={s.id} value={s.id}>{s.title}</option>
+          ))}
+        </select>
+        {other && (
+          <button className="btn btn-quiet" disabled={busy} onClick={() => { onAdd(other); setOther(""); }}>
+            Add it
+          </button>
+        )}
+      </div>
+    </section>
   );
 }

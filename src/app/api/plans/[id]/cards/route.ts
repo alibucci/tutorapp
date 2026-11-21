@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { LIMIT, readJson } from "@/lib/http";
-import { CARDS_MAX, MONTH_DEFAULT, MONTH_MAX, isSuggesting, newCard, planFor, startBuild, startMonth } from "@/lib/plans";
+import { CARDS_MAX, MONTH_DEFAULT, MONTH_MAX, isSuggesting, newCard, planFor, startBuild, startMonth, studentsOf } from "@/lib/plans";
+import { nextLiveStory, storyFor, storyOpen } from "@/lib/storySlides";
 import { updatePlan } from "@/lib/store";
 import type { PlanCard } from "@/lib/types";
 import { randomUUID } from "crypto";
@@ -20,7 +21,14 @@ export async function POST(request: Request, { params }: Params) {
   const found = await planFor(id);
   if (!found) return NextResponse.json({ error: "No such plan." }, { status: 404 });
   const { plan } = found;
-  const body = await readJson<{ mode?: unknown; topic?: unknown; count?: unknown; duplicate?: unknown; copyFrom?: unknown }>(
+  const body = await readJson<{
+    mode?: unknown;
+    topic?: unknown;
+    count?: unknown;
+    duplicate?: unknown;
+    copyFrom?: unknown;
+    storyId?: unknown;
+  }>(
     request,
     LIMIT.small,
   );
@@ -39,6 +47,19 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   let card: PlanCard;
+  // A Bible story for a live lesson: only while the track is open for every
+  // child of this plan. The next one in the programme, or one the tutor picks.
+  if (body.mode === "story") {
+    const { students } = await studentsOf(plan);
+    if (!(await storyOpen(plan.tutorId, students))) {
+      return NextResponse.json({ error: "No such lesson." }, { status: 404 });
+    }
+    const story = typeof body.storyId === "string" ? storyFor(body.storyId) : nextLiveStory(students);
+    if (!story) return NextResponse.json({ error: "The programme has no more stories." }, { status: 409 });
+    card = newCard({ topic: story.title, goal: `Today's good habit: ${story.value.rule}`, story: { storyId: story.id } });
+    await updatePlan(id, (current) => ({ cards: [...current.cards, card] }));
+    return NextResponse.json((await startBuild(id, card.id)) ?? card, { status: 201 });
+  }
   // From the library: a card of one of this tutor's plans, into this one.
   const copy = body.copyFrom as { planId?: unknown; cardId?: unknown } | undefined;
   const fromPlan =
@@ -52,6 +73,10 @@ export async function POST(request: Request, { params }: Params) {
     const sourceId = fromPlan ? (copy!.cardId as string) : (body.duplicate as string);
     const source = (fromPlan ?? plan).cards.find((c) => c.id === sourceId);
     if (!source) return NextResponse.json({ error: "No such lesson." }, { status: 404 });
+    // Bible stories stay out of the library: not copied into other plans.
+    if (source.story && fromPlan && fromPlan.id !== id) {
+      return NextResponse.json({ error: "Bible stories are not copied between plans." }, { status: 409 });
+    }
     card = newCard({
       topic: source.topic,
       words: source.words,
@@ -61,6 +86,7 @@ export async function POST(request: Request, { params }: Params) {
       audience: source.audience,
       visibility: "private",
       ...(fromPlan && { copiedFrom: source.id }),
+      ...(source.story && { story: source.story }),
       // Pictures are shared files: the copy points at the same ones.
       ...(source.materials && {
         materials: {

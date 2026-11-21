@@ -1,5 +1,5 @@
 import { videoSearchUrl } from "./planShared";
-import type { GameStyle } from "./gameStyles";
+import { readablePalette, type GameStyle } from "./gameStyles";
 import type { PlanCard, Sheet, Slide, VideoIdea } from "./types";
 
 /**
@@ -25,6 +25,8 @@ export type DeckInput = {
   style: Pick<GameStyle, "palette" | "name">;
   /** Picture file name to what an <img> loads: a server URL, or a data: URI. */
   imageSrc: (name: string) => string | undefined;
+  /** A ready-made picture's public path to what an <img> loads. */
+  artSrc?: (path: string) => string | undefined;
   offline: boolean;
   /** "2026-11-20 14:05" - shown in a saved pack, so the tutor knows which it is. */
   savedAt?: string;
@@ -38,14 +40,15 @@ const LINE_BREAKS = new RegExp("[\\u2028\\u2029]", "g");
 const safeJson = (v: unknown) => JSON.stringify(v).replace(/</g, "\\u003c").replace(LINE_BREAKS, " ");
 
 export function renderDeck(input: DeckInput): string {
-  const p = input.style.palette;
+  // Text sits on the panel colour, checked to read at 4.5:1.
+  const p = readablePalette(input.style.palette);
   const slides = input.slides.map((s) => ({
     part: s.part,
     title: s.title,
     text: s.text ?? "",
     say: s.say ?? "",
     emoji: s.emoji ?? "",
-    image: s.image ? input.imageSrc(s.image) ?? "" : "",
+    image: s.image ? input.imageSrc(s.image) ?? "" : s.art ? input.artSrc?.(s.art) ?? "" : "",
     notes: s.notes ?? "",
     harder: s.harder ?? null,
   }));
@@ -78,22 +81,22 @@ button{font:inherit;cursor:pointer}
 .nav{display:flex;gap:8px;align-items:center}.nav .count{margin:0 auto;font-weight:700}
 .videos a{color:#1c2430}.videos li{margin:6px 0}.hint{font-size:13px;color:#6b7684}
 /* The slide itself: the same markup on the tutor's page and the child's screen. */
-.slide{position:relative;width:100%;height:100%;background:var(--ground);color:var(--ink);display:flex;flex-direction:column;
+.slide{position:relative;width:100%;height:100%;background:var(--panel);color:var(--ink);box-shadow:inset 0 0 0 1.6cqh var(--ground);display:flex;flex-direction:column;
 align-items:center;justify-content:center;text-align:center;gap:2.5cqh;padding:5cqh 6cqw;font-family:var(--font)}
-.slide .part{position:absolute;top:3cqh;left:3cqw;font-size:2.6cqh;font-weight:700;opacity:.55;text-transform:uppercase;letter-spacing:.08em}
+.slide .part{position:absolute;top:4cqh;left:4cqw;font-size:2.6cqh;font-weight:700;opacity:.55;text-transform:uppercase;letter-spacing:.08em}
 .slide .t{font-size:11cqh;font-weight:800;line-height:1.05;margin:0;overflow-wrap:anywhere}
 .slide .x{font-size:6cqh;line-height:1.25;margin:0;max-width:90%;overflow-wrap:anywhere}
-.slide .pic{max-height:45cqh;max-width:70cqw;border-radius:2cqh;background:var(--panel);object-fit:contain}
+.slide .pic{max-height:45cqh;max-width:70cqw;border-radius:2cqh;background:#fff;object-fit:contain}
 .slide .emo{font-size:22cqh;line-height:1}
 .slide .say{border:0;border-radius:99px;background:var(--accent);color:var(--accent-ink);font-size:4.6cqh;font-weight:800;padding:1.6cqh 4cqh}
 .slide.online .t{font-size:14cqh}.slide.online .x{font-size:7.5cqh}.slide.online .emo{font-size:26cqh}.slide.online .pic{max-height:40cqh}
-.slide .harder{display:flex;flex-direction:column;align-items:center;gap:1.4cqh;background:var(--panel);border:.5cqh solid var(--accent);border-radius:3cqh;padding:2cqh 4cqw;max-width:92%}
+.slide .harder{display:flex;flex-direction:column;align-items:center;gap:1.4cqh;background:color-mix(in srgb,var(--accent) 10%,var(--panel));border:.5cqh solid var(--accent);border-radius:3cqh;padding:2cqh 4cqw;max-width:92%}
 .slide .harder .tag{font-size:2.6cqh;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
 .slide .harder .t2{font-size:7cqh;font-weight:800;margin:0;line-height:1.1;overflow-wrap:anywhere}
 .slide .harder .x{font-size:4.6cqh}.slide .harder .say{font-size:3.6cqh;padding:1.2cqh 3cqh}
 .slide.up{gap:1.6cqh}.slide.up .t,.slide.online.up .t{font-size:8cqh}.slide.up .x,.slide.online.up .x{font-size:4.6cqh}
 .slide.up .emo,.slide.online.up .emo{font-size:11cqh}.slide.up .pic{max-height:22cqh}.btn[hidden]{display:none}
-.screen{position:fixed;inset:0;container-type:size;background:var(--ground)}
+.screen{position:fixed;inset:0;container-type:size;background:var(--panel)}
 .here{position:fixed;inset:0;z-index:9;container-type:size}.here[hidden]{display:none}
 .sheets{display:none}
 @media print{

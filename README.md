@@ -262,6 +262,16 @@ anyone else none of it exists (pages and routes are 404).
   decides whether the rest goes into the next planned card.
 - **Library** (`/library`): every written lesson of this tutor, to search,
   mark "worked" or "did not suit", copy into another plan or save offline.
+- **Bible stories for live lessons** (`storySlides.ts`): a separate track on
+  the board, only while the programme is open to the tutor
+  (`CHRISTIANITY_TUTORS`) and switched on for every child of the plan; the
+  model never adds one. Same cards and checks as the homework: the model tells
+  the story, code checks every fact and every forbidden word (slides and
+  notes) before it is shown; questions, order of events, today's habit and the
+  ready-made drawings come from the card. No slide is rewritten or drawn on
+  its own, and stories stay out of the library. Taught (checked or marked
+  done), a story moves the same programme place the homework follows, and
+  the parent's message carries the story's checked line.
 
 ---
 
@@ -301,7 +311,7 @@ src/lib/
   notices.ts telegram.ts email.ts feed.ts
   pronounce.ts voice.ts help.ts
   groups.ts plans.ts lessonPlan.ts planCheck.ts planImages.ts
-  deck.ts deckFor.ts planShared.ts tutorList.ts      lesson plans
+  deck.ts deckFor.ts planShared.ts tutorList.ts storySlides.ts   lesson plans
 src/content/          programme cards (Bible stories)
 src/hooks/            recorder, clip transcriber, browser recogniser, wake lock
 public/tutor-gate-worklet.js         the gate, on the audio thread
