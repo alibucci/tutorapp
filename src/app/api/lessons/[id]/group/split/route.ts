@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { lessonFor } from "@/lib/access";
 import { debriefForChild, linesForChild } from "@/lib/groupLesson";
 import { LIMIT, readJson } from "@/lib/http";
 import { createLesson, getStudent, updateLesson } from "@/lib/store";
 import { autoHomeworkAfter } from "@/lib/autoHomework";
+import { runPlanCheck } from "@/lib/planCheck";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -81,6 +82,8 @@ export async function POST(request: Request, { params }: Params) {
     });
     // Each child's own summary and homework, made and sent one after another.
     autoHomeworkAfter(...made.map((l) => l.id));
+    // Taught from a plan: one check for the whole group, on the shared lesson.
+    if (lesson.planCard) after(() => runPlanCheck(id).then(() => undefined));
     return NextResponse.json({ lesson: updated, lessons: made });
   } finally {
     running.delete(id);

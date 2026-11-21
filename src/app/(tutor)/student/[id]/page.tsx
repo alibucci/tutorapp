@@ -18,7 +18,8 @@ import { SkillList } from "@/components/SkillList";
 import { Avatar, ChevronLeft, ChevronRight } from "@/components/ui";
 import { studentFor } from "@/lib/access";
 import { homeworkDone } from "@/lib/homework";
-import { listLessons, listReports } from "@/lib/store";
+import { listGroups, listLessons, listReports } from "@/lib/store";
+import { plansOpenTo } from "@/lib/tutorList";
 import type { Lesson } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,12 @@ export default async function StudentPage({
   if (!found) notFound();
   const { student, session } = found;
   const christianityOpen = await christianityOpenTo(session);
+  // Saved groups this child is in, so archiving can say it takes them out.
+  const inGroups = (await plansOpenTo(student.tutorId))
+    ? (await listGroups(student.tutorId))
+        .filter((g) => !g.archivedAt && g.studentIds.includes(student.id))
+        .map((g) => g.name)
+    : [];
   const christianity = moduleOf(student);
   const upNext = christianity?.enabled ? nextStory(christianity) : null;
 
@@ -201,7 +208,7 @@ export default async function StudentPage({
       </details>
 
       {!student.archivedAt && (
-        <ArchiveStudent studentId={student.id} studentName={student.name} archived={false} />
+        <ArchiveStudent studentId={student.id} studentName={student.name} archived={false} groups={inGroups} />
       )}
       </div>
       </div>

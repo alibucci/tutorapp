@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { GroupSplit } from "@/components/GroupSplit";
+import { PlanCheckPanel } from "@/components/PlanCheckPanel";
 import { ChevronRight } from "@/components/ui";
 import { lessonFor } from "@/lib/access";
 import { getLesson, getStudent } from "@/lib/store";
@@ -58,6 +59,10 @@ export default async function GroupPage({
             </li>
           ))}
         </ul>
+        {/* Still being written while any child's summary is: then shown, or left out if it failed. */}
+        {lesson.planCard && (lesson.planCheck || made.some((l) => !l.summary)) && (
+          <PlanCheckPanel lessonId={lesson.id} check={lesson.planCheck} planHref={`/plans/${lesson.planCard.planId}`} />
+        )}
       </div>
     );
   }

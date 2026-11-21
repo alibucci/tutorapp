@@ -60,6 +60,8 @@ feature is hidden, not broken. `.env.example` lists every key and what it does.
 | `HOMEWORK_PICTURE_AI=on` + `DASHSCOPE_API_KEY` | drawn homework pictures (off by default) |
 | `CHRISTIANITY_TUTORS` | which tutors see the Bible-story programme |
 | `PARENT_QUOTE_TUTORS` | which tutors' parent messages quote the child (tried with Victor first) |
+| `LESSON_PLANS_TUTORS` | lesson plans, slides, sheets, offline file, saved groups, library (Victor first) |
+| `PLAN_IMAGES_PER_CARD`, `PLAN_IMAGES_PER_MONTH` | caps on plan pictures (default 6 a lesson, 150 a tutor a month) |
 
 All data lives in `data/` as JSON files plus images. The folder is gitignored
 and is the only storage. `src/lib/store.ts` is the only file that knows this,
@@ -222,6 +224,47 @@ The debrief asks three questions about each child, and none shared.
 
 ---
 
+## Lesson plans
+
+Before the lesson rather than after it. Behind `LESSON_PLANS_TUTORS`; for
+anyone else none of it exists (pages and routes are 404).
+
+- **Saved groups** (`/groups`, `groups.ts`): a name and 2–6 children, picked in
+  one tap on New lesson. Archiving a child takes them out of their groups.
+- **A plan** (`/plans/[id]`, `plans.ts`) belongs to one child or one group and
+  is a board of lesson cards: dragged by a handle (pointer events, so a
+  tablet works), duplicated, removed, marked done or moved. "Next" is the
+  first card still planned. Cards come from "I'll name a topic" (one lesson,
+  slides written straight away) or "Suggest a month" (topics in order, none
+  the children have had).
+- **Materials** (`lessonPlan.ts`): slides in five parts (warm-up, words, game,
+  speaking, wrap-up; 8/11/14 for 30/45/60 minutes), notes for the tutor,
+  word cards, a fill-the-gap sheet and a colouring page, and video searches
+  for YouTube and Bilibili. The model gets ages, levels and interests, never
+  a name. Writing runs after the request (`after()`), one job per card.
+- **Rebuilding** keeps every slide the tutor changed by hand at its place
+  (`editedAt`); one slide can be rewritten on its own.
+- **Groups of mixed levels**: slides are pitched at the weakest child, and
+  the words, game and speaking slides carry a `harder` step for the stronger
+  ones. The tutor reveals it on the child's screen with "Harder" or the H
+  key; the next slide starts easy again.
+- **Slides** (`deck.ts`, `deckFor.ts`) are one self-contained HTML document:
+  the tutor's page with notes and the next slide, and a second window for the
+  child with the slide alone. The offline file is the same document with the
+  pictures written into it; a multi-lesson file holds several in frames.
+- **Pictures** (`planImages.ts`) use the homework picture switch and key.
+  One at a time for the server, capped per lesson and per tutor a month,
+  refunded when refused. A missing picture is the slide's emoji, or the word
+  in outline on a colouring page.
+- **Against the plan** (`planCheck.ts`): a lesson started from a card is
+  checked when its summary is written (a group lesson once, at the split).
+  The model marks each plan point done, partly or missed by number; the tutor
+  decides whether the rest goes into the next planned card.
+- **Library** (`/library`): every written lesson of this tutor, to search,
+  mark "worked" or "did not suit", copy into another plan or save offline.
+
+---
+
 ## Models and outside services
 
 | Service | For | File |
@@ -257,6 +300,8 @@ src/lib/
   gameStyles.ts themeGen.ts themeFor.ts imageGen.ts scenePrompt.ts
   notices.ts telegram.ts email.ts feed.ts
   pronounce.ts voice.ts help.ts
+  groups.ts plans.ts lessonPlan.ts planCheck.ts planImages.ts
+  deck.ts deckFor.ts planShared.ts tutorList.ts      lesson plans
 src/content/          programme cards (Bible stories)
 src/hooks/            recorder, clip transcriber, browser recogniser, wake lock
 public/tutor-gate-worklet.js         the gate, on the audio thread

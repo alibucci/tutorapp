@@ -16,10 +16,13 @@ export function ArchiveStudent({
   studentId,
   studentName,
   archived,
+  groups = [],
 }: {
   studentId: string;
   studentName: string;
   archived: boolean;
+  /** Saved groups they are in: archiving takes them out of each. */
+  groups?: string[];
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -67,7 +70,11 @@ export function ArchiveStudent({
       <ConfirmDialog
         open={confirming}
         title={`Archive ${studentName}?`}
-        body={`${studentName} leaves your list, and their private links and family sign-in stop working on every phone. Nothing is deleted - you can restore them from the bottom of your home page.`}
+        body={`${studentName} leaves your list, and their private links and family sign-in stop working on every phone. Nothing is deleted - you can restore them from the bottom of your home page.${
+          groups.length
+            ? ` They also leave ${groups.length === 1 ? "the group" : "the groups"} ${groups.map((g) => `"${g}"`).join(", ")}.`
+            : ""
+        }`}
         confirmLabel="Archive"
         cancelLabel="Keep"
         onConfirm={() => void change(true)}

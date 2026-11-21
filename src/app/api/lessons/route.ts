@@ -2,6 +2,7 @@ import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
 import { getSession } from "@/lib/auth";
+import { cardForLesson, linkLesson } from "@/lib/plans";
 import { createLesson, listLessons, listStudents } from "@/lib/store";
 import {
   DEFAULT_LANGUAGE,
@@ -38,6 +39,8 @@ export async function POST(request: Request) {
     studentIds?: string[];
     language?: string;
     kind?: string;
+    /** Taught from a lesson plan's card. */
+    planCard?: unknown;
   }>(request, LIMIT.small);
   if (parsed instanceof Response) return parsed;
   const body = parsed;
@@ -46,7 +49,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A title is required." }, { status: 400 });
   }
   if (Array.isArray(body.studentIds) && body.studentIds.length > 1) {
-    return createGroupLesson(body.title.trim(), body.studentIds, body.language);
+    return createGroupLesson(body.title.trim(), body.studentIds, body.language, body.planCard);
   }
   if (!body.studentId) {
     return NextResponse.json({ error: "A student is required." }, { status: 400 });
@@ -57,6 +60,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No such student." }, { status: 404 });
   }
   const { student } = found;
+  const planCard =
+    body.kind === "intro" ? null : await cardForLesson(student.tutorId, body.planCard, { studentId: student.id });
   if (student.archivedAt) {
     return NextResponse.json(
       { error: "This student is archived. Restore them first." },
@@ -77,7 +82,9 @@ export async function POST(request: Request) {
     // A spoken note about a child nobody has taught yet. Nothing is recorded,
     // so consent does not come into it.
     ...(body.kind === "intro" && { kind: "intro" as const }),
+    ...(planCard && { planCard }),
   });
+  if (planCard) await linkLesson(planCard, lesson.id);
 
   return NextResponse.json(lesson, { status: 201 });
 }
@@ -85,7 +92,7 @@ export async function POST(request: Request) {
 /** A few children around one microphone is the most this is meant to read. */
 const MAX_GROUP = 6;
 
-async function createGroupLesson(title: string, studentIds: string[], language?: string) {
+async function createGroupLesson(title: string, studentIds: string[], language?: string, planRef?: unknown) {
   const ids = [...new Set(studentIds)];
   if (ids.length < 2 || ids.length > MAX_GROUP) {
     return NextResponse.json(
@@ -104,6 +111,7 @@ async function createGroupLesson(title: string, studentIds: string[], language?:
       { status: 409 },
     );
   }
+  const planCard = await cardForLesson(students[0]!.tutorId, planRef, { studentIds: ids });
   const lesson = await createLesson({
     title,
     kind: "group",
@@ -115,6 +123,8 @@ async function createGroupLesson(title: string, studentIds: string[], language?:
     language: LESSON_LANGUAGES.some((l) => l.tag === language) ? language! : DEFAULT_LANGUAGE,
     // The transcript holds every child's words, so every parent has to agree.
     capture: students.every((s) => s?.recordingConsent) ? "both" : "tutor",
+    ...(planCard && { planCard }),
   });
+  if (planCard) await linkLesson(planCard, lesson.id);
   return NextResponse.json(lesson, { status: 201 });
 }

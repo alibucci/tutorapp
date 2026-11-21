@@ -9,6 +9,7 @@ export function AppHeader({
   accountHref,
   helpHref,
   homeHref = "/",
+  links = [],
 }: {
   name: string;
   context?: string;
@@ -16,6 +17,8 @@ export function AppHeader({
   accountHref?: string;
   helpHref?: string;
   homeHref?: string;
+  /** Extra places, for features open to this account. */
+  links?: { href: string; label: string }[];
 }) {
   return (
     <header className="border-b border-line bg-surface">
@@ -45,6 +48,11 @@ export function AppHeader({
               </Link>
             </span>
           )}
+          {links.map((l) => (
+            <Link key={l.href} href={l.href} className="btn btn-ghost btn-sm">
+              {l.label}
+            </Link>
+          ))}
           {helpHref && (
             <Link href={helpHref} className="btn btn-ghost btn-sm">
               Help

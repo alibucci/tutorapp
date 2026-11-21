@@ -1,7 +1,7 @@
 import { getFamilySession, getSession, type Session } from "./auth";
 import { homeworkDone } from "./homework";
-import { getLesson, getStudent } from "./store";
-import type { Lesson, Student } from "./types";
+import { getGroup, getLesson, getStudent } from "./store";
+import type { Lesson, Student, StudentGroup } from "./types";
 
 /**
  * Authorisation lives next to the data, not in proxy.ts.
@@ -64,4 +64,15 @@ export async function homeworkFor(
   const parent = key !== null && key.length > 0 && key === student.parentKey;
   if (parent && homeworkDone(lesson.homework)) return { lesson, student, tutor: false };
   return null;
+}
+
+/** A saved group, for the tutor who made it (or the superadmin). */
+export async function groupFor(
+  id: string,
+): Promise<{ session: Session; group: StudentGroup } | null> {
+  const session = await getSession();
+  if (!session) return null;
+  const group = await getGroup(id);
+  if (!group || (session.role !== "admin" && group.tutorId !== session.id)) return null;
+  return { session, group };
 }

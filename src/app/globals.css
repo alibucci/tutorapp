@@ -475,7 +475,8 @@ textarea.field { line-height: var(--leading-normal); }
   transition: background-color var(--dur-hover) ease, color var(--dur-hover) ease;
 }
 .segmented > [aria-current="page"],
-.segmented > [aria-selected="true"] {
+.segmented > [aria-selected="true"],
+.segmented > [aria-checked="true"] {
   background: var(--surface);
   color: var(--foreground);
   box-shadow: 0 1px 2px rgb(18 21 27 / 0.08);

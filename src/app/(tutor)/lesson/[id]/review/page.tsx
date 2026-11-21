@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { ChangeStudent } from "@/components/ChangeStudent";
 import { HomeworkPanel } from "@/components/HomeworkPanel";
 import { ParentMessagePanel } from "@/components/ParentMessagePanel";
+import { PlanCheckPanel } from "@/components/PlanCheckPanel";
+import { within } from "@/lib/planShared";
 import { SkillReview } from "@/components/SkillReview";
 import { SummaryPanel } from "@/components/SummaryPanel";
 import { ChevronLeft } from "@/components/ui";
@@ -165,6 +167,11 @@ export default async function ReviewPage({
         {/* Keyed by student: after a move, each starts again from nothing. */}
         <SummaryPanel key={student.id} lesson={lesson} />
       </div>
+      {/* A child's lesson from a group: the plan was checked once, on the group lesson. */}
+      {lesson.planCard && !lesson.groupId && lesson.summary &&
+        (lesson.planCheck || within(lesson.summary.generatedAt, 3 * 60_000)) && (
+        <PlanCheckPanel lessonId={lesson.id} check={lesson.planCheck} planHref={`/plans/${lesson.planCard.planId}`} />
+      )}
 
       <SkillReview key={student.id} lesson={lesson} studentName={student?.name} />
       </div>

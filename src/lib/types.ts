@@ -138,6 +138,10 @@ export type Lesson = {
   groupLessonIds?: string[];
   /** On a child's lesson: the group lesson it was split from. */
   groupId?: string;
+  /** Taught from this card of a lesson plan. */
+  planCard?: { planId: string; cardId: string };
+  /** What of the plan the lesson reached, read from the recording and debrief. */
+  planCheck?: PlanCheck;
   createdAt: string;
   startedAt?: string;
   endedAt?: string;
@@ -238,6 +242,8 @@ export type Tutor = {
     token?: string;
     sentAt?: string;
   };
+  /** Pictures drawn for lesson plans this month: a paid service, so capped. */
+  planImages?: { month: string; count: number };
 };
 
 export type Student = {
@@ -648,6 +654,158 @@ export type SentStyle = Omit<CustomStyle, "madeFrom" | "madeAt"> & {
 // ---------------------------------------------------------------------------
 // Weekly parent report.
 // ---------------------------------------------------------------------------
+
+/**
+ * A saved group: a name and the children in it, picked in one tap when a
+ * lesson or a plan starts. Nothing else - no profile, no history of its own;
+ * each child keeps theirs.
+ */
+export type StudentGroup = {
+  id: string;
+  tutorId: string;
+  /** "Tuesday, little ones". */
+  name: string;
+  /** 2 to 6 of this tutor's children, the same limit as a group lesson. */
+  studentIds: string[];
+  createdAt: string;
+  archivedAt?: string;
+};
+
+// ---------------------------------------------------------------------------
+// Lesson plans and their materials
+// ---------------------------------------------------------------------------
+
+/** The five parts every lesson is built from, in this order. */
+export const SLIDE_PARTS = ["warmup", "words", "activity", "speaking", "wrapup"] as const;
+export type SlidePart = (typeof SLIDE_PARTS)[number];
+
+export type Slide = {
+  id: string;
+  part: SlidePart;
+  /** Big, on screen. */
+  title: string;
+  /** A short line or a word, on screen. */
+  text?: string;
+  /** A word or phrase the Listen button reads aloud. */
+  say?: string;
+  /** Shown when there is no picture: the lesson never waits for one. */
+  emoji?: string;
+  /** What a picture would show, for the image model. No brands or characters. */
+  picture?: string;
+  /** The drawn picture, a file in data/plan-images. */
+  image?: string;
+  /** For the tutor only: never on the child's screen. */
+  notes?: string;
+  /**
+   * A group of mixed levels: the same slide one step up, for the stronger
+   * children. The slide itself stays at the weakest child's level; the tutor
+   * reveals this on top of it.
+   */
+  harder?: SlideStep;
+  /** Changed by the tutor by hand: a rebuild keeps it as it is. */
+  editedAt?: string;
+};
+
+export type SlideStep = { title?: string; text?: string; say?: string };
+
+export type SheetKind = "coloring" | "wordcards" | "worksheet";
+
+/** One printable A4 page. */
+export type Sheet = {
+  id: string;
+  kind: SheetKind;
+  title: string;
+  /** Word cards: the words. Worksheet: the lines, with ___ for a gap. */
+  items: string[];
+  /** Worksheet with gaps: the answers, for the tutor's copy. */
+  answers?: string[];
+  /** Colouring page: what the outline drawing shows. */
+  picture?: string;
+  image?: string;
+};
+
+/** A search to run, not a checked video: the tutor watches it first. */
+export type VideoIdea = { platform: "YouTube" | "Bilibili"; query: string; what: string };
+
+export type PlanCardStatus = "planned" | "done" | "moved";
+
+export type LessonMaterials = {
+  slides: Slide[];
+  sheets: Sheet[];
+  videos: VideoIdea[];
+  builtAt: string;
+  /** The tutor's last wish the materials were rebuilt with. */
+  wish?: string;
+};
+
+export type PlanCard = {
+  id: string;
+  topic: string;
+  /** 3 to 6 words to learn. */
+  words: string[];
+  /** "Talk about animals, use can". */
+  goal: string;
+  /** How it follows on from the lessons before. */
+  link?: string;
+  source: "ai" | "tutor";
+  status: PlanCardStatus;
+  /** Not used yet: kept so a calendar can come later without moving data. */
+  plannedDate?: string;
+  /** The lesson taught from this card. */
+  lessonId?: string;
+  /** What the lesson actually covered, from its summary. */
+  covered?: string[];
+  /** Points carried over from an earlier card that were not reached. */
+  carried?: string[];
+  materials?: LessonMaterials;
+  /** Materials being made in the background. */
+  building?: { since: string; step: string };
+  buildError?: string;
+  /** When the offline pack was last downloaded; stale once updatedAt passes it. */
+  packAt?: string;
+  /** Who the materials were written for, without naming anyone: for the library. */
+  audience?: { ages: number[]; level?: string };
+  /** The tutor's own note on how it went. */
+  mark?: "worked" | "not";
+  /**
+   * Library visibility. Everything is "private" for now; the field is here so
+   * a shared library can open later without moving data.
+   */
+  visibility?: "private" | "shared";
+  /** Copied from another card in the library. */
+  copiedFrom?: string;
+  updatedAt: string;
+};
+
+/**
+ * A learner's (or a saved group's) lessons, in order: a board of cards. One
+ * active plan each. A card named by the tutor and a month suggested by the
+ * model end up on the same board.
+ */
+export type LessonPlan = {
+  id: string;
+  tutorId: string;
+  studentId?: string;
+  groupId?: string;
+  /** What the parents want, which is not always what the child likes. */
+  parentWishes?: string;
+  durationMinutes: 30 | 45 | 60;
+  cards: PlanCard[];
+  /** A month of cards being suggested in the background. */
+  suggesting?: { since: string };
+  suggestError?: string;
+  createdAt: string;
+  archivedAt?: string;
+};
+
+export type PlanCheck = {
+  done: string[];
+  partial: string[];
+  missed: string[];
+  at: string;
+  /** The tutor's answer on carrying the rest to the next card. */
+  carried?: "yes" | "no";
+};
 
 export type ParentReportBody = {
   /** What moved this week - the question a parent is actually asking. */

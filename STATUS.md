@@ -3,7 +3,7 @@
 Where aloudli actually is: what works, what was decided, what is still open.
 How it is built is in [README.md](README.md).
 
-Last updated: 2026-11-20 (code at `d263308`)
+Last updated: 2026-11-20
 
 ---
 
@@ -58,6 +58,7 @@ tutor's home screen.
 | Families | One sign-in shared by the child and the parent, plus private links that can be rotated. |
 | Tutor notices | A feed on the home screen, plus Telegram and email (Resend; sent only to an address the tutor confirmed). |
 | Help | A Help page for tutors with how-to films and the same steps in writing (`help.ts`). |
+| Lesson plans | Saved groups, a plan per child or group, one lesson on a topic or a month of them, slides with tutor-only notes, printable sheets, video searches, an offline file, a check of the lesson against its plan, a personal library. Only for `LESSON_PLANS_TUTORS` (Victor first). |
 | Admin | The superadmin creates, suspends and resets tutors. |
 | Other | Moving a lesson started under the wrong child, archiving a student, themes made from a description of the learner. |
 
@@ -117,6 +118,14 @@ show something new.
 ## Known gaps
 
 In rough order of priority.
+
+**Lesson plans, not built yet** (spec 20 Nov, release order 7-9):
+   recording with no network that sends later (needs Victor's decision on
+   keeping audio on the device), the Christianity track for live lessons,
+   and school textbooks (scenario 2). **Plan pictures are off**: the server
+   has no DashScope key, and the local key is refused by the image model
+   (`AccessDenied.Unpurchased`); slides use emoji until Victor gives one.
+
 
 1. **Nothing is pushed to parents.** The tutor pastes the message into WeChat by
    hand, and the weekly note waits for the parent to open their page. Tutors do

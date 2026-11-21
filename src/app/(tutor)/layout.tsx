@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { requireSession } from "@/lib/auth";
+import { plansOpenTo } from "@/lib/tutorList";
 
 /**
  * The tutor's workspace. Default (compact) density: this is a tool someone is
@@ -21,6 +22,7 @@ export default async function TutorLayout({
         action={{ href: "/lesson/new", label: "New lesson" }}
         accountHref="/account"
         helpHref="/help"
+        links={(await plansOpenTo(session.id)) ? [{ href: "/plans", label: "Plans" }] : []}
       />
       <div className="page page-wide flex-1 py-8">{children}</div>
     </>

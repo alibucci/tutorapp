@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomBytes, randomUUID } from "crypto";
-import type { Lesson, ParentReport, Student, Tutor } from "./types";
+import type { Lesson, LessonPlan, ParentReport, Student, StudentGroup, Tutor } from "./types";
 
 /**
  * File-backed store. One JSON file per record, plus homework pictures.
@@ -14,10 +14,13 @@ const STUDENT_DIR = path.join(DATA_DIR, "students");
 const TUTOR_DIR = path.join(DATA_DIR, "tutors");
 const REPORT_DIR = path.join(DATA_DIR, "reports");
 const IMAGE_DIR = path.join(DATA_DIR, "images");
+const GROUP_DIR = path.join(DATA_DIR, "groups");
+const PLAN_DIR = path.join(DATA_DIR, "plans");
+const PLAN_IMAGE_DIR = path.join(DATA_DIR, "plan-images");
 
 async function ensureDirs() {
   await Promise.all(
-    [LESSON_DIR, STUDENT_DIR, TUTOR_DIR, REPORT_DIR, IMAGE_DIR].map((d) =>
+    [LESSON_DIR, STUDENT_DIR, TUTOR_DIR, REPORT_DIR, IMAGE_DIR, GROUP_DIR, PLAN_DIR, PLAN_IMAGE_DIR].map((d) =>
       fs.mkdir(d, { recursive: true }),
     ),
   );
@@ -246,6 +249,7 @@ export async function createLesson(
         | "module"
         | "groupStudentIds"
         | "groupId"
+        | "planCard"
         | "startedAt"
         | "endedAt"
         | "recordedMs"
@@ -267,6 +271,7 @@ export async function createLesson(
     ...(input.module && { module: input.module }),
     ...(input.groupStudentIds && { groupStudentIds: input.groupStudentIds }),
     ...(input.groupId && { groupId: input.groupId }),
+    ...(input.planCard && { planCard: input.planCard }),
     ...(input.startedAt && { startedAt: input.startedAt }),
     ...(input.endedAt && { endedAt: input.endedAt }),
     ...(input.recordedMs !== undefined && { recordedMs: input.recordedMs }),
@@ -333,6 +338,89 @@ export async function listReports(studentId?: string): Promise<ParentReport[]> {
   return reports
     .filter((r) => !studentId || r.studentId === studentId)
     .sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+}
+
+// --- saved groups ----------------------------------------------------------
+
+export async function createGroup(
+  input: Pick<StudentGroup, "tutorId" | "name" | "studentIds">,
+): Promise<StudentGroup> {
+  await ensureDirs();
+  const group: StudentGroup = { id: randomUUID(), ...input, createdAt: new Date().toISOString() };
+  await writeJson(path.join(GROUP_DIR, `${group.id}.json`), group);
+  return group;
+}
+
+export async function getGroup(id: string): Promise<StudentGroup | null> {
+  return readJson<StudentGroup>(recordPath(GROUP_DIR, id));
+}
+
+export async function updateGroup(
+  id: string,
+  change: Change<StudentGroup>,
+): Promise<StudentGroup | null> {
+  return updateRecord<StudentGroup>(GROUP_DIR, id, change);
+}
+
+/** One tutor's groups, archived ones included, by name. */
+export async function listGroups(tutorId: string): Promise<StudentGroup[]> {
+  const groups = await readAll<StudentGroup>(GROUP_DIR);
+  return groups
+    .filter((g) => g.tutorId === tutorId)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// --- lesson plans ------------------------------------------------------------
+
+export async function createPlan(
+  input: Omit<LessonPlan, "id" | "createdAt" | "cards">,
+): Promise<LessonPlan> {
+  await ensureDirs();
+  const plan: LessonPlan = { id: randomUUID(), ...input, cards: [], createdAt: new Date().toISOString() };
+  await writeJson(path.join(PLAN_DIR, `${plan.id}.json`), plan);
+  return plan;
+}
+
+export async function getPlan(id: string): Promise<LessonPlan | null> {
+  return readJson<LessonPlan>(recordPath(PLAN_DIR, id));
+}
+
+export async function updatePlan(id: string, change: Change<LessonPlan>): Promise<LessonPlan | null> {
+  return updateRecord<LessonPlan>(PLAN_DIR, id, change);
+}
+
+export async function listPlans(tutorId: string): Promise<LessonPlan[]> {
+  const plans = await readAll<LessonPlan>(PLAN_DIR);
+  return plans.filter((p) => p.tutorId === tutorId);
+}
+
+/** A plan's pictures: one file each, named after the plan so they go with it. */
+const PLAN_IMAGE_NAME = /^[\w-]+\.(jpg|png|webp)$/;
+
+export async function savePlanImage(
+  planId: string,
+  data: ArrayBuffer,
+  ext: "jpg" | "png" | "webp",
+): Promise<string> {
+  if (!SAFE_ID.test(planId)) throw new Error("Bad plan id.");
+  await ensureDirs();
+  const name = `${planId}-${randomBytes(6).toString("hex")}.${ext}`;
+  await fs.writeFile(path.join(PLAN_IMAGE_DIR, name), Buffer.from(data));
+  return name;
+}
+
+export async function readPlanImage(name: string): Promise<Buffer | null> {
+  if (!PLAN_IMAGE_NAME.test(name)) return null;
+  try {
+    return await fs.readFile(path.join(PLAN_IMAGE_DIR, name));
+  } catch {
+    return null;
+  }
+}
+
+export async function deletePlanImage(name: string | undefined): Promise<void> {
+  if (!name || !PLAN_IMAGE_NAME.test(name)) return;
+  await fs.rm(path.join(PLAN_IMAGE_DIR, name), { force: true });
 }
 
 // --- homework pictures -----------------------------------------------------

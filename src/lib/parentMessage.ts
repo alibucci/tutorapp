@@ -2,8 +2,8 @@ import { z } from "zod";
 import { MODEL, MODEL_FAST, complete } from "./llm";
 import { quoteLine } from "./parentLines";
 import { hasParent } from "./profile";
-import { getTutor } from "./store";
 import { renderLesson } from "./summarize";
+import { tutorListed } from "./tutorList";
 import type { Lesson, ParentMessage, Student } from "./types";
 
 const MessageSchema = z.object({
@@ -88,19 +88,8 @@ const QUOTE_LATIN_SHARE = 0.6;
  * By the lesson's tutor, not a session: the message is written in the
  * background, after the request that triggered it has gone.
  */
-export async function quoteOpenTo(tutorId: string): Promise<boolean> {
-  const list = (process.env.PARENT_QUOTE_TUTORS ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  if (list.length === 0) return false;
-  if (list.includes("*") || list.includes(tutorId.toLowerCase())) return true;
-  try {
-    const tutor = await getTutor(tutorId);
-    return Boolean(tutor && list.includes(tutor.email.toLowerCase()));
-  } catch {
-    return false;
-  }
+export function quoteOpenTo(tutorId: string): Promise<boolean> {
+  return tutorListed("PARENT_QUOTE_TUTORS", tutorId);
 }
 
 /**

@@ -2,6 +2,7 @@ import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { studentFor } from "@/lib/access";
 import { isGameStyle } from "@/lib/gameStyles";
+import { leaveGroups } from "@/lib/groups";
 import { readProfile } from "@/lib/profile";
 import { themeFor } from "@/lib/themeFor";
 import { accessKey, updateStudent } from "@/lib/store";
@@ -112,6 +113,11 @@ export async function PATCH(request: Request, { params }: Params) {
       (!style || style === "custom"));
 
   const saved = await updateStudent(id, patch);
+  // An archived child leaves their saved groups; the tutor is told which.
+  if (saved && patch.archivedAt) {
+    const leftGroups = await leaveGroups(saved);
+    if (leftGroups.length) return NextResponse.json({ ...saved, leftGroups });
+  }
   if (saved && remake) {
     const made = await themeFor(saved);
     return NextResponse.json({ ...(made.student ?? saved), ...(made.error && { themeError: made.error }) });

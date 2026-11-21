@@ -11,13 +11,25 @@ import {
   type Student,
 } from "@/lib/types";
 
-export function NewLessonForm({ students }: { students: Student[] }) {
+type SavedGroup = { id: string; name: string; studentIds: string[] };
+
+export function NewLessonForm({
+  students,
+  groups,
+  fromPlan,
+}: {
+  students: Student[];
+  /** Saved groups; undefined where the feature is not open to this tutor. */
+  groups?: SavedGroup[];
+  /** Taught from a plan card: its children and title, filled in. */
+  fromPlan?: { planId: string; cardId: string; title: string; studentIds: string[] };
+}) {
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [studentId, setStudentId] = useState(students[0]?.id ?? "");
+  const [title, setTitle] = useState(fromPlan?.title ?? "");
+  const [studentId, setStudentId] = useState(fromPlan?.studentIds[0] ?? students[0]?.id ?? "");
   /** The other children, when it is a group lesson. */
-  const [others, setOthers] = useState<string[]>([]);
-  const [isGroup, setIsGroup] = useState(false);
+  const [others, setOthers] = useState<string[]>(fromPlan?.studentIds.slice(1) ?? []);
+  const [isGroup, setIsGroup] = useState((fromPlan?.studentIds.length ?? 0) > 1);
   const [newName, setNewName] = useState("");
   const [consentFrom, setConsentFrom] = useState("");
   const [mode, setMode] = useState<LessonMode>("online");
@@ -31,6 +43,21 @@ export function NewLessonForm({ students }: { students: Student[] }) {
   const inGroup = students.filter((s) => groupIds.includes(s.id));
   const groupReady = groupIds.length > 1;
   const noConsent = inGroup.filter((s) => !s.recordingConsent);
+  const usableGroups = (groups ?? []).filter((g) => g.studentIds.length > 1);
+
+  /** One tap: the group's children, as a group lesson. */
+  function pickGroup(group: SavedGroup) {
+    setIsGroup(true);
+    setStudentId(group.studentIds[0]);
+    setOthers(group.studentIds.slice(1));
+    if (!title.trim()) setTitle(group.name);
+  }
+  const pickedGroup = usableGroups.find(
+    (g) =>
+      isGroup &&
+      g.studentIds.length === groupIds.length &&
+      g.studentIds.every((id) => groupIds.includes(id)),
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,11 +80,12 @@ export function NewLessonForm({ students }: { students: Student[] }) {
       const res = await fetch("/api/lessons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          groupReady
+        body: JSON.stringify({
+          ...(groupReady
             ? { title, language, studentIds: groupIds }
-            : { title, mode, language, studentId: id },
-        ),
+            : { title, mode, language, studentId: id }),
+          ...(fromPlan && { planCard: { planId: fromPlan.planId, cardId: fromPlan.cardId } }),
+        }),
       });
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
@@ -79,7 +107,39 @@ export function NewLessonForm({ students }: { students: Student[] }) {
         <p className="t-body t-muted mt-2">
           Thirty seconds of setup, then nothing else until the lesson ends.
         </p>
+        {fromPlan && (
+          <p className="note note-accent mt-3">
+            From the plan: &ldquo;{fromPlan.title}&rdquo;. After the lesson the summary shows what of it you reached.
+          </p>
+        )}
       </div>
+
+      {groups && (
+        <div className="space-y-2">
+          <span className="label">Saved groups</span>
+          {usableGroups.length ? (
+            <div className="flex flex-wrap gap-2">
+              {usableGroups.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => pickGroup(g)}
+                  aria-pressed={pickedGroup?.id === g.id}
+                  className={`btn btn-sm ${pickedGroup?.id === g.id ? "btn-primary" : "btn-quiet"}`}
+                >
+                  {g.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <span className="hint">
+            <Link href="/groups" className="underline">
+              {usableGroups.length ? "Manage groups" : "Make a group"}
+            </Link>{" "}
+            - a name and the children in it, picked in one tap.
+          </span>
+        </div>
+      )}
 
       <label className="block">
         <span className="label">Student</span>

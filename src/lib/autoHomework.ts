@@ -7,6 +7,7 @@ import { homeworkDone, sendsItself } from "./homework";
 import { writeParentMessage } from "./parentMessage";
 import { getLesson, getStudent, updateLesson } from "./store";
 import { summarizeLesson } from "./summarize";
+import { recordCovered, runPlanCheck } from "./planCheck";
 import type { Homework, Lesson, Student } from "./types";
 
 /**
@@ -78,6 +79,9 @@ async function writeSummary(id: string, lesson: Lesson, student: Student): Promi
       summarizeLesson(working, student),
       // A tutor's edited message is theirs; regenerating must not overwrite it.
       lesson.parentMessage?.editedAt ? Promise.resolve(lesson.parentMessage) : writeParentMessage(working, student),
+      // Taught from a plan: what of it the lesson reached. Its own record; it
+      // never holds up or fails the summary.
+      lesson.planCard && !lesson.groupId ? runPlanCheck(id) : Promise.resolve(null),
     ]);
 
     // Decided against the record as it is now, under its lock: the tutor may
@@ -91,6 +95,7 @@ async function writeSummary(id: string, lesson: Lesson, student: Student): Promi
             parentMessage: current.parentMessage?.editedAt ? current.parentMessage : parentMessage,
           },
     );
+    if (saved) await recordCovered(saved, summary.covered).catch(() => {});
     return { ok: true, value: saved };
   } catch (e) {
     return fail(e instanceof Error ? e.message : "Summary failed.", 502);
