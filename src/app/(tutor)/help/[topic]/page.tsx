@@ -2,37 +2,44 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HelpVideo } from "@/components/HelpVideo";
 import { requireSession } from "@/lib/auth";
-import { CORE_FILM, HELP_FILMS, clock } from "@/lib/help";
+import { CORE_FILM, clock, helpFor } from "@/lib/help";
+import { helpAccess } from "@/lib/helpAccess";
 
 type Params = { params: Promise<{ topic: string }> };
 
-const find = (topic: string) => HELP_FILMS.findIndex((f) => f.id.toLowerCase() === topic.toLowerCase());
-
-export async function generateMetadata({ params }: Params) {
-  const i = find((await params).topic);
-  return { title: i >= 0 ? `Help · ${HELP_FILMS[i].title}` : "Help" };
+async function topics() {
+  return helpFor(await helpAccess(await requireSession()));
 }
 
-/** One function: its film, the same steps written out, and the way on. */
+export async function generateMetadata({ params }: Params) {
+  const topic = (await params).topic.toLowerCase();
+  const f = (await topics()).find((x) => x.id.toLowerCase() === topic);
+  return { title: f ? `Help · ${f.title}` : "Help" };
+}
+
+/** One function: its film (where there is one), the steps written out, and the way on. */
 export default async function HelpTopicPage({ params }: Params) {
-  await requireSession();
-  const i = find((await params).topic);
+  const list = await topics();
+  const topic = (await params).topic.toLowerCase();
+  const i = list.findIndex((x) => x.id.toLowerCase() === topic);
+  // A topic for a feature this tutor does not have is not there at all.
   if (i < 0) notFound();
-  const f = HELP_FILMS[i];
-  const prev = i > 0 ? HELP_FILMS[i - 1] : null;
-  const next = HELP_FILMS[i + 1] ?? null;
+  const f = list[i];
+  const prev = i > 0 ? list[i - 1] : null;
+  const next = list[i + 1] ?? null;
 
   return (
     <article className="space-y-6">
       <header>
         <p className="t-eyebrow">
-          Help · {f.id} · {clock(f.seconds)}
+          Help · {f.id}
+          {f.seconds ? ` · ${clock(f.seconds)}` : " · steps"}
         </p>
         <h1 className="t-display mt-2">{f.title}</h1>
         <p className="t-muted mt-2 max-w-[42rem]">{f.why}</p>
       </header>
 
-      <HelpVideo src={f.file} poster={f.poster} title={f.title} />
+      {f.file && f.poster && <HelpVideo src={f.file} poster={f.poster} title={f.title} />}
 
       <section className="card card-pad space-y-3">
         <h2 className="t-title">Step by step</h2>

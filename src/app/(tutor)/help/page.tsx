@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { HelpVideo } from "@/components/HelpVideo";
 import { requireSession } from "@/lib/auth";
-import { CORE_CHAPTERS, CORE_FILM, HELP_FILMS, clock } from "@/lib/help";
+import { CORE_CHAPTERS, CORE_FILM, clock, helpFor } from "@/lib/help";
+import { helpAccess } from "@/lib/helpAccess";
 
 export const metadata = { title: "Help" };
 
@@ -10,8 +11,7 @@ export const metadata = { title: "Help" };
  * Signed-in tutors only (the layout and /api/auth/media both check).
  */
 export default async function HelpPage() {
-  await requireSession();
-  const first = HELP_FILMS[0];
+  const first = helpFor(await helpAccess(await requireSession()))[0];
 
   return (
     <article className="space-y-6">
