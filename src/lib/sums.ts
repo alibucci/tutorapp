@@ -30,6 +30,11 @@ export type NumbersPlan = {
   countTo: number;
   /** Counting in ones, or twos, fives, tens. Empty means ones. */
   countBy: number[];
+  /**
+   * Sums the learner got wrong in earlier homework, brought back by the
+   * tutor. They go in first, as long as they fit the limits.
+   */
+  again?: Sum[];
 };
 
 export type NumbersWords = {
@@ -40,7 +45,7 @@ export type NumbersWords = {
 };
 
 type Op = "+" | "-" | "×" | "÷";
-type Sum = { a: number; op: Op; b: number; answer: number };
+export type Sum = { a: number; op: Op; b: number; answer: number };
 
 const rand = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 const pick = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
@@ -90,8 +95,39 @@ function makeSum(op: Op, plan: NumbersPlan): Sum | null {
   }
 }
 
+/**
+ * The sum in a round as the learner saw it - "14 - 6 = ___", "___ + 4 = 11",
+ * "9 + 4 = 13" - worked out again here, so a sum brought back is right
+ * whatever the round showed. Null when it is not a plain sum.
+ */
+export function sumFrom(shown: string): Sum | null {
+  const m = shown.match(/(\d{1,4}|___)\s*([+\-−–×x*÷/:])\s*(\d{1,4}|___)\s*=\s*(\d{1,5}|___)?/);
+  if (!m) return null;
+  const sign = m[2];
+  const op: Op = sign === "+" ? "+" : /[×x*]/.test(sign) ? "×" : /[÷/:]/.test(sign) ? "÷" : "-";
+  const num = (s: string | undefined) => (s && s !== "___" ? Number(s) : null);
+  let a = num(m[1]);
+  let b = num(m[3]);
+  const total = num(m[4]);
+  if (a === null && b !== null && total !== null) {
+    a = op === "+" ? total - b : op === "-" ? total + b : op === "×" ? (b ? total / b : NaN) : total * b;
+  } else if (b === null && a !== null && total !== null) {
+    b = op === "+" ? total - a : op === "-" ? a - total : op === "×" ? (a ? total / a : NaN) : total ? a / total : NaN;
+  }
+  if (a === null || b === null || !Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) return null;
+  const answer = op === "+" ? a + b : op === "-" ? a - b : op === "×" ? a * b : b ? a / b : NaN;
+  if (!Number.isInteger(answer) || answer < 0) return null;
+  return { a, op, b, answer };
+}
+
 /** `count` different sums, the operations taking turns. */
 function makeSums(plan: NumbersPlan, count: number): Sum[] {
+  // Brought back from earlier homework: first in, up to half the set, and
+  // only those inside the limit the tutor gave for this one.
+  const top = sumLimit(plan);
+  const again = (plan.again ?? [])
+    .filter((s) => Math.max(s.a, s.b, s.answer) <= top)
+    .slice(0, Math.ceil(count / 2));
   const ops: Op[] = [
     ...(plan.add ? (["+"] as const) : []),
     ...(plan.subtract ? (["-"] as const) : []),
@@ -99,8 +135,8 @@ function makeSums(plan: NumbersPlan, count: number): Sum[] {
     ...(plan.divide ? (["÷"] as const) : []),
   ];
   if (!ops.length) return [];
-  const seen = new Set<string>();
-  const out: Sum[] = [];
+  const seen = new Set<string>(again.map(text));
+  const out: Sum[] = [...new Map(again.map((s) => [text(s), s])).values()];
   for (let tries = 0; out.length < count && tries < count * 50; tries++) {
     const sum = makeSum(ops[out.length % ops.length], plan);
     if (!sum) continue;

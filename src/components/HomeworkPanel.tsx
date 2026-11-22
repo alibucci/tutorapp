@@ -4,7 +4,6 @@ import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { GameStylePicker } from "@/components/GameStylePicker";
 import { homeworkDone, scored, sendsItself } from "@/lib/homework";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type Lesson } from "@/lib/types";
 
@@ -45,27 +44,22 @@ async function toJpeg(file: File): Promise<Blob> {
 
 export function HomeworkPanel({
   lesson,
-  studentId,
   studentName,
   studentKey,
-  styleId,
   styleName,
-  ownStyleName,
   canDraw,
+  redo,
 }: {
   lesson: Lesson;
-  studentId: string;
-  /** The student's game style, picked here as well as on their page. */
-  styleId?: string;
   studentName: string;
   /** The child's private link key, for previewing their screen. */
   studentKey: string;
   /** The student's game style, for the button's wording. */
   styleName: string;
-  /** The theme made for this learner, offered beside the ready-made ones. */
-  ownStyleName?: string;
   /** Whether this server can draw pictures (an image API key is set). */
   canDraw: boolean;
+  /** This homework's mistakes kept for the next one, if any (see redo.ts). */
+  redo: { kept: number; usedIn?: string };
 }) {
   const router = useRouter();
   const homework = lesson.homework;
@@ -84,6 +78,11 @@ export function HomeworkPanel({
   const story = Boolean(lesson.module);
   const finished = homeworkDone(homework);
   const [confirmReopen, setConfirmReopen] = useState(false);
+  // Wrong rounds worth bringing back: not "What would you do?" (every option
+  // is kind) and not "answer aloud" (no one right answer).
+  const mistakes = (homework?.results ?? [])
+    .filter((r) => r.kind !== "kindness" && r.kind !== "speak")
+    .reduce((n, r) => n + (r.rounds ?? []).filter((x) => !x.right).length, 0);
   const [seconds, setSeconds] = useState(0);
   // Homework goes out by itself, programme stories too. Once the tutor takes
   // it back, sending it is theirs again.
@@ -182,6 +181,22 @@ export function HomeworkPanel({
       setBusy(null);
       if (fileRef.current) fileRef.current.value = "";
     }
+  }
+
+  async function keepMistakes(keep: boolean) {
+    setBusy("redo");
+    setError(null);
+    const result = await api(
+      `/api/lessons/${lesson.id}/homework/redo`,
+      { method: keep ? "POST" : "DELETE" },
+      "Could not save. Try again.",
+    );
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
   }
 
   async function patch(
@@ -382,6 +397,64 @@ export function HomeworkPanel({
               })}
             </ul>
           )}
+          {homework?.redo ? (
+            <p className="hint">
+              Also brings back {homework.redo} {homework.redo === 1 ? "mistake" : "mistakes"} from
+              earlier homework, as you asked.
+            </p>
+          ) : null}
+
+          {/* The report read: what went wrong comes back next time. */}
+          {!story && redo.usedIn ? (
+            <p className="note note-quiet">
+              ✓ These mistakes went into a later homework.{" "}
+              <a href={`/lesson/${redo.usedIn}/review#homework`} className="font-semibold text-accent">
+                See it
+              </a>
+            </p>
+          ) : !story && redo.kept > 0 ? (
+            <div className="note note-accent flex flex-wrap items-center justify-between gap-2">
+              <span>
+                ✓ {redo.kept} {redo.kept === 1 ? "mistake is" : "mistakes are"} saved. The next
+                homework for {studentName} brings {redo.kept === 1 ? "it" : "them"} back.
+              </span>
+              <button
+                onClick={() => void keepMistakes(false)}
+                disabled={busy !== null}
+                className="btn btn-ghost btn-sm"
+              >
+                Undo
+              </button>
+            </div>
+          ) : !story && mistakes > 0 && homework?.carriedAt ? (
+            <div className="note note-accent flex flex-wrap items-center justify-between gap-2">
+              <span>✓ These mistakes were brought back in a later homework.</span>
+              <button
+                onClick={() => void keepMistakes(true)}
+                disabled={busy !== null}
+                className="btn btn-ghost btn-sm"
+              >
+                {busy === "redo" ? "Saving…" : "Once more"}
+              </button>
+            </div>
+          ) : !story && mistakes > 0 ? (
+            <div className="space-y-1">
+              <button
+                onClick={() => void keepMistakes(true)}
+                disabled={busy !== null}
+                className="btn btn-soft btn-block"
+              >
+                {busy === "redo"
+                  ? "Saving…"
+                  : `Practise ${mistakes === 1 ? "this mistake" : `these ${Math.min(mistakes, 8)} mistakes`} next time`}
+              </button>
+              <p className="hint">
+                The next homework for {studentName} brings back what went wrong here,
+                alongside the new lesson. Sums come back as the very same sums.
+              </p>
+            </div>
+          ) : null}
+
           {exercises.length > 0 && sent && !finished && !homework?.results?.length && (
             <p className="hint">
               {story ? (
@@ -403,9 +476,9 @@ export function HomeworkPanel({
               {homework?.takenBackAt && !story
                 ? "You took it back. Change what you like, then send it again."
                 : story
-                ? "Use Preview to check it before you send - the story is retold by the model from a fixed card, and checked against it, but read it yourself."
+                ? "Open the overview to check it before you send - the story is retold by the model from a fixed card, and checked against it, but read it yourself."
                 : <>
-                    Use Preview to check it before you send - the words come from{" "}
+                    Open the overview to check it before you send - the words come from{" "}
                     {lesson.kind === "practice" ? "what you asked for" : "this lesson"}, but
                     they are written by the model.
                   </>}
@@ -508,25 +581,22 @@ export function HomeworkPanel({
           )}
         </label>
 
-        {/* Before anything goes out: the look, and the screen it makes. */}
+        {/* The homework itself, as the learner gets it. The look is picked
+            on the student's page. */}
         {(homework?.imageFile || exercises.length > 0) && (
           <div className="space-y-2 border-t border-line pt-4">
-            <p className="t-eyebrow">How {studentName} will see it</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <GameStylePicker studentId={studentId} value={styleId} ownName={ownStyleName} />
-            </div>
             <a
               href={`/s/${studentKey}/quest/${lesson.id}`}
               target="_blank"
               rel="noopener"
-              className="btn btn-soft btn-lg btn-block"
+              className="btn btn-soft btn-block"
             >
               <EyeIcon />
-              Preview what {studentName} will see
+              Overview of the homework
             </a>
             <p className="hint">
-              Opens {studentName}&rsquo;s screen in this theme. Nothing you tap
-              there is saved{sent ? "." : ", and they cannot see it until it is sent."}
+              Opens it as {studentName} sees it. Nothing you tap there is
+              saved{sent ? "." : ", and they cannot see it until it is sent."}
             </p>
           </div>
         )}

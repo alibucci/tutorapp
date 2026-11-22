@@ -2,8 +2,9 @@ import { z } from "zod";
 import { MODEL, MODEL_FAST, complete } from "./llm";
 import { describeLearner, formatsFor, isChild } from "./profile";
 import { listLessons } from "./store";
-import { type NumbersPlan, numbersHomework } from "./sums";
-import { EXERCISE_KINDS, type EnglishKind, type Exercise, type Lesson, type Student } from "./types";
+import { type NumbersPlan, numbersHomework, sumFrom, type Sum } from "./sums";
+import { describeRedo } from "./redo";
+import { EXERCISE_KINDS, type EnglishKind, type Exercise, type Lesson, type RedoItem, type Student } from "./types";
 
 /**
  * Practice built from one lesson's mistakes.
@@ -400,7 +401,7 @@ type Plan = { kinds: EnglishKind[]; numbers: (NumbersPlan & z.infer<typeof Reque
  * Read what the tutor asked for: plain sums, which code makes, or anything
  * else, with the shapes of task that suit it.
  */
-async function planRequest(request: string, student: Student, short: boolean): Promise<Plan> {
+async function planRequest(request: string, student: Student, short: boolean, redo: RedoItem[] = []): Promise<Plan> {
   try {
     const plan = await complete({
       system: `A tutor asks for extra homework for one learner. Read the request.
@@ -411,7 +412,12 @@ Either way, pick two or three kinds of task that practise it best. Speaking kind
 
 The kinds:
 ${EXERCISE_KINDS.map((k) => `- ${KIND_HINT[k]}`).join("\n")}`,
-      user: `${describeLearner(student.name, student.profile)}\n\nThe tutor asks for: ${request}`,
+      user: [
+        describeLearner(student.name, student.profile),
+        "",
+        `The tutor asks for: ${request}`,
+        redo.length ? `\n${describeRedo(redo)}` : "",
+      ].join("\n"),
       schema: RequestPlan,
       schemaName: "Plan",
       model: MODEL_FAST,
@@ -431,12 +437,13 @@ ${EXERCISE_KINDS.map((k) => `- ${KIND_HINT[k]}`).join("\n")}`,
 }
 
 /** What the model needs for extra homework: the learner and the request. */
-function describeRequest(lesson: Lesson, student: Student, interests: string): string {
+function describeRequest(lesson: Lesson, student: Student, interests: string, redo: RedoItem[]): string {
   return [
     describeLearner(student.name, student.profile),
     interests ? `What they are into: ${interests}` : "What they are into: not recorded",
     "",
     `What the tutor wants practised: ${lesson.request ?? lesson.title}`,
+    redo.length ? `\n${describeRedo(redo)}` : "",
   ].join("\n");
 }
 
@@ -485,7 +492,7 @@ export async function interestsOf(student: Student): Promise<string> {
 }
 
 /** Everything the model needs about this lesson, and nothing else. */
-function describeLesson(lesson: Lesson, student: Student, interests: string): string {
+function describeLesson(lesson: Lesson, student: Student, interests: string, redo: RedoItem[]): string {
   const s = lesson.summary;
   const weak = student.skills
     .filter((k) => k.status !== "solid")
@@ -508,6 +515,7 @@ function describeLesson(lesson: Lesson, student: Student, interests: string): st
     `Topics covered: ${s?.covered.join(", ") || "general English"}`,
     s?.homeworkFocus ? `The tutor wants them to practise: ${s.homeworkFocus}` : "",
     weak ? `\nStill weak from earlier lessons:\n${weak}` : "",
+    redo.length ? `\n${describeRedo(redo)}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -541,14 +549,18 @@ function threeOptions(options: string[]): boolean {
 export async function buildExercises(
   lesson: Lesson,
   student: Student,
+  /** Earlier mistakes the tutor asked to see again (redo.ts). */
+  redo: RedoItem[] = [],
 ): Promise<Exercise[]> {
   const practice = lesson.kind === "practice";
   const short = Boolean(student.profile?.shortTasks);
   const child = isChild(student.profile);
-  const plan = practice ? await planRequest(lesson.request ?? lesson.title, student, short) : null;
+  const plan = practice ? await planRequest(lesson.request ?? lesson.title, student, short, redo) : null;
   // Sums and counting: made by code, right by construction. No model writes them.
   if (plan?.numbers) {
-    const made = numbersHomework(plan.numbers, plan.numbers, short);
+    // Sums got wrong before come back as the very same sums, worked out again.
+    const again = redo.map((r) => sumFrom(r.asked)).filter((x): x is Sum => x !== null);
+    const made = numbersHomework({ ...plan.numbers, again }, plan.numbers, short);
     if (made.length) return made;
   }
   const formats = plan ? plan.kinds : formatsFor(student.profile);
@@ -557,7 +569,9 @@ export async function buildExercises(
 
   const parsed = (await complete({
     system: practice ? systemForPractice(formats, child) : usual ? KID_SCHOOL : systemFor(formats, child),
-    user: practice ? describeRequest(lesson, student, interests) : describeLesson(lesson, student, interests),
+    user: practice
+      ? describeRequest(lesson, student, interests, redo)
+      : describeLesson(lesson, student, interests, redo),
     schema: schemaFor(formats, short),
     schemaName: "Homework",
     maxTokens: 8000,

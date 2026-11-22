@@ -8,6 +8,7 @@ import { writeParentMessage } from "./parentMessage";
 import { getLesson, getStudent, updateLesson } from "./store";
 import { summarizeLesson } from "./summarize";
 import { recordCovered, runPlanCheck } from "./planCheck";
+import { markUsed, redoFor } from "./redo";
 import type { Homework, Lesson, Student } from "./types";
 
 /**
@@ -111,14 +112,23 @@ export function buildGamesOnce(id: string, lesson: Lesson, student: Student): Pr
 
 async function buildGames(id: string, lesson: Lesson, student: Student): Promise<Outcome<Homework | undefined>> {
   try {
-    const exercises = await buildExercises(lesson, student);
+    // The tutor's "Practise these next time", read fresh: the student passed
+    // in may be from before it was tapped.
+    const redo = redoFor((await getStudent(student.id)) ?? student, id);
+    const exercises = await buildExercises(lesson, student, redo);
     if (exercises.length === 0) return fail("Could not build usable games from this lesson. Try again.", 502);
+    let built = false;
     const updated = await updateLesson(id, (current) => {
       // Started by the child since: what they are playing stays as it is.
       if (current.homework?.answers || current.homework?.results?.length || current.studentId !== student.id) return null;
       const homework = current.homework ?? { focus: current.summary?.homeworkFocus ?? "" };
-      return { homework: { ...homework, exercises } };
+      built = true;
+      const next = { ...homework, exercises };
+      if (redo.length) next.redo = redo.length;
+      else delete next.redo;
+      return { homework: next };
     });
+    if (built) await markUsed(student.id, id, redo);
     return { ok: true, value: updated?.homework };
   } catch (e) {
     console.error("[exercises]", e);

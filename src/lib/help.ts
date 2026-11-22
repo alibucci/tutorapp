@@ -102,7 +102,7 @@ export const CORE_CHAPTERS: CoreChapter[] = [
     steps: [
       "After the debrief the games are built by themselves from today's mistakes, in the student's own look, and sent to the student.",
       "Edit the \"Tip\" in the child's own words if you like.",
-      "\"Preview what … will see\" plays it exactly as the child does. Not right? \"Build different ones\" before they start.",
+      "\"Overview of the homework\" plays it exactly as the child does. Not right? \"Build different ones\" before they start.",
     ],
   },
   {
@@ -110,6 +110,7 @@ export const CORE_CHAPTERS: CoreChapter[] = [
     steps: [
       "Nothing to click: once the games are built the tag reads \"Sent · waiting\".",
       "When the student has finished it reads \"Handed in\", with a score per game. \"See the answers\" shows every answer.",
+      "Mistakes worth another go? \"Practise these mistakes next time\": the next homework brings them back. Sums come back as the same sums.",
     ],
   },
   {
@@ -160,7 +161,7 @@ export const HELP_FILMS: HelpFilm[] = [
     steps: [
       "On the student's page, under \"Extra homework\", describe it in your own words - for example \"adding and taking away up to 20\".",
       "Click \"Make homework\". The games are built in the student's own look and sent straight away.",
-      "\"Preview what … will see\" shows what they got.",
+      "\"Overview of the homework\" shows what they got.",
     ],
     tip: "Sums and counting are made by code, so every answer is right and stays within your limit.",
   },

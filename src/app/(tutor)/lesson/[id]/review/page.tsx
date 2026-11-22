@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChangeStudent } from "@/components/ChangeStudent";
 import { HomeworkPanel } from "@/components/HomeworkPanel";
+import { redoState } from "@/lib/redo";
 import { ParentMessagePanel } from "@/components/ParentMessagePanel";
 import { PlanCheckPanel } from "@/components/PlanCheckPanel";
 import { within } from "@/lib/planShared";
@@ -182,13 +183,11 @@ export default async function ReviewPage({
         <HomeworkPanel
           key={student.id}
           lesson={lesson}
-          studentId={student?.id ?? ""}
           studentName={student?.name ?? "the student"}
           studentKey={student?.studentKey ?? ""}
-          styleId={student?.gameStyle}
           styleName={styleFor(student).name}
-          ownStyleName={student.customStyle?.name}
           canDraw={canDrawPictures()}
+          redo={redoState(student, lesson.id)}
         />
       )}
 

@@ -284,6 +284,32 @@ export type Student = {
    * a record from before this field needs nothing done to it.
    */
   modules?: { christianity?: ModuleState };
+  /**
+   * Homework mistakes the tutor asked to see again ("Practise these next
+   * time"). The next homework built for this learner works them in; see
+   * redo.ts.
+   */
+  redo?: RedoItem[];
+};
+
+/** One round the learner got wrong, kept for the next homework. */
+export type RedoItem = {
+  /** The lesson whose homework it came from. */
+  fromLesson: string;
+  kind: ExerciseKind;
+  topic: string;
+  /** What was asked, as the tutor read it in the answers. */
+  asked: string;
+  /** What the learner answered. */
+  answered: string;
+  /** The right answer, where the game has one. */
+  correct?: string;
+  savedAt: string;
+  /**
+   * The homework it went into. Kept while that homework can still be built
+   * again, and dropped once a later one is built.
+   */
+  usedIn?: string;
 };
 
 /**
@@ -625,6 +651,10 @@ export type Homework = {
    * games, which then ask about it. Not tied to any one subject.
    */
   read?: ReadAndAnswer;
+  /** How many earlier mistakes these games were asked to bring back. */
+  redo?: number;
+  /** When the tutor asked for this homework's mistakes to come back (redo.ts). */
+  carriedAt?: string;
 };
 
 export type ReadAndAnswer = {
