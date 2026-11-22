@@ -55,27 +55,31 @@ export function SummaryPanel({ lesson }: { lesson: Lesson }) {
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4">
         <h2 className="t-title">Summary</h2>
-        <button
-          onClick={() => void generate()}
-          disabled={busy || !canGenerate}
-          className="btn btn-ghost btn-sm"
-        >
-          {busy ? `Writing… ${seconds}s` : summary ? "Regenerate" : "Generate"}
-        </button>
+        {!busy && (
+          <button
+            onClick={() => void generate()}
+            disabled={!canGenerate}
+            className="btn btn-ghost btn-sm"
+          >
+            {summary ? "Regenerate" : "Generate"}
+          </button>
+        )}
       </div>
 
       {error && <p className="note note-warn">{error}</p>}
 
+      {busy && <Writing seconds={seconds} again={Boolean(summary)} />}
+
       {!summary ? (
+        busy ? null : (
         <p className="empty">
           {!canGenerate
             ? "Record a lesson or a debrief first."
-            : lesson.debrief.length === 0 && !busy
+            : lesson.debrief.length === 0
               ? "Written once your debrief is in - it carries what the transcript cannot."
-            : busy
-              ? "Reading the lesson and writing the summary and the parent message. This usually takes under a minute - two at a busy time."
               : "Nothing generated yet."}
         </p>
+        )
       ) : (
         <div className="card space-y-6 p-5">
           {/* The one line that matters most, set apart from everything else. */}
@@ -260,3 +264,35 @@ const BulbIcon = () => (
     <path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />
   </Icon>
 );
+
+/**
+ * The model at work, where the tutor is looking: what is happening, how long
+ * so far, and that a long wait is a busy model, not a stuck page.
+ */
+function Writing({ seconds, again }: { seconds: number; again: boolean }) {
+  // Fills fast, then slows: never full until it is done.
+  const filled = Math.round(95 * (1 - Math.exp(-seconds / 30)));
+  const slow = seconds >= 60;
+  return (
+    <div role="status" aria-live="polite" className="card space-y-3 border-accent! bg-accent-soft! p-5">
+      <div className="flex items-center gap-3">
+        <span className="spinner shrink-0" aria-hidden />
+        <p className="text-[1.0625rem] font-semibold">
+          {again ? "Writing the summary again" : "Writing the summary"}…
+        </p>
+        <span className="ml-auto shrink-0 t-small font-semibold tabular-nums text-accent">{seconds}s</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-surface">
+        <div
+          className="h-full rounded-full bg-accent transition-[width] duration-1000 ease-out"
+          style={{ width: `${filled}%` }}
+        />
+      </div>
+      <p className="t-small">
+        {slow
+          ? "Taking longer than usual - the model is busy right now. It is still working; there is nothing to press."
+          : "Reading the lesson, then writing the summary and the parent message. Usually under a minute. The homework is built right after."}
+      </p>
+    </div>
+  );
+}
