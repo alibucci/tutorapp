@@ -84,8 +84,8 @@ export function HomeworkPanel({
     .filter((r) => r.kind !== "kindness" && r.kind !== "speak")
     .reduce((n, r) => n + (r.rounds ?? []).filter((x) => !x.right).length, 0);
   const [seconds, setSeconds] = useState(0);
-  // Homework goes out by itself, programme stories too. Once the tutor takes
-  // it back, sending it is theirs again.
+  // Homework goes out by itself - not a Bible story, which the tutor checks
+  // and sends. Once the tutor takes it back, sending it is theirs again.
   const waiting = sendsItself(lesson) && !sent && !finished && !homework?.takenBackAt;
 
   // Drawing and building take from a few seconds to a minute or two; count
@@ -459,8 +459,8 @@ export function HomeworkPanel({
             <p className="hint">
               {story ? (
                 <>
-                  Sent by itself - the story is retold by the model from a fixed card, and checked
-                  against it. Not right? Take it back.
+                  Sent - the story is retold by the model from a fixed card, and checked against it.
+                  Not right? Take it back.
                 </>
               ) : (
                 <>

@@ -1,20 +1,23 @@
 import { after } from "next/server";
-import { type Outcome, runAutoHomework } from "./autoHomework";
-import { StoryNotBuilt, buildStoryHomework, christianityOpenTo, moduleOf, nextStory } from "./christianity";
+import type { Outcome } from "./autoHomework";
+import { PROGRAMME, StoryNotBuilt, buildStoryHomework, cardById, christianityOpenTo, moduleOf, nextStory } from "./christianity";
 import { homeworkDone } from "./homework";
 import { createLesson, getStudent, listLessons, updateLesson, updateStudent } from "./store";
 import { DEFAULT_LANGUAGE, type Lesson, type Student } from "./types";
 
 /**
  * Programmes: homework that comes as a series, one item after another (the
- * Bible stories today). They run by themselves like every other homework:
- * switched on for a learner, the first item is built and sent; each time the
- * learner finishes one, the next is built and sent - until the programme ends.
+ * Bible stories today).
+ *
+ * The next item is PREPARED by itself - when the programme is switched on,
+ * and each time the learner finishes one - but never SENT by itself: the
+ * tutor opens the overview, at the end of a lesson or on the learner's page,
+ * and sends it (Viktor, 24 Nov: a story is not sent unseen).
  *
  * What stays in place: a programme reaches a learner only while it is switched
  * on for them (with the parent's request ticked) and their tutor may use it,
  * and an item goes out only once its card is approved. One item at a time: the
- * next waits until the one in hand is finished.
+ * next is prepared once the one in hand is finished.
  */
 
 const CHRISTIANITY = "christianity";
@@ -33,14 +36,20 @@ async function running(student: Student): Promise<boolean> {
 }
 
 /** One start per learner at a time: a second call joins the first. */
+export function storyBuilding(studentId: string): boolean {
+  return starts.has(studentId);
+}
+
 const starts: Map<string, Promise<Outcome<string | null>>> = ((globalThis as {
   __aloudliProgrammeStarts?: Map<string, Promise<Outcome<string | null>>>;
 }).__aloudliProgrammeStarts ??= new Map());
 
 /**
- * Build the learner's next story and send it. Returns the lesson id, or null
- * when the programme is over. The story is checked against its card while it
- * is built; if that fails nothing is made, so there is never a half-built item.
+ * Prepare the learner's next story: built, checked, waiting for the tutor to
+ * send it. Returns the lesson id - the one already waiting, if there is one -
+ * or null when the programme is over. The story is checked against its card
+ * while it is built; if that fails nothing is made, so there is never a
+ * half-built item.
  */
 export function startNextStory(student: Student): Promise<Outcome<string | null>> {
   const key = student.id;
@@ -77,12 +86,8 @@ async function attempt(student: Student): Promise<Outcome<string | null>> {
 
   const open = await itemInHand(student.id, CHRISTIANITY);
   if (open) {
-    // Not gone yet (a failed send, say): send it rather than start another.
-    if (!open.homework?.sentAt && !open.homework?.takenBackAt) {
-      const sent = await runAutoHomework(open.id);
-      if (!sent.ok) return sent;
-      return { ok: true, value: open.id };
-    }
+    // Prepared and waiting for the tutor: that is the one.
+    if (!open.homework?.sentAt) return { ok: true, value: open.id };
     return {
       ok: false,
       error: `"${open.title}" is with ${student.name} now. The next story goes when it is finished.`,
@@ -112,10 +117,8 @@ async function attempt(student: Student): Promise<Outcome<string | null>> {
       startedAt: now,
       endedAt: now,
     });
+    // Ready, not sent: the tutor checks it and sends it.
     await updateLesson(lesson.id, { homework: built.homework, parentMessage: built.parentMessage });
-    // A failed send is marked on the lesson itself (autoFailed) and shown there.
-    const sent = await runAutoHomework(lesson.id);
-    if (!sent.ok) console.error(`[programme] story ${lesson.id} built, not sent: ${sent.error}`);
     return { ok: true, value: lesson.id };
   } catch (e) {
     console.error("[christianity] build", e);
@@ -124,7 +127,7 @@ async function attempt(student: Student): Promise<Outcome<string | null>> {
   }
 }
 
-/** Start whatever programme item is due for this learner, if it runs by itself. */
+/** Prepare whatever programme item is due for this learner, if it runs. */
 export async function continueProgrammes(studentId: string): Promise<void> {
   const student = await getStudent(studentId);
   if (!student || !(await running(student))) return;
@@ -153,4 +156,46 @@ export function startNextAfter(student: Student): void {
 export function onHomeworkDone(before: Lesson, current: Lesson | null): void {
   if (!current?.module || homeworkDone(before.homework) || !homeworkDone(current.homework)) return;
   programmesAfter(current.studentId);
+}
+
+/** Where the learner is with the Bible stories, as the tutor needs to see it. */
+export type StoryStatus =
+  /** Prepared, waiting for the tutor to check and send. */
+  | { state: "ready"; lessonId: string; title: string; reference: string; approved: boolean; recap?: string }
+  /** Sent, not finished yet. */
+  | { state: "with"; lessonId: string; title: string; sentAt: string; next?: string }
+  /** Being written now. */
+  | { state: "building"; next?: string }
+  /** The last try to prepare it failed. */
+  | { state: "failed"; error: string; next: string }
+  /** Nothing prepared yet. */
+  | { state: "due"; next: string; reference: string }
+  /** Every story done. */
+  | { state: "done" };
+
+export async function storyStatus(student: Student): Promise<StoryStatus | null> {
+  const state = moduleOf(student);
+  if (!state?.enabled) return null;
+  const open = await itemInHand(student.id, CHRISTIANITY);
+  const upNext = nextStory(state);
+  if (open) {
+    const card = cardById(open.module?.storyId);
+    if (!open.homework?.sentAt) {
+      return {
+        state: "ready",
+        lessonId: open.id,
+        title: open.title,
+        reference: card?.reference ?? "",
+        approved: Boolean(card?.approved),
+        ...(open.module?.reviewOf && { recap: cardById(open.module.reviewOf)?.title }),
+      };
+    }
+    // What comes after the one in hand: its place moves on once it is finished.
+    const after = PROGRAMME.find((c) => c.order === (card?.order ?? -1) + 1);
+    return { state: "with", lessonId: open.id, title: open.title, sentAt: open.homework.sentAt, next: after?.title };
+  }
+  if (storyBuilding(student.id)) return { state: "building", next: upNext?.card.title };
+  if (!upNext) return { state: "done" };
+  if (state.failed) return { state: "failed", error: state.failed.error, next: upNext.card.title };
+  return { state: "due", next: upNext.card.title, reference: upNext.card.reference };
 }

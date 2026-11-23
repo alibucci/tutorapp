@@ -53,7 +53,7 @@ tutor's home screen.
 | Transcription | On the server (Deepgram Nova-3, or Qwen3-ASR as the fallback). Pieces of 8–25 s go up while the lesson runs and retry on a weak connection. Audio is never stored. |
 | Debrief | Five prompts with no clock. Spoken or typed. Group lessons: three questions per child. |
 | Homework | Games built from the lesson's mistakes. The kinds depend on the learner's profile (`profile.ts`, `exercises.ts`). Also: extra homework from the tutor's own words, number homework made by code (`sums.ts`), and an optional picture. |
-| Programmes | Bible stories (`christianity.ts`). A tutor switches them on per learner, and only when the parent asked. Then they run one after another. Which tutors see them: `CHRISTIANITY_TUTORS`. |
+| Programmes | Bible stories (`christianity.ts`). A tutor switches them on per learner, and only when the parent asked. Each story is written by itself, then waits: the tutor checks the overview and sends it (since 24 Nov). Which tutors see them: `CHRISTIANITY_TUTORS`. |
 | Pronunciation checks | SpeechSuper. Adults only, and the learner must agree themselves. |
 | Families | One sign-in shared by the child and the parent, plus private links that can be rotated. |
 | Tutor notices | A feed on the home screen, plus Telegram and email (Resend; sent only to an address the tutor confirmed). |
@@ -132,9 +132,9 @@ In rough order of priority.
 2. **The Help films show the old manual homework.** Chapters "Build the
    homework" and "Send and see results" predate 18 November. The re-shoot list is
    in `~/Desktop/aloudli-film/notes/REFILM-auto-homework.md`.
-3. **Bible story building often hits the token limit** (`christianity.ts`,
-   `maxTokens: 6000`). Raising it was offered. Not done, because the code is
-   Viktor's.
+3. **Bible story building hit the token limit** (`maxTokens: 6000`). Raised to
+   16000 on 24 Nov, and a token-limit failure now falls back to the fast model.
+   Watch the next few stories.
 4. **Group labelling is untested on messy speech.** Children answering without
    being called, or talking over each other.
 5. **The signed consent document is not stored.** The app keeps only a name and

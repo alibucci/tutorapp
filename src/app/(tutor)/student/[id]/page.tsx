@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ChristianityPanel } from "@/components/ChristianityPanel";
 import { ExtraHomework } from "@/components/ExtraHomework";
-import { PROGRAMME, christianityOpenTo, moduleOf, nextStory } from "@/lib/christianity";
+import { PROGRAMME, christianityOpenTo, moduleOf } from "@/lib/christianity";
+import { storyStatus } from "@/lib/programmes";
 import { canScoreVoice } from "@/lib/pronounce";
 import { hasVoiceConsent, mayScoreVoice } from "@/lib/voice";
 import { notFound } from "next/navigation";
@@ -41,7 +42,7 @@ export default async function StudentPage({
         .map((g) => g.name)
     : [];
   const christianity = moduleOf(student);
-  const upNext = christianity?.enabled ? nextStory(christianity) : null;
+  const story = christianityOpen && !student.archivedAt ? await storyStatus(student) : null;
 
   const [lessons, reports] = await Promise.all([
     listLessons(id),
@@ -168,16 +169,6 @@ export default async function StudentPage({
         <ExtraHomework
           studentId={student.id}
           studentName={student.name}
-          christianity={
-            christianityOpen && christianity?.enabled
-              ? {
-                  next: upNext?.card.title ?? null,
-                  reference: upNext?.card.reference,
-                  review: upNext?.review?.title,
-                  approved: Boolean(upNext?.card.approved),
-                }
-              : undefined
-          }
         />
       )}
 
@@ -189,8 +180,8 @@ export default async function StudentPage({
           parentAskedAt={christianity?.parentAskedAt || undefined}
           passed={christianity?.passed.length ?? 0}
           total={PROGRAMME.length}
-          next={nextStory(christianity)?.card.title ?? null}
-          failed={christianity?.failed?.error}
+          studentKey={student.studentKey}
+          story={story}
         />
       )}
 

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import type { StoryStatus } from "@/lib/programmes";
+import { StoryNext } from "@/components/StoryNext";
 
 /**
  * Switching the Christianity programme on for one learner. Off by default;
@@ -16,8 +18,8 @@ export function ChristianityPanel({
   parentAskedAt,
   passed,
   total,
-  next,
-  failed,
+  studentKey,
+  story,
 }: {
   studentId: string;
   studentName: string;
@@ -25,10 +27,9 @@ export function ChristianityPanel({
   parentAskedAt?: string;
   passed: number;
   total: number;
-  /** The next story's title, or null at the end of the programme. */
-  next: string | null;
-  /** Why the next story did not go out by itself, if it did not. */
-  failed?: string;
+  studentKey: string;
+  /** Where the learner is with the stories; null while it is off. */
+  story: StoryStatus | null;
 }) {
   const router = useRouter();
   const [asked, setAsked] = useState(false);
@@ -72,27 +73,21 @@ export function ChristianityPanel({
                 <br />
               </>
             )}
-            {passed} of {total} stories passed ·{" "}
-            {next ? (
-              <>
-                next: <span className="font-semibold">{next}</span>
-              </>
-            ) : (
-              "that's all for now"
-            )}
+            {passed} of {total} stories passed
+          </p>
+          {story && (
+            <div className="border-t border-line pt-3">
+              <StoryNext studentId={studentId} studentName={studentName} studentKey={studentKey} status={story} framed={false} />
+            </div>
+          )}
+          <p className="hint">
+            The next story is written when {studentName} finishes the one before. It waits for you:
+            open the overview, then send it - here or at the end of a lesson.
           </p>
           <button onClick={() => void save(false)} disabled={busy} className="btn btn-quiet btn-block">
             {busy ? "Saving…" : "Switch off"}
           </button>
-          {failed && (
-            <p className="note note-warn">
-              The next story could not be built and sent by itself: {failed}. Use &ldquo;Send the next story now&rdquo; under Extra homework.
-            </p>
-          )}
-          <p className="hint">
-            Each story is built and sent by itself when {studentName} finishes the one before.
-            Switching off keeps {studentName}&rsquo;s place for later.
-          </p>
+          <p className="hint">Switching off keeps {studentName}&rsquo;s place for later.</p>
         </>
       ) : (
         <>

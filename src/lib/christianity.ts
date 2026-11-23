@@ -400,7 +400,9 @@ export async function buildStoryHomework(
         user: userPrompt(student, card, review, problems),
         schema: Retelling,
         schemaName: "Story",
-        maxTokens: 6000,
+        // 6000 ran out while the model was still thinking (22 Nov, Victor's
+        // second story): nothing came back at all.
+        maxTokens: 16000,
         effort: "low",
         timeoutMs: 60_000,
         fallbackModel: MODEL_FAST,

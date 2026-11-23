@@ -103,7 +103,9 @@ async function chat(
   const content = choice?.message?.content ?? "";
   if (!content.trim()) {
     if (choice?.finish_reason === "length") {
-      throw new Error(
+      // A thinking model can spend the whole limit thinking. The fallback,
+      // where there is one, is worth asking rather than giving up.
+      throw new ModelUnavailable(
         `${model} hit the token limit before answering. Raise maxTokens.`,
       );
     }

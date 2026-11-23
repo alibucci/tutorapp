@@ -14,7 +14,9 @@ import { moveOptions } from "@/lib/moveLesson";
 import { styleFor } from "@/lib/gameStyles";
 import { hasParent } from "@/lib/profile";
 import { canDrawPictures } from "@/lib/imageGen";
-import { PROGRAMME, cardById } from "@/lib/christianity";
+import { PROGRAMME, cardById, christianityOpenTo } from "@/lib/christianity";
+import { storyStatus } from "@/lib/programmes";
+import { StoryNext } from "@/components/StoryNext";
 import { listReports } from "@/lib/store";
 import { INTERRUPTION_LABEL, promptLabel } from "@/lib/types";
 
@@ -30,7 +32,7 @@ export default async function ReviewPage({
   const { id } = await params;
   const found = await lessonFor(id);
   if (!found) notFound();
-  const { lesson, student } = found;
+  const { lesson, student, session } = found;
   // The shared recording has no summary of its own: each child's lesson does.
   if (lesson.kind === "group") redirect(`/lesson/${id}/group`);
   // Extra homework has no lesson behind it: no summary, debrief or parent
@@ -39,6 +41,10 @@ export default async function ReviewPage({
   // A Bible story from the programme: the story the system picked.
   const story = cardById(lesson.module?.storyId);
   const recapOf = cardById(lesson.module?.reviewOf);
+
+  // The end of a lesson is where the next Bible story is checked and sent.
+  const bible =
+    !practice && !student.archivedAt && (await christianityOpenTo(session)) ? await storyStatus(student) : null;
 
   const homeworkSent = Boolean(lesson.homework?.sentAt);
   const messageSent = Boolean(lesson.parentMessage?.copiedAt);
@@ -189,6 +195,10 @@ export default async function ReviewPage({
           canDraw={canDrawPictures()}
           redo={redoState(student, lesson.id)}
         />
+      )}
+
+      {bible && (
+        <StoryNext studentId={student.id} studentName={student.name} studentKey={student.studentKey} status={bible} />
       )}
 
       {parent && (!practice || story) && (

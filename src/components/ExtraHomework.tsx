@@ -11,16 +11,12 @@ import { api } from "@/lib/api";
 export function ExtraHomework({
   studentId,
   studentName,
-  christianity,
 }: {
   studentId: string;
   studentName: string;
-  /** Only where the module is on for this learner: the next story, or null at the end. */
-  christianity?: { next: string | null; reference?: string; review?: string; approved: boolean };
 }) {
   const router = useRouter();
   const [request, setRequest] = useState("");
-  const [what, setWhat] = useState<"request" | "christianity">("request");
   const [busy, setBusy] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -49,23 +45,6 @@ export function ExtraHomework({
     router.push(`/lesson/${result.data.id}/review#homework`);
   }
 
-  async function makeStory() {
-    setSeconds(0);
-    setBusy(true);
-    setError(null);
-    const result = await api<{ id: string }>(
-      `/api/students/${studentId}/christianity`,
-      { method: "POST" },
-      "Could not build it. Try again.",
-    );
-    if (!result.ok) {
-      setBusy(false);
-      setError(result.error);
-      return;
-    }
-    router.push(`/lesson/${result.data.id}/review#homework`);
-  }
-
   return (
     <section className="card card-pad space-y-3">
       <div>
@@ -75,62 +54,6 @@ export function ExtraHomework({
           that - in {studentName}&rsquo;s look - and sent straight away.
         </p>
       </div>
-      {christianity && (
-        <div role="tablist" aria-label="Kind of homework" className="grid grid-cols-2 gap-2">
-          {(
-            [
-              ["request", "Your request"],
-              ["christianity", "Christianity"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={what === id}
-              onClick={() => {
-                setWhat(id);
-                setError(null);
-              }}
-              disabled={busy}
-              className={`btn btn-sm ${what === id ? "btn-soft" : "btn-ghost"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-      {christianity && what === "christianity" ? (
-        <div className="space-y-2">
-          {christianity.next ? (
-            <p className="t-small">
-              Next story: <span className="font-semibold">{christianity.next}</span>
-              {christianity.reference && <span className="t-muted"> · {christianity.reference}</span>}
-              {christianity.review && (
-                <span className="block t-muted">Starts with a short recap of &ldquo;{christianity.review}&rdquo;.</span>
-              )}
-            </p>
-          ) : (
-            <p className="note">That&rsquo;s all for now: {studentName} has had every story in the programme.</p>
-          )}
-          {christianity.next && !christianity.approved && (
-            <p className="hint">This story&rsquo;s card is not approved yet, so it cannot be sent.</p>
-          )}
-          <p className="hint">
-            Stories go out by themselves: the next one is built and sent when {studentName} finishes the last.
-            This sends it now.
-          </p>
-          {error && <p className="note note-warn">{error}</p>}
-          <button
-            onClick={() => void makeStory()}
-            disabled={busy || !christianity.next}
-            className="btn btn-primary btn-block"
-          >
-            {busy ? `Writing the story… ${seconds}s` : "Send the next story now"}
-          </button>
-          {busy && <p className="hint">Usually under a minute. The page opens when it is ready.</p>}
-        </div>
-      ) : (
       <form
         className="space-y-2"
         onSubmit={(e) => {
@@ -156,7 +79,6 @@ export function ExtraHomework({
           <p className="hint">Usually under a minute. The page opens when they are ready.</p>
         )}
       </form>
-      )}
     </section>
   );
 }

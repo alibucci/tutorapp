@@ -23,15 +23,15 @@ export async function PATCH(request: Request, { params }: Params) {
   }
   const result = await setModule(found.student, body.on, body.parentAsked === true);
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
-  // Switched on: the first story (or the one due) is built and sent by itself.
+  // Switched on: the first story (or the one due) is written, to wait for the tutor.
   if (body.on && result.student) startNextAfter(result.student);
   return NextResponse.json(result.student?.modules?.christianity ?? null);
 }
 
 /**
- * Build the next story and send it now. The system picks the story; the tutor
- * never picks a number. Stories also go out by themselves (programmes.ts):
- * this is for "now" rather than when the last one is finished.
+ * Write the next story now, or return the one already waiting. Nothing is
+ * sent: the tutor checks it and sends it. The system picks the story; the
+ * tutor never picks a number.
  */
 export async function POST(_request: Request, { params }: Params) {
   const { id } = await params;

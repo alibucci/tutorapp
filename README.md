@@ -198,9 +198,10 @@ kept forever, and the parent's progress view is built from first attempts.
 - **Number homework**: the model reads the request ("times tables 3 to 5"), and
   `sums.ts` makes every question and answer, so each one is right by
   construction.
-- **Programmes** (`programmes.ts`): a series that runs by itself. The first
-  item goes out when the programme is switched on; the next one when the
-  learner finishes the current one. Bible stories are the only programme today
+- **Programmes** (`programmes.ts`): a series, one item at a time. The first
+  item is written when the programme is switched on, the next one when the
+  learner finishes the current one - but never sent by itself: the tutor opens
+  the overview (at the end of a lesson, or on the learner's page) and sends it. Bible stories are the only programme today
   (`christianity.ts`, cards in `src/content/christianity`). An item goes out
   only if its card is approved. The model retells the story, and code checks
   the retelling against the card.

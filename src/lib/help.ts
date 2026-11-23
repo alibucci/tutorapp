@@ -307,6 +307,18 @@ export const HELP_FILMS: HelpFilm[] = [
     tip: "Nobody in the family sees this field. Only the message home uses it.",
   },
   {
+    id: "A18", title: "Bible story homework", needs: ["stories"],
+    why: "Check each Bible story, then send it yourself.",
+    steps: [
+      "On the student's page, under \"Christianity\", tick \"The parent asked for this\" and click \"Switch on\". The first story is written - it is not sent.",
+      "At the end of a lesson, under \"Bible story for …\", click \"Overview of the homework\" and go through it as the child will.",
+      "Happy with it? Click \"Send to …\". Not happy? \"Open it\", then \"Write the story again\".",
+      "The block says where the child is: ready to check, with the child now, or being written. When the child finishes a story, the next one is written and waits for you.",
+      "If writing fails, the block says so: click \"Try again\".",
+    ],
+    tip: "Nothing goes to the child until you click Send. The same block is on the student's page.",
+  },
+  {
     id: "P1", title: "Saved groups", needs: ["plans"],
     why: "Pick the same children for a lesson or a plan in one tap.",
     steps: [
