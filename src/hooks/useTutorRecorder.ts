@@ -342,7 +342,7 @@ export function useTutorRecorder(options: Options = {}) {
   };
 }
 
-function pickMimeType(): string {
+export function pickMimeType(): string {
   const candidates = [
     "audio/webm;codecs=opus",
     "audio/webm",

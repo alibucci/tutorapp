@@ -208,9 +208,11 @@ kept forever, and the parent's progress view is built from first attempts.
 - **A picture** to describe. The tutor uploads it, or Wan draws one if switched
   on (`imageGen.ts`, `scenePrompt.ts`).
 
-**Spoken answers** in homework still use the browser's own recogniser
-(`useSpeechTranscript.ts`), so they depend on the browser. Only the text is
-kept. **Pronunciation checks** (`pronounce.ts`, SpeechSuper) are only for adults
+**Spoken answers** in homework are recorded in the browser and recognised on
+the server (`useAnswerMic.ts`, `api/lessons/[id]/homework/speech`), like the
+lesson: the browser's own recogniser needed Google from Chrome, which mainland
+China cannot reach, and is missing inside WeChat. The audio is not kept, only
+the text. **Pronunciation checks** (`pronounce.ts`, SpeechSuper) are only for adults
 who agreed themselves (`voice.ts`).
 
 **Themes** (`gameStyles.ts`): each one is a list entry with words, a five-colour
@@ -327,7 +329,7 @@ src/lib/
   groups.ts plans.ts lessonPlan.ts planCheck.ts planImages.ts
   deck.ts deckFor.ts planShared.ts tutorList.ts storySlides.ts   lesson plans
 src/content/          programme cards (Bible stories)
-src/hooks/            recorder, clip transcriber, browser recogniser, wake lock
+src/hooks/            recorder, clip transcriber, homework microphone, wake lock
 public/tutor-gate-worklet.js         the gate, on the audio thread
 
 src/app/(admin)/ (tutor)/ (family)/ (guest)/   one route group per audience

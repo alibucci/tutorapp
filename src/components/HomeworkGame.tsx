@@ -2,8 +2,8 @@
 
 import { api } from "@/lib/api";
 import Link from "next/link";
-import { useState } from "react";
-import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
+import { useMemo, useState } from "react";
+import { AnswerMicContext, useAnswerMic } from "@/hooks/useAnswerMic";
 import { gameFonts } from "@/lib/fonts";
 import { type GameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
 import { scored } from "@/lib/homework";
@@ -135,25 +135,25 @@ export function HomeworkGame({
   /** Rounds answered so far in the game on screen, for the bar. */
   const [inGame, setInGame] = useState(0);
 
-  // Speaking instead of typing, for children who cannot type yet. The
-  // browser's recogniser turns speech into text; nothing records or keeps the
-  // child's voice here - only the words land in the answer.
-  const speech = useSpeechTranscript("en-US");
-  const [listeningFor, setListeningFor] = useState<string | null>(null);
+  // Speaking instead of typing, for children who cannot type yet. The answer
+  // is recorded and read into text on the server (useAnswerMic); the
+  // recording is not kept - only the words land in the answer.
+  const answerMic = useAnswerMic(lessonId, linkKey);
+  /** The box the microphone is filling, while it records or reads. */
+  const [micField, setMicField] = useState<string | null>(null);
+  const micBusy = answerMic.state !== "idle";
+  /** The same homework, for the spoken answers inside the games. */
+  const micTarget = useMemo(() => ({ lessonId, linkKey }), [lessonId, linkKey]);
 
-  /** Start listening - synchronously, inside the tap, or iOS refuses. */
+  /** Start recording - inside the tap, or iOS refuses. */
   function startMic(field: string) {
     setError(null);
-    speech.start();
-    setListeningFor(field);
+    setMicField(field);
+    void answerMic.start((said) => put(field, said));
   }
 
-  /** Stop, wait for the last words, and put what was said into the field. */
-  async function stopMic() {
-    const field = listeningFor;
-    setListeningFor(null);
-    const said = (await speech.stopAndFlush()).map((s) => s.text).join(" ").trim();
-    if (!field || !said) return;
+  /** Put what was said into its box. */
+  function put(field: string, said: string) {
     if (field === "adjectives") {
       // "big, happy and loud" -> three boxes.
       const words = said
@@ -182,20 +182,20 @@ export function HomeworkGame({
 
   /** Moving between tasks never leaves the microphone listening. */
   function go(next: number) {
-    if (listeningFor) speech.stop();
-    setListeningFor(null);
+    if (micBusy) answerMic.cancel();
+    setMicField(null);
     setStep(next);
   }
 
   const mic = (field: string) =>
-    speech.supported ? (
+    answerMic.available ? (
       <MicButton
-        listening={listeningFor === field}
-        busy={listeningFor !== null && listeningFor !== field}
-        interim={listeningFor === field ? speech.interim : ""}
-        error={listeningFor === null ? speech.error : null}
+        listening={answerMic.state === "listening" && micField === field}
+        working={answerMic.state === "working" && micField === field}
+        busy={micBusy && micField !== field}
+        error={!micBusy && micField === field ? answerMic.error : null}
         onStart={() => startMic(field)}
-        onStop={() => void stopMic()}
+        onStop={answerMic.stop}
       />
     ) : null;
 
@@ -283,6 +283,7 @@ export function HomeworkGame({
   }
 
   return (
+    <AnswerMicContext.Provider value={micTarget}>
     <div
       className={`game game-${skinOf(style)} ${themeOf(style)} ${gameFonts}`}
       style={paletteVars(style) as React.CSSProperties}
@@ -546,6 +547,7 @@ export function HomeworkGame({
         </div>
       </div>
     </div>
+    </AnswerMicContext.Provider>
   );
 }
 

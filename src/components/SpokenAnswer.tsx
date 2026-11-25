@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
-import { useSpeechTranscript } from "@/hooks/useSpeechTranscript";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useAnswerMic } from "@/hooks/useAnswerMic";
 
 /**
  * Saying an answer instead of typing it, and hearing a sentence read out.
  *
- * Both stay in the browser: speech becomes text through the browser's own
- * recogniser, the same one the picture tasks use, and the sentence is read by
- * the phone's own voice. No recording is made or kept. Where the browser has
- * neither, the learner types - every spoken task can be done by typing.
+ * A spoken answer is recorded and read into text by the server (useAnswerMic),
+ * the same way as the picture tasks; the recording is not kept. The sentence is
+ * read by the phone's own voice. Every spoken task can still be done by typing.
  */
 
 const subscribeNever = () => () => {};
@@ -57,29 +56,29 @@ export function SpokenAnswer({
   multiline?: boolean;
   placeholder?: string;
 }) {
-  const speech = useSpeechTranscript("en-US");
-  const [listening, setListening] = useState(false);
-
-  async function stop() {
-    setListening(false);
-    const said = (await speech.stopAndFlush()).map((s) => s.text).join(" ").trim();
-    if (said) onChange(value.trim() ? `${value.trim()} ${said}` : said);
-  }
+  const mic = useAnswerMic();
+  // The words come back after the tap; add them to what the box holds then.
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   const Field = multiline ? "textarea" : "input";
   return (
     <div className="mt-3">
-      {speech.supported && !disabled && (
+      {mic.available && !disabled && (
         <MicButton
-          listening={listening}
+          listening={mic.state === "listening"}
+          working={mic.state === "working"}
           busy={false}
-          interim={listening ? speech.interim : ""}
-          error={listening ? null : speech.error}
-          onStart={() => {
-            speech.start();
-            setListening(true);
-          }}
-          onStop={() => void stop()}
+          error={mic.error}
+          onStart={() =>
+            void mic.start((said) => {
+              const before = valueRef.current.trim();
+              onChange(before ? `${before} ${said}` : said);
+            })
+          }
+          onStop={mic.stop}
         />
       )}
       <Field
@@ -87,7 +86,7 @@ export function SpokenAnswer({
         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value)}
         disabled={disabled}
         rows={multiline ? 3 : undefined}
-        placeholder={placeholder ?? (speech.supported ? "Or type it here" : "Type it here")}
+        placeholder={placeholder ?? (mic.available ? "Or type it here" : "Type it here")}
         autoCapitalize="sentences"
         className="game-input mt-3"
       />
@@ -101,15 +100,16 @@ export function SpokenAnswer({
  */
 export function MicButton({
   listening,
+  working = false,
   busy,
-  interim,
   error,
   onStart,
   onStop,
 }: {
   listening: boolean;
+  /** Stopped, and the words are on their way back. */
+  working?: boolean;
   busy: boolean;
-  interim: string;
   error: string | null;
   onStart: () => void;
   onStop: () => void;
@@ -119,7 +119,7 @@ export function MicButton({
       <button
         type="button"
         onClick={listening ? onStop : onStart}
-        disabled={busy}
+        disabled={busy || working}
         aria-pressed={listening}
         aria-label={listening ? "Stop recording" : "Say your answer"}
         className={`game-mic ${listening ? "game-mic-on" : ""}`}
@@ -137,10 +137,10 @@ export function MicButton({
       </button>
       <p className="game-hint text-center min-h-[1.5rem]">
         {listening
-          ? interim || "I'm listening… tap again when you finish."
-          : error
-            ? "The microphone did not work. You can type instead."
-            : "Tap and say it - or type below."}
+          ? "I'm listening… tap again when you finish."
+          : working
+            ? "Writing down what you said…"
+            : error ?? "Tap and say it - or type below."}
       </p>
     </div>
   );
