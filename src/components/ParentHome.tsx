@@ -1,5 +1,6 @@
 import { gameScore, homeworkDone, homeworkImageUrl, progressByTopic, scored } from "@/lib/homework";
 import { listLessons, listReports } from "@/lib/store";
+import { parentTimeline, type ParentItem } from "@/lib/timeline";
 import {
   EXERCISE_LABEL,
   HOMEWORK_TASKS,
@@ -32,7 +33,9 @@ export async function ParentHome({
 }) {
   const reports = (await listReports(student.id)).filter((r) => r.approvedAt);
   const [latest, ...older] = reports;
-  const homework = (await listLessons(student.id)).filter((l) => l.homework?.sentAt);
+  const lessons = await listLessons(student.id);
+  const homework = lessons.filter((l) => l.homework?.sentAt);
+  const timeline = parentTimeline(lessons);
 
   return (
     <div className="stack-lg">
@@ -105,8 +108,45 @@ export async function ParentHome({
         </>
       )}
 
+      <LessonTimeline items={timeline} />
+
       <HomeworkHistory lessons={homework} name={student.name} linkKey={linkKey} />
     </div>
+  );
+}
+
+/**
+ * Every lesson the tutor has sent a note about, newest first: the date, what
+ * it was, and the first line of that note. The latest few are open; the rest
+ * fold away so the page stays short.
+ */
+function LessonTimeline({ items }: { items: ParentItem[] }) {
+  if (items.length === 0) return null;
+  const OPEN = 5;
+  const row = (it: ParentItem) => (
+    <li key={it.id} className="flex gap-3">
+      <span className="t-small t-muted w-14 shrink-0 tabular-nums pt-0.5">{DATE.format(new Date(it.date))}</span>
+      <span className="min-w-0">
+        <span className="block font-medium">{it.title}</span>
+        <span className="block t-small t-muted">{it.line}</span>
+        {it.score && <span className="block t-small mt-0.5">Homework: {it.score.right} of {it.score.total} right</span>}
+      </span>
+    </li>
+  );
+  return (
+    <section className="space-y-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="t-title">Lessons so far</h2>
+        <span className="t-small t-muted">{items.length}</span>
+      </div>
+      <ol className="card card-pad space-y-4">{items.slice(0, OPEN).map(row)}</ol>
+      {items.length > OPEN && (
+        <details className="card card-pad">
+          <summary className="cursor-pointer t-small font-medium">Earlier lessons ({items.length - OPEN})</summary>
+          <ol className="mt-4 space-y-4">{items.slice(OPEN).map(row)}</ol>
+        </details>
+      )}
+    </section>
   );
 }
 

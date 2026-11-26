@@ -74,6 +74,9 @@ export default async function StudentPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link href={`/student/${student.id}/progress`} className="btn btn-primary btn-sm">
+            Progress
+          </Link>
           <GameStylePicker studentId={student.id} value={student.gameStyle} ownName={student.customStyle?.name} />
           <span className="tag tag-quiet min-h-9 px-3 t-small">
             {student.recordingConsent ? "Both voices recorded" : "Tutor's voice only"}
