@@ -37,6 +37,11 @@ npm run build
 cp -r public .next/standalone/
 cp -r .next/static .next/standalone/.next/
 
+# The scheduler's start hook (src/instrumentation.ts) reaches the store, and
+# its trace sweeps this machine's data/ into the bundle - outputFileTracing-
+# Excludes only applies to routes. The server links its own data in; this
+# copy must never ship, so it is removed here and the check below stays.
+rm -rf .next/standalone/data
 if [ -e .next/standalone/data ]; then
 	echo "!!! the bundle contains a data directory - refusing to ship it" >&2
 	exit 1
