@@ -343,7 +343,7 @@ export const HELP_FILMS: HelpFilm[] = [
     id: "P3", title: "Showing the slides", needs: ["plans"],
     why: "Teach from the slides; your notes stay on your screen.",
     steps: [
-      "Open a lesson in the plan and click \"Show the slides\". Your page shows the slide, your notes and the next slide.",
+      "Open a lesson in the plan and click \"Start lesson\" (or \"Only show the slides\" to look without recording). Your page shows the slide, your notes and the next slide.",
       "Click \"Child's screen\" to open the slide alone in a second window: share that window on the video call, or put it on the projector.",
       "Choose \"Online\" for bigger text on a video call, or \"In the room\".",
       "Arrow keys or space move the slides, in either window. \"Listen\" reads the word aloud.",
@@ -365,7 +365,7 @@ export const HELP_FILMS: HelpFilm[] = [
     id: "P5", title: "Sheets and videos", needs: ["plans"],
     why: "Something to print, and something to watch.",
     steps: [
-      "Under \"Sheets to print\" click \"Print sheets\": word cards, a fill-the-gap sheet and a colouring page, on A4.",
+      "Under \"Sheets to print\" tick the ones you want - word cards, fill the gaps, colouring, match the word and the picture, find the words, read and answer - click \"Save\", then \"Print\". Each is one A4 page.",
       "Under \"Videos to look up\" each line opens a search on YouTube or Bilibili. Watch a video before you show it - these are ideas, not checked videos.",
     ],
     tip: "YouTube needs a VPN in mainland China; Bilibili does not.",
@@ -382,10 +382,12 @@ export const HELP_FILMS: HelpFilm[] = [
     ],
   },
   {
-    id: "P7", title: "Recording a planned lesson", needs: ["plans"],
-    why: "See what of the plan the lesson reached.",
+    id: "P7", title: "Teaching a planned lesson", needs: ["plans"],
+    why: "One button: the slides open and the recording starts.",
     steps: [
-      "On the lesson in the plan click \"Record this lesson\". The new lesson is filled in for you.",
+      "On the lesson in the plan choose \"In the room\" or \"Online\" and click \"Start lesson\". The slides open in their own window and the recording starts by itself.",
+      "During the lesson \"Pause\" stops the recording and leaves the slides open. Closed the slides? \"Open the slides\" is at the top of the recording page.",
+      "\"Finish & review\" ends the recording and opens the debrief.",
       "After the debrief, the review page shows \"Against the plan\": done, partly, not reached.",
       "\"Carry it over\" adds what was not reached to the next lesson in the plan; \"Leave it\" does not.",
     ],

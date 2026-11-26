@@ -17,6 +17,7 @@ export function CardEditor({
   building,
   canDraw,
   group = false,
+  start,
 }: {
   planId: string;
   card: PlanCard;
@@ -25,6 +26,8 @@ export function CardEditor({
   canDraw: boolean;
   /** A group's plan: slides can carry a harder step. */
   group?: boolean;
+  /** Who the lesson is for, and a lesson from this card still going, if any. */
+  start?: StartInfo;
 }) {
   const router = useRouter();
   useRefreshWhile(building);
@@ -69,7 +72,7 @@ export function CardEditor({
       ) : (
         <>
           {card.buildError && <p className="note note-warn">The last rebuild failed: {card.buildError}</p>}
-          <Teach planId={planId} card={card} />
+          <Teach planId={planId} card={card} start={start} />
           {card.story ? (
             <section className="card card-pad stack-sm">
               <h2 className="font-semibold">Bible story</h2>
@@ -194,18 +197,112 @@ function Basics({
   );
 }
 
-/** Show the slides, or save them as one file for a lesson without internet. */
-function Teach({ planId, card }: { planId: string; card: PlanCard }) {
+export type StartInfo = {
+  studentIds: string[];
+  /** A lesson made from this card and not finished: go back to it. */
+  openLessonId?: string;
+  /** ...and it was already recording. */
+  started?: boolean;
+};
+
+const MODE_KEY = "aloudli-start-mode";
+
+/**
+ * Start the lesson: one press makes the lesson, opens the slides in their own
+ * window and starts the recording. The window is opened inside the press -
+ * a browser only allows a pop-up there - and pointed at the slides once the
+ * lesson exists.
+ */
+function StartLesson({ planId, card, start }: { planId: string; card: PlanCard; start: StartInfo }) {
+  const router = useRouter();
+  const group = start.studentIds.length > 1;
+  const [mode, setMode] = useState<"classroom" | "online">(() => {
+    try {
+      return window.localStorage.getItem(MODE_KEY) === "online" ? "online" : "classroom";
+    } catch {
+      return "classroom";
+    }
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const deck = `/api/plans/${planId}/cards/${card.id}/deck`;
+
+  async function go() {
+    setBusy(true);
+    setError(null);
+    const slides = window.open("", "aloudli-slides");
+    try {
+      let lessonId = start.openLessonId;
+      if (!lessonId) {
+        const made = await api<{ id: string }>("/api/lessons", {
+          method: "POST",
+          json: {
+            title: card.topic || "Lesson",
+            ...(group ? { studentIds: start.studentIds } : { studentId: start.studentIds[0], mode }),
+            planCard: { planId, cardId: card.id },
+          },
+        });
+        if (!made.ok) throw new Error(made.error);
+        lessonId = made.data.id;
+      }
+      if (slides) slides.location.href = deck;
+      router.push(`/lesson/${lessonId}?start=1`);
+    } catch (e) {
+      slides?.close();
+      setError(e instanceof Error ? e.message : "The lesson could not be started.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="stack-sm">
+      {!group && !start.openLessonId && (
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Where is the lesson?">
+          {(["classroom", "online"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={mode === m}
+              onClick={() => {
+                setMode(m);
+                try {
+                  window.localStorage.setItem(MODE_KEY, m);
+                } catch {}
+              }}
+              className={`btn btn-sm ${mode === m ? "btn-primary" : "btn-quiet"}`}
+            >
+              {m === "classroom" ? "In the room" : "Online"}
+            </button>
+          ))}
+        </div>
+      )}
+      <button className="btn btn-primary btn-lg self-start" disabled={busy || !start.studentIds.length} onClick={() => void go()}>
+        {busy ? "Starting…" : start.started ? "Carry on the lesson" : "Start lesson"}
+      </button>
+      <p className="t-small t-muted">
+        {start.started
+          ? "This lesson was started and not finished. Carry on: the slides open and the recording picks up where it stopped."
+          : "The slides open in their own window and the recording starts. Finish the lesson there and the debrief opens."}
+      </p>
+      {error && <p className="note note-warn">{error}</p>}
+    </div>
+  );
+}
+
+/** Start the lesson, show the slides, or save them as one file for a lesson without internet. */
+function Teach({ planId, card, start }: { planId: string; card: PlanCard; start?: StartInfo }) {
   const deck = `/api/plans/${planId}/cards/${card.id}/deck`;
   const fresh = packFresh(card);
   return (
     <section className="card card-pad stack-sm">
+      {start && <StartLesson planId={planId} card={card} start={start} />}
       <div className="flex flex-wrap gap-2">
-        <a href={deck} target="_blank" rel="noopener" className="btn btn-primary">
-          Show the slides
+        <a href={deck} target="_blank" rel="noopener" className={`btn ${start ? "btn-quiet" : "btn-primary"}`}>
+          Only show the slides
         </a>
         <a href={`/lesson/new?plan=${planId}&card=${card.id}`} className="btn btn-quiet">
-          Record this lesson
+          Record with other settings
         </a>
         <a href={`${deck}?pack=1`} className="btn btn-quiet" download>
           Save for offline

@@ -38,7 +38,29 @@ function readDraft(id: string): TranscriptSegment[] {
   }
 }
 
-export function LessonRecorder({ lesson }: { lesson: Lesson }) {
+/**
+ * The plan's slides beside the recording: opened in their own window by
+ * "Start lesson", and here to open again if that window was closed or blocked.
+ */
+export function LessonMaterials({ planId, cardId }: { planId: string; cardId: string }) {
+  const deck = `/api/plans/${planId}/cards/${cardId}/deck`;
+  return (
+    <section className="card card-pad flex flex-wrap items-center gap-3">
+      <span className="t-small font-medium mr-auto">Slides and your notes</span>
+      <button className="btn btn-primary btn-sm" onClick={() => window.open(deck, "aloudli-slides")}>
+        Open the slides
+      </button>
+      <a href={`${deck}?print=1`} target="_blank" rel="noopener" className="btn btn-quiet btn-sm">
+        Print sheets
+      </a>
+      <a href={`/plans/${planId}/${cardId}`} className="btn btn-quiet btn-sm">
+        The lesson plan
+      </a>
+    </section>
+  );
+}
+
+export function LessonRecorder({ lesson, autoStart = false }: { lesson: Lesson; autoStart?: boolean }) {
   const router = useRouter();
   const isClassroom = lesson.mode === "classroom";
 
@@ -395,6 +417,19 @@ export function LessonRecorder({ lesson }: { lesson: Lesson }) {
     // A stopped recorder cannot start again; a fresh one is built here.
     await rec.arm(rec.deviceId || undefined);
   }
+
+  // "Start lesson" on a plan card: start as soon as the mic is ready, once.
+  // Never over an interrupted lesson - that asks the tutor what to do.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoStarted.current || interrupted || lesson.startedAt || rec.state !== "ready") return;
+    autoStarted.current = true;
+    // A reload of this page must not start a second take.
+    router.replace(`/lesson/${lesson.id}`);
+    void begin();
+    // begin() reads current state; this runs once, when the mic is ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, interrupted, lesson.startedAt, rec.state]);
 
   function pause() {
     void cutClip();

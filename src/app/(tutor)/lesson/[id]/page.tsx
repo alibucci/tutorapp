@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { LessonRecorder } from "@/components/LessonRecorder";
+import { LessonMaterials, LessonRecorder } from "@/components/LessonRecorder";
 import { lessonFor } from "@/lib/access";
 import { getStudent } from "@/lib/store";
 
@@ -7,10 +7,14 @@ export const dynamic = "force-dynamic";
 
 export default async function LessonPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ start?: string }>;
 }) {
   const { id } = await params;
+  // Pressed "Start lesson" on a plan card: the recording starts by itself.
+  const autoStart = (await searchParams).start === "1";
   const found = await lessonFor(id);
   if (!found) notFound();
   const { lesson, student } = found;
@@ -37,7 +41,11 @@ export default async function LessonPage({
         </p>
       </header>
 
-      <LessonRecorder lesson={lesson} />
+      {lesson.planCard && !lesson.endedAt && (
+        <LessonMaterials planId={lesson.planCard.planId} cardId={lesson.planCard.cardId} />
+      )}
+
+      <LessonRecorder lesson={lesson} autoStart={autoStart} />
     </div>
   );
 }
