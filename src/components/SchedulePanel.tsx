@@ -11,7 +11,7 @@ const ZONES = ["Asia/Shanghai", "Asia/Hong_Kong", "Asia/Almaty", "Asia/Tashkent"
 
 const MODES: { value: DeliveryMode; label: string; hint: string }[] = [
   { value: "approval", label: "Made ahead, you approve", hint: "Ready at the time, waits for you to check and send. You get a notice." },
-  { value: "auto", label: "Sent by itself", hint: "Made from the newest results and sent at the time." },
+  { value: "auto", label: "Sent by itself", hint: "Made from the newest results and sent at the time - unless \"I approve practice first\" is ticked in the learning programme." },
   { value: "manual", label: "Only when you make one", hint: "The schedule makes nothing; use Smart Review below." },
 ];
 

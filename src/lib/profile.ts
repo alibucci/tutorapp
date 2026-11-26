@@ -203,7 +203,11 @@ export const PREFERENCE_RULES = `THE LEARNING PROGRAMME (given with the learner)
   never replaces the learning content and never decides what is taught.
 - What the lesson needs and the tutor asks for here comes first. The
   programme and what the parents asked for are worked in where they fit -
-  except topics to avoid, which always hold.`;
+  except topics to avoid, which always hold.
+- A religious focus (Bible stories) is revision of what the lessons already
+  told, never new teaching: use only the names, events and words the lessons
+  gave, exactly as told. Never add to a story, retell one that was not taught,
+  or write anything new about faith.`;
 
 /** Who the homework talks to: a child, or someone who is not one. */
 export function isChild(profile: StudentProfile | undefined): boolean {

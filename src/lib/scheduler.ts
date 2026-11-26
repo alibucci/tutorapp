@@ -73,7 +73,8 @@ export async function runSchedule(studentId: string, now = Date.now()): Promise<
     return e;
   }
   const lessonId = made.lesson.id;
-  if (schedule.mode === "auto") {
+  // "I approve practice first" in the learning programme overrides "sent by itself".
+  if (schedule.mode === "auto" && !student.profile?.learning?.approval) {
     const sent = await updateLesson(lessonId, (current) => {
       const r = markSent(current, student);
       return "error" in r ? null : { homework: r.homework };

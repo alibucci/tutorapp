@@ -64,17 +64,20 @@ const hasProgrammes = (learners: Learner[]) => learners.some((l) => (l.preferenc
 /**
  * The system prompt with the programme rules, only when some child has a
  * programme: a plan for children without one is asked exactly as before.
- * The no-religion rule gives way to a curriculum the family chose - a
- * family that asked for Bible stories gets them - and to nothing else.
+ *
+ * The no-religion rule does NOT give way to a curriculum focus. Bible stories
+ * reach a lesson only through the story track (storySlides.ts), told from
+ * checked cards - every fact there, nothing added. A general lesson written
+ * by the model around "Bible stories" would skip those checks.
  */
 function withProgrammes(system: string, learners: Learner[]): string {
   if (!hasProgrammes(learners)) return system;
   return `${system}
 
 ${PREFERENCE_RULES}
-- A curriculum focus the family chose is taught even where the rules above
-  would leave it out (for example Bible stories: told simply and kindly, as
-  the story goes). Nothing else those rules forbid becomes allowed.`;
+- These rules never lift the ones above. A religious curriculum focus (Bible
+  stories) is taught by the tutor's own story track, not here: keep these
+  lessons to English, and use the focus only for themes the rules above allow.`;
 }
 
 /** The group as the model sees it: no names, the youngest and weakest first. */
