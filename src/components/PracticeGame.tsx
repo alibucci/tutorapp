@@ -937,13 +937,22 @@ function Order({
 
   const round = rounds[at];
   const last = at + 1 >= rounds.length;
-  const pile = shuffle(
+  const pile = shuffledAway(
     round.events.map((text, i) => ({ text, i })),
     round.events.join("|"),
   );
   const built = placed.map((p) => pile[p].text);
   const full = placed.length === round.events.length;
   const correct = built.join("\n") === round.events.join("\n");
+  const n = round.events.length;
+  // Where the next tap goes, said the way a six-year-old would hear it.
+  const prompt = full
+    ? "All in place! Press Done."
+    : placed.length === 0
+      ? "Tap what happened first."
+      : placed.length === n - 1
+        ? "Now tap what happened last."
+        : "Now tap what happened next.";
 
   function check() {
     setChecked(true);
@@ -964,35 +973,69 @@ function Order({
   return (
     <div className="game-panel" key={at}>
       <Counter at={at} of={rounds.length} />
-      <p className="game-title mt-2">{title}</p>
-      <p className="game-hint mt-2">Tap what happened first, then next.</p>
+      <p className="game-title mt-2">Put the story in order!</p>
+      {title && <p className="game-hint mt-1">{title}</p>}
+      {!checked && (
+        <div className="mt-2 flex items-center gap-2">
+          <p className="game-rule" aria-live="polite">{prompt}</p>
+          <ListenButton text={prompt} />
+        </div>
+      )}
 
+      {/* The slots, numbered, the next empty one lit; a filled one taps back out. */}
       <ol className="mt-4 grid gap-2">
-        {(checked ? round.events : built).map((text, slot) => (
-          <li key={slot} className={`game-option ${checked ? "game-option-yes" : ""}`}>
-            {slot + 1}. {text}
-          </li>
-        ))}
+        {round.events.map((_, slot) => {
+          const p = placed[slot];
+          const text = p === undefined ? undefined : pile[p].text;
+          const mark = checked ? (text === round.events[slot] ? "yes" : "no") : null;
+          return (
+            <li key={slot}>
+              <button
+                type="button"
+                disabled={checked || text === undefined}
+                onClick={() => setPlaced(placed.filter((_, k) => k !== slot))}
+                aria-label={text ? `${slotName(slot, n)}: ${text}. Tap to take it out.` : `${slotName(slot, n)}: empty`}
+                className={`game-option order-slot ${
+                  mark ? `game-option-${mark}` : text === undefined ? `order-slot-empty${slot === placed.length ? " order-slot-on" : ""}` : ""
+                }`}
+              >
+                <span className="order-slot-n">
+                  {slot + 1} · {slotName(slot, n)}
+                </span>
+                <span>{mark === "yes" ? `✓ ${text}` : mark === "no" ? `✗ ${text}` : text ?? ""}</span>
+              </button>
+            </li>
+          );
+        })}
       </ol>
 
       {!checked && (
-        <div className="mt-3 grid gap-2">
-          {pile.map((tile, p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPlaced(placed.includes(p) ? placed.filter((x) => x !== p) : [...placed, p])}
-              className={`game-option ${placed.includes(p) ? "game-tile-used" : ""}`}
-            >
-              {tile.text}
-            </button>
-          ))}
+        <div className="mt-4 grid gap-2">
+          {pile.map((tile, p) =>
+            placed.includes(p) ? null : (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPlaced([...placed, p])}
+                className="game-option"
+              >
+                {tile.text}
+              </button>
+            ),
+          )}
         </div>
       )}
 
       {checked && (
-        <div className={`game-verdict ${correct ? "game-verdict-yes" : "game-verdict-soft"}`}>
-          <p className="game-verdict-head">{correct ? "Yes, that's the story!" : "This is how the story goes:"}</p>
+        <div className={`game-verdict ${correct ? "game-verdict-yes" : "game-verdict-no"}`}>
+          <p className="game-verdict-head">{correct ? "Yes, that's the story!" : "Not quite. This is how the story goes:"}</p>
+          {!correct && (
+            <ol className="game-verdict-why list-decimal pl-5">
+              {round.events.map((e, k) => (
+                <li key={k}>{e}</li>
+              ))}
+            </ol>
+          )}
           <p className="game-verdict-why">{round.why}</p>
         </div>
       )}
@@ -1002,11 +1045,16 @@ function Order({
           {last ? "Finish" : "Next"}
         </button>
       ) : (
-        <div className="mt-4 flex gap-3">
+        <div className="mt-4 flex flex-wrap gap-3">
           {placed.length > 0 && (
-            <button onClick={() => setPlaced([])} className="game-button game-button-no">
-              Start again
-            </button>
+            <>
+              <button onClick={() => setPlaced(placed.slice(0, -1))} className="game-button game-button-no">
+                Undo
+              </button>
+              <button onClick={() => setPlaced([])} className="game-button game-button-no">
+                Start again
+              </button>
+            </>
           )}
           <button onClick={check} disabled={!full} className="game-button">
             Done
@@ -1015,6 +1063,20 @@ function Order({
       )}
     </div>
   );
+}
+
+/** First, Next…, Last - by position, for any number of events. */
+function slotName(slot: number, of: number): string {
+  if (slot === 0) return "First";
+  if (slot === of - 1) return "Last";
+  return "Next";
+}
+
+/** Shuffled, and never left in the right order already - that is no puzzle. */
+function shuffledAway<T>(items: T[], seed: string): T[] {
+  const out = shuffle(items, seed);
+  if (out.length > 1 && out.every((x, k) => x === items[k])) out.push(out.shift()!);
+  return out;
 }
 
 /**

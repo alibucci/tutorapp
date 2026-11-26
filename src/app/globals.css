@@ -1310,6 +1310,15 @@ textarea.field { line-height: var(--leading-normal); }
 .game-tile-placed { animation: game-pop 240ms var(--ease-out); }
 .game-tile-used { opacity: 0.25; cursor: default; }
 
+/* Order: numbered slots, the next empty one lit, so a six-year-old sees where the tap goes. */
+.order-slot { display: flex; align-items: center; gap: var(--space-3); text-align: left; }
+.order-slot:disabled { cursor: default; }
+.order-slot-n { flex: none; min-width: 5.5rem; font-size: 0.8125rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
+.order-slot-empty { border-style: dashed !important; opacity: 0.6; }
+.order-slot-on { opacity: 1; outline: 3px solid currentColor; outline-offset: 2px; animation: order-pulse 1.4s ease-in-out infinite; }
+@keyframes order-pulse { 50% { outline-offset: 5px; } }
+@media (prefers-reduced-motion: reduce) { .order-slot-on { animation: none; } }
+
 /* Catch: one word drifts in, then flies off whichever way the child sent it. */
 .game-lane {
   display: grid;
