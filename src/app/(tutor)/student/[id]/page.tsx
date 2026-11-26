@@ -23,6 +23,8 @@ import { listGroups, listLessons, listReports } from "@/lib/store";
 import { learningOpenTo, plansOpenTo } from "@/lib/tutorList";
 import { withIds } from "@/lib/memory";
 import { SkillTidy } from "@/components/SkillTidy";
+import { SmartReviewPanel } from "@/components/SmartReviewPanel";
+import { reviewState } from "@/lib/review";
 import type { Lesson } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -173,6 +175,18 @@ export default async function StudentPage({
         username={student.login?.username}
         parent={hasParent(student)}
       />
+
+      {learning && !student.archivedAt && (
+        <SmartReviewPanel
+          studentId={student.id}
+          studentName={student.name}
+          skills={skills.map((s) => ({ id: s.id!, topic: s.topic }))}
+          recent={lessons
+            .filter((l) => l.review)
+            .slice(0, 4)
+            .map((l) => ({ id: l.id, title: l.title, ...reviewState(l) }))}
+        />
+      )}
 
       {!student.archivedAt && (
         <ExtraHomework

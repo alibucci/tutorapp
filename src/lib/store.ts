@@ -246,6 +246,7 @@ export async function createLesson(
         Lesson,
         | "kind"
         | "request"
+        | "review"
         | "module"
         | "groupStudentIds"
         | "groupId"
@@ -268,6 +269,7 @@ export async function createLesson(
     language: input.language,
     ...(input.kind && { kind: input.kind }),
     ...(input.request && { request: input.request }),
+    ...(input.review && { review: input.review }),
     ...(input.module && { module: input.module }),
     ...(input.groupStudentIds && { groupStudentIds: input.groupStudentIds }),
     ...(input.groupId && { groupId: input.groupId }),

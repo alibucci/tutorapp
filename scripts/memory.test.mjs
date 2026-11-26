@@ -132,3 +132,34 @@ test("due skills, longest overdue first", () => {
   const skills = withIds([skill({ reviewAt: day(4) }), skill({ topic: "B", reviewAt: day(2), firstSeen: day(1) }), skill({ topic: "C", reviewAt: day(20), firstSeen: day(2) })]);
   assert.deepEqual(dueSkills(skills, day(5)).map((s) => s.topic), ["B", "Irregular past tense verbs"]);
 });
+
+import { pickForReview, reviewSize } from "../src/lib/memory.ts";
+
+test("a review mixes weak, consolidating and applying - weak first", () => {
+  const now = day(10);
+  const skills = withIds([
+    skill({ topic: "W1", status: "struggling", firstSeen: day(1), mistakes: [{ at: day(2), lessonId: "a", asked: "q", answered: "x" }] }),
+    skill({ topic: "W2", status: "struggling", firstSeen: day(2) }),
+    skill({ topic: "C1", status: "improving", firstSeen: day(3), reviewAt: day(9) }),
+    skill({ topic: "C2", status: "improving", firstSeen: day(4), reviewAt: day(20) }),
+    skill({ topic: "A1", status: "solid", firstSeen: day(5), reviewAt: day(30) }),
+    skill({ topic: "N", lessonIds: [], firstSeen: day(6) }),
+  ]);
+  const picks = pickForReview(skills, { minutes: 15, now });
+  assert.equal(picks.length, reviewSize(15));
+  assert.deepEqual(picks.map((p) => [p.skill.topic, p.role]), [["W1", "weak"], ["W2", "weak"], ["C1", "consolidate"], ["A1", "apply"]]);
+  assert.ok(!picks.some((p) => p.skill.topic === "N"), "never something not assessed");
+  assert.match(picks.find((p) => p.skill.topic === "C1").why, /review due/);
+});
+
+test("no weak skills: the review is going over and using what was covered", () => {
+  const skills = withIds([skill({ topic: "C1", status: "improving" }), skill({ topic: "A1", status: "solid", firstSeen: day(1), reviewAt: day(40) })]);
+  const picks = pickForReview(skills, { minutes: 10, now: day(5) });
+  assert.deepEqual(picks.map((p) => p.skill.topic).sort(), ["A1", "C1"]);
+});
+
+test("the tutor's own choice is taken as it is", () => {
+  const skills = withIds([skill({ topic: "C1", status: "improving" }), skill({ topic: "W1", status: "struggling", firstSeen: day(1) })]);
+  const picks = pickForReview(skills, { minutes: 5, only: [skills[0].id] });
+  assert.deepEqual(picks.map((p) => p.skill.topic), ["C1"]);
+});

@@ -84,7 +84,7 @@ export default async function ReviewPage({
             {student && <span className="font-normal t-muted"> · {student.name}</span>}
           </h1>
           <p className="t-small t-muted">
-            {story ? `Christianity · ${story.reference}` : practice ? "Extra homework" : lesson.mode === "classroom" ? "In the room" : "Online"}
+            {story ? `Christianity · ${story.reference}` : practice ? (lesson.review ? "Smart Review" : "Extra homework") : lesson.mode === "classroom" ? "In the room" : "Online"}
             {!practice && lesson.recordedMs
               ? ` · ${Math.max(1, Math.round(lesson.recordedMs / 60000))} min`
               : ""}
@@ -162,6 +162,19 @@ export default async function ReviewPage({
               This story&rsquo;s card is not approved yet. You can preview it, but it cannot be sent.
             </p>
           )}
+        </section>
+      ) : practice && lesson.review ? (
+        <section className="card card-pad space-y-2">
+          <p className="t-eyebrow">
+            Why this Smart Review · about {lesson.review.minutes} min · {lesson.review.by === "schedule" ? "made by the schedule" : "made by you"}
+          </p>
+          <ul className="list-disc pl-5 space-y-1 t-small">
+            {lesson.review.reason.split(" · ").map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          {lesson.review.comment && <p className="t-small t-muted">You asked: {lesson.review.comment}</p>}
+          <p className="hint">New questions on these skills, from what the lessons covered. Nothing reaches the child until it is sent.</p>
         </section>
       ) : practice ? (
         <section className="card card-pad space-y-1">

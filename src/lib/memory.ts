@@ -256,3 +256,102 @@ export function recordGame(skills: Skill[], skillIds: string[] | undefined, topi
   if (!hit.size) return skills;
   return all.map((s) => (hit.has(s.id) ? recordPractice(s, p) : s));
 }
+
+// ---------------------------------------------------------------------------
+// What a Smart Review practises
+// ---------------------------------------------------------------------------
+
+/**
+ * Its part in the review: what still needs work, what to keep fresh, and what
+ * the child knows - used somewhere new. Roughly half, a third and the rest.
+ */
+export type ReviewRole = "weak" | "consolidate" | "apply";
+export type ReviewPick = { skill: Skill; role: ReviewRole; why: string };
+
+/** How many skills fit into a review of this length. */
+export function reviewSize(minutes: number): number {
+  return minutes <= 5 ? 2 : minutes <= 10 ? 3 : 4;
+}
+
+const ROLE_OF: Record<MemoryState, ReviewRole | null> = {
+  not_assessed: null,
+  learning: "weak",
+  needs_review: "weak",
+  improving: "consolidate",
+  retained: "apply",
+};
+
+const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+
+/** Why this skill, in a line the tutor can check against the evidence. */
+export function whyPicked(skill: Skill, now: string): string {
+  const parts: string[] = [];
+  const last = (skill.evidence ?? []).filter((e) => e.source !== "lesson" && (e.total ?? 0) > 0).at(-1);
+  if (last) parts.push(`${last.right}/${last.total} first go on ${SHORT.format(new Date(last.at))}`);
+  else parts.push("not practised in homework yet");
+  if (skill.reviewAt && skill.reviewAt <= now) parts.push("review due");
+  const again = recurringMistakes(skill).length;
+  if (again) parts.push(`${again} mistakes that keep coming back`);
+  return `${MEMORY_STATE_WORD[memoryState(skill, now)]}; ${parts.join("; ")}`;
+}
+
+const MEMORY_STATE_WORD: Record<MemoryState, string> = {
+  not_assessed: "not assessed",
+  learning: "still learning",
+  needs_review: "needs review",
+  improving: "improving",
+  retained: "retained",
+};
+
+/**
+ * The skills a review practises. Weak ones first (the overdue, then the ones
+ * with the most mistakes), then improving ones due back, then solid ones to
+ * use somewhere new. When a part is short - no weak skills at all, say - the
+ * others fill it: there is always something worth going over. The tutor's own
+ * choice, when given, is taken as it is.
+ */
+export function pickForReview(
+  skills: Skill[],
+  opts: { minutes: number; only?: string[]; now?: string },
+): ReviewPick[] {
+  const now = opts.now ?? new Date().toISOString();
+  const all = withIds(skills);
+  if (opts.only?.length) {
+    return opts.only
+      .map((id) => all.find((s) => s.id === id))
+      .filter((s): s is Skill => Boolean(s))
+      .map((s) => ({ skill: s, role: ROLE_OF[memoryState(s, now)] ?? "consolidate", why: whyPicked(s, now) }));
+  }
+  const n = reviewSize(opts.minutes);
+  const overdue = (s: Skill) => (s.reviewAt && s.reviewAt <= now ? 0 : 1);
+  const stale = (s: Skill) => s.lastPracticed ?? s.lastSeen;
+  const pool = (role: ReviewRole) =>
+    all
+      .filter((s) => ROLE_OF[memoryState(s, now)] === role)
+      .sort(
+        (a, b) =>
+          overdue(a) - overdue(b) ||
+          (role === "weak" ? (b.mistakes?.length ?? 0) - (a.mistakes?.length ?? 0) : 0) ||
+          stale(a).localeCompare(stale(b)),
+      );
+  const pools: Record<ReviewRole, Skill[]> = { weak: pool("weak"), consolidate: pool("consolidate"), apply: pool("apply") };
+  const want: Record<ReviewRole, number> = { weak: Math.ceil(n * 0.5), consolidate: Math.round(n * 0.3), apply: 0 };
+  want.apply = Math.max(0, n - want.weak - want.consolidate);
+
+  const picks: ReviewPick[] = [];
+  const take = (role: ReviewRole, count: number, as: ReviewRole = role) => {
+    for (const s of pools[role]) {
+      if (count <= 0 || picks.length >= n) break;
+      if (picks.some((p) => p.skill.id === s.id)) continue;
+      picks.push({ skill: s, role: as, why: whyPicked(s, now) });
+      count--;
+    }
+  };
+  take("weak", want.weak);
+  take("consolidate", want.consolidate);
+  take("apply", want.apply);
+  // Short somewhere: fill from the rest, in the same order of need.
+  for (const role of ["weak", "consolidate", "apply"] as const) take(role, n - picks.length);
+  const order: Record<ReviewRole, number> = { weak: 0, consolidate: 1, apply: 2 };
+  return picks.sort((a, b) => order[a.role] - order[b.role]);
+}

@@ -13,8 +13,9 @@ export const AUTO_SINCE = "2026-11-17T21:00:00.000Z"; // 18 Nov, 02:00 in UTC+5
  * Never a Bible story: it is prepared by itself, but the tutor opens the
  * overview and sends it (Viktor, 24 Nov) - a story is not sent unseen.
  */
-export function sendsItself(lesson: Pick<Lesson, "createdAt" | "module">): boolean {
-  if (lesson.module) return false;
+export function sendsItself(lesson: Pick<Lesson, "createdAt" | "module" | "review">): boolean {
+  // A Smart Review is sent by the tutor, or by the learning schedule.
+  if (lesson.module || lesson.review) return false;
   return lesson.createdAt >= AUTO_SINCE;
 }
 
