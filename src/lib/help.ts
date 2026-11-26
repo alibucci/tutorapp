@@ -135,6 +135,18 @@ const film = (n: number) => ({ file: `${MEDIA}/help-a${n}-v1.mp4`, poster: `${ME
 
 export const HELP_FILMS: HelpFilm[] = [
   {
+    id: "A0", title: "aloudli as an app on your phone or computer",
+    why: "One tap on its icon opens aloudli, in its own window - no typing the address, no browser bars.",
+    steps: [
+      "iPhone or iPad: open aloudli.com in Safari and sign in. Tap Share (the square with the arrow up), scroll down, tap \"Add to Home Screen\", then \"Add\".",
+      "Android: open aloudli.com in Chrome and sign in. Tap ⋮ (top right), then \"Add to Home screen\" or \"Install app\", then \"Install\".",
+      "Computer, Chrome or Edge: open aloudli.com and sign in. Click the install icon at the right end of the address bar (a screen with an arrow), or ⋮ → \"Cast, save and share\" → \"Install page as app\".",
+      "Mac, Safari: open aloudli.com and sign in, then File → \"Add to Dock\".",
+      "The green aloudli icon is now on your home screen, in your apps or in the Dock. Tap it: aloudli opens signed in, in its own window.",
+    ],
+    tip: "Parents and children can do the same from the link you send them: open it, then the same steps. Their icon opens their own page straight away, with no password.",
+  },
+  {
     id: "A1", title: "Group lessons", ...film(1), seconds: 35,
     why: "One recording, and each child gets their own lesson, summary and homework.",
     steps: [

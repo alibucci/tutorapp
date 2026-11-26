@@ -4,7 +4,11 @@ import { getStudentByKey } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "What I'm working on" };
+export async function generateMetadata({ params }: { params: Promise<{ key: string }> }) {
+  // Added to a home screen from here, the icon opens this link.
+  const { key } = await params;
+  return { title: "What I'm working on", manifest: `/s/${encodeURIComponent(key)}/app.webmanifest` };
+}
 
 /** The child's screen, reached by private link. */
 export default async function StudentView({
