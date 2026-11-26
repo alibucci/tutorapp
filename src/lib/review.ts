@@ -1,6 +1,7 @@
 import { buildExercises } from "./exercises";
 import { type ReviewPick, pickForReview, recurringMistakes, withIds } from "./memory";
 import { createLesson, getLesson, listLessons, updateLesson } from "./store";
+import { withUsage } from "./usage";
 import { DEFAULT_LANGUAGE, type Lesson, type SmartReview, type Student } from "./types";
 
 /**
@@ -127,7 +128,11 @@ export async function buildReviewGames(lessonId: string, student: Student, minut
   if (!lesson?.review || lesson.homework?.results?.length || lesson.homework?.answers) return false;
   const learner: Student = minutes <= 5 ? { ...student, profile: { ...student.profile, shortTasks: true } } : student;
   try {
-    const exercises = await buildExercises(lesson, learner, []);
+    // Counted as a Smart Review in the usage log (admin → Usage).
+    const exercises = await withUsage(
+      { purpose: "smart_review", studentId: student.id, tutorId: student.tutorId, lessonId },
+      () => buildExercises(lesson, learner, []),
+    );
     if (!exercises.length) return false;
     // Each game counts toward the skills the review was made for.
     const linked = exercises.map((e) => ({ ...e, skillIds: e.skillIds?.length ? e.skillIds : lesson.review!.skillIds }));
