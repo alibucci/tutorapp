@@ -1,3 +1,4 @@
+import { ReviewActions } from "@/components/ReviewActions";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChangeStudent } from "@/components/ChangeStudent";
@@ -175,6 +176,7 @@ export default async function ReviewPage({
           </ul>
           {lesson.review.comment && <p className="t-small t-muted">You asked: {lesson.review.comment}</p>}
           <p className="hint">New questions on these skills, from what the lessons covered. Nothing reaches the child until it is sent.</p>
+          <ReviewActions lessonId={lesson.id} state={lesson.review.state} />
         </section>
       ) : practice ? (
         <section className="card card-pad space-y-1">

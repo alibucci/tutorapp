@@ -395,6 +395,46 @@ export type Student = {
    * redo.ts.
    */
   redo?: RedoItem[];
+  /** When Smart Reviews come by themselves (schedule.ts). Absent: never. */
+  schedule?: LearningSchedule;
+};
+
+/**
+ * How a scheduled Smart Review reaches the child: sent by itself, made ahead
+ * for the tutor to approve, or not made at all until the tutor asks.
+ */
+export type DeliveryMode = "auto" | "approval" | "manual";
+
+/** What happened at one of the schedule's slots, for the tutor to read. */
+export type ScheduleEvent = {
+  slot: string;
+  at: string;
+  outcome: "sent" | "awaiting_approval" | "deferred" | "skipped" | "failed";
+  lessonId?: string;
+  reason: string;
+};
+
+/** A learner's own practice schedule between lessons. */
+export type LearningSchedule = {
+  enabled: boolean;
+  /** Days a Smart Review comes: 0 Sunday to 6 Saturday, in the learner's time zone. */
+  reviewDays: number[];
+  /** Their usual lesson days, shown to the tutor; the queue does not need them. */
+  lessonDays?: number[];
+  /** "17:30", in the learner's time zone. */
+  time: string;
+  /** IANA name: "Asia/Shanghai". */
+  timezone: string;
+  minutes: number;
+  /** Never more scheduled reviews than this in seven days. */
+  maxPerWeek: number;
+  mode: DeliveryMode;
+  pausedAt?: string;
+  updatedAt: string;
+  /** The last slot dealt with - made, deferred or skipped - so none is dealt with twice. */
+  lastSlot?: string;
+  /** Newest last, capped. */
+  log?: ScheduleEvent[];
 };
 
 /** One round the learner got wrong, kept for the next homework. */

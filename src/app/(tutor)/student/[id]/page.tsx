@@ -25,6 +25,8 @@ import { withIds } from "@/lib/memory";
 import { SkillTidy } from "@/components/SkillTidy";
 import { SmartReviewPanel } from "@/components/SmartReviewPanel";
 import { reviewState } from "@/lib/review";
+import { scheduleView } from "@/lib/schedule";
+import { SchedulePanel } from "@/components/SchedulePanel";
 import type { Lesson } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +51,7 @@ export default async function StudentPage({
   // The learner's memory, for the tutors continuous learning is open to.
   const learning = await learningOpenTo(student.tutorId);
   const skills = withIds(student.skills);
+  const { schedule, next: nextAt } = scheduleView(student.schedule);
   const story = christianityOpen && !student.archivedAt ? await storyStatus(student) : null;
 
   const [lessons, reports] = await Promise.all([
@@ -175,6 +178,15 @@ export default async function StudentPage({
         username={student.login?.username}
         parent={hasParent(student)}
       />
+
+      {learning && !student.archivedAt && (
+        <SchedulePanel
+          studentId={student.id}
+          studentName={student.name}
+          schedule={schedule}
+          next={nextAt}
+        />
+      )}
 
       {learning && !student.archivedAt && (
         <SmartReviewPanel

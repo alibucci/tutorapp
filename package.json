@@ -14,7 +14,8 @@
     "test:scoring": "node --test scripts/scoring.test.mjs",
     "test:memory": "node --test scripts/memory.test.mjs",
     "test:usage": "node --test scripts/usage.test.mjs",
-    "test": "node --test scripts/*.test.mjs"
+    "test": "node --test scripts/*.test.mjs",
+    "test:schedule": "node --test scripts/schedule.test.mjs"
   },
   "dependencies": {
     "next": "16.3.8",

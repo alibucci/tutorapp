@@ -49,3 +49,6 @@ backups/
 
 # local MCP servers
 .mcp.json
+
+# Agent worktrees
+.claude/worktrees/

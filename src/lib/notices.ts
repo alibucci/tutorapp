@@ -92,3 +92,35 @@ ${details.length ? `<ul style="margin:0 0 16px;padding-left:20px">${details.map(
 <p style="margin:0;font-size:13px;color:#78716c">You get this because you switched on email notices in your aloudli account. <a href="${e(siteUrl())}/account" style="color:#78716c">Switch them off</a>.</p>
 </div>`;
 }
+
+/**
+ * A scheduled Smart Review is ready and waits for the tutor's yes. Worth a
+ * notice: with approval on, nothing reaches the child until they look.
+ */
+export function noticeReviewWaiting(lesson: Lesson): void {
+  if (!canNotify() && !canEmail()) return;
+  void (async () => {
+    const student = await getStudent(lesson.studentId);
+    const tutor = student && (await getTutor(student.tutorId));
+    if (!student || !tutor) return;
+    const headline = `A Smart Review for ${student.name} is ready for you to check.`;
+    const link = `${siteUrl()}/lesson/${lesson.id}/review#homework`;
+    const sends: Promise<unknown>[] = [];
+    const chatId = tutor.telegram?.chatId;
+    if (chatId && canNotify()) {
+      sends.push(notify(chatId, `<b>${escapeHtml(student.name)}</b>: a Smart Review is ready for you to check and send.\n${escapeHtml(link)}`));
+    }
+    const address = noticeAddress(tutor);
+    if (canEmail() && address) {
+      sends.push(
+        sendEmail({
+          to: address,
+          subject: `Smart Review for ${student.name} - check and send`,
+          text: [headline, "It goes to the child once you send it.", "", link, "", OFF_TEXT].join("\n"),
+          html: emailHtml(headline, "It goes to the child once you send it.", [], link),
+        }),
+      );
+    }
+    await Promise.all(sends);
+  })().catch((e) => console.error("[notice] review", e));
+}
