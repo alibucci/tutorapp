@@ -31,7 +31,7 @@ export function PlanCheckPanel({
   if (!check) {
     return <p className="note note-quiet">Checking the lesson against its plan…</p>;
   }
-  const rest = [...check.missed, ...check.partial];
+  const rest = [...check.missed, ...check.partial, ...(check.unclear ?? [])];
 
   async function answer(carry: boolean) {
     setBusy(true);
@@ -63,6 +63,7 @@ export function PlanCheckPanel({
       {list("Done", check.done, "tag-done")}
       {list("Partly", check.partial, "tag-info")}
       {list("Not reached", check.missed, "tag-warn")}
+      {list("Needs confirmation", check.unclear ?? [], "tag-quiet")}
       {rest.length > 0 && !check.carried && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="t-small">Carry what was not done into the next lesson?</span>

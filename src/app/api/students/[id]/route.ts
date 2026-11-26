@@ -1,13 +1,29 @@
 import { LIMIT, readJson } from "@/lib/http";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { studentFor } from "@/lib/access";
 import { isGameStyle } from "@/lib/gameStyles";
 import { leaveGroups } from "@/lib/groups";
-import { readProfile } from "@/lib/profile";
+import { LEARNING_MAX, cleanLearning, readProfile } from "@/lib/profile";
 import { themeFor } from "@/lib/themeFor";
 import { accessKey, updateStudent } from "@/lib/store";
+import type { Student, StudentProfile } from "@/lib/types";
 
 type Params = { params: Promise<{ id: string }> };
+
+/** The learning programme as the form sends it; cleaned before it is stored. */
+const text = (max: number) => z.string().max(max).optional();
+const LearningIn = z
+  .object({
+    objectives: text(LEARNING_MAX.objectives),
+    curriculum: text(LEARNING_MAX.curriculum),
+    include: text(LEARNING_MAX.include),
+    avoid: text(LEARNING_MAX.avoid),
+    requirements: text(LEARNING_MAX.requirements),
+    difficulty: z.enum(["easier", "level", "stretch"]).optional(),
+    approval: z.boolean().optional(),
+  })
+  .strip();
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
@@ -40,13 +56,15 @@ export async function PATCH(request: Request, { params }: Params) {
     gameStyle?: string;
     archived?: boolean;
     profile?: unknown;
+    /** The learning programme, saved on its own: the profile form never sends it. */
+    learning?: unknown;
     /** Make the learner's own theme again from the description. */
     remakeTheme?: boolean;
   }>(request, LIMIT.small);
   if (parsed instanceof Response) return parsed;
   const body = parsed;
 
-  const patch: Parameters<typeof updateStudent>[1] = {};
+  const patch: Partial<Student> = {};
 
   if (typeof body.name === "string") {
     if (!body.name.trim()) {
@@ -72,18 +90,40 @@ export async function PATCH(request: Request, { params }: Params) {
     patch.gameStyle = body.gameStyle;
   }
 
-  if (body.profile !== undefined) {
-    const profile = readProfile(body.profile);
-    if (!profile) {
-      return NextResponse.json({ error: "Check the age, level and goal." }, { status: 400 });
-    }
+  // The profile is worked out from the record as it is under the lock, not as
+  // it was read above: the "About" form and the learning programme save
+  // separately, and each must keep what the other just saved.
+  let profileFor: ((current: StudentProfile | undefined) => StudentProfile) | undefined;
+  const form = body.profile === undefined ? undefined : readProfile(body.profile);
+  if (form === null) {
+    return NextResponse.json({ error: "Check the age, level and goal." }, { status: 400 });
+  }
+  if (form) {
     // The profile is replaced whole, so a form that does not know about the
     // parent's wish (a tab opened before it existed) would wipe it. Only a
-    // form that sends the field, empty or not, may change it.
+    // form that sends the field, empty or not, may change it. The learning
+    // programme is never the profile form's to change.
     const sent = body.profile as Record<string, unknown>;
-    const wish = found.student.profile?.parentWish;
-    if (wish && !("parentWish" in sent)) profile.parentWish = wish;
-    patch.profile = profile;
+    profileFor = (current) => ({
+      ...form,
+      ...(current?.parentWish && !("parentWish" in sent) && { parentWish: current.parentWish }),
+      ...(current?.learning && { learning: current.learning }),
+    });
+  }
+
+  if (body.learning !== undefined) {
+    const parsed = LearningIn.safeParse(body.learning);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Check the learning programme: one of the boxes is too long." }, { status: 400 });
+    }
+    // An emptied form clears it: nothing is stored rather than empty strings.
+    const learning = cleanLearning(parsed.data);
+    const before = profileFor;
+    profileFor = (current) => {
+      const next: StudentProfile = { ...(before ? before(current) : current) };
+      delete next.learning;
+      return learning ? { ...next, learning } : next;
+    };
   }
 
   // Archiving keeps everything; restoring is the same call with false.
@@ -97,22 +137,26 @@ export async function PATCH(request: Request, { params }: Params) {
     patch.parentKey = accessKey();
   }
 
-  if (Object.keys(patch).length === 0 && !body.remakeTheme) {
+  if (Object.keys(patch).length === 0 && !profileFor && !body.remakeTheme) {
     return NextResponse.json({ error: "Nothing to change." }, { status: 400 });
   }
 
   // A new description makes a new theme, when the learner has their own or
-  // has none picked yet. A ready-made theme the tutor chose stays theirs.
-  const about = patch.profile?.about ?? "";
+  // has none picked yet. A ready-made theme the tutor chose stays theirs. The
+  // learning programme never does: it is what is taught, not how it looks.
+  const about = form?.about ?? "";
   const style = patch.gameStyle ?? found.student.gameStyle;
   const remake =
     body.remakeTheme ||
-    (patch.profile !== undefined &&
+    (form !== undefined &&
       about !== (found.student.customStyle?.madeFrom ?? "") &&
       Boolean(about) &&
       (!style || style === "custom"));
 
-  const saved = await updateStudent(id, patch);
+  const saved = await updateStudent(id, (current) => ({
+    ...patch,
+    ...(profileFor && { profile: profileFor(current.profile) }),
+  }));
   // An archived child leaves their saved groups; the tutor is told which.
   if (saved && patch.archivedAt) {
     const leftGroups = await leaveGroups(saved);

@@ -1,7 +1,9 @@
 import type {
   EnglishLevel,
   EnglishKind,
+  LearningDifficulty,
   LearningGoal,
+  LearningPrefs,
   Student,
   StudentProfile,
 } from "./types";
@@ -109,6 +111,99 @@ export function describeLearner(name: string, profile: StudentProfile | undefine
     .filter(Boolean)
     .join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// The learning programme: what the family wants taught, set once
+// ---------------------------------------------------------------------------
+
+export const DIFFICULTIES: { id: LearningDifficulty; label: string }[] = [
+  { id: "easier", label: "A step easier than their level" },
+  { id: "level", label: "At their level" },
+  { id: "stretch", label: "A step above their level (a stretch)" },
+];
+
+/** Long enough for a sentence or two each; the prompt stays short. */
+export const LEARNING_MAX = {
+  objectives: 300,
+  curriculum: 200,
+  include: 300,
+  avoid: 300,
+  requirements: 400,
+} as const;
+
+type LearningText = keyof typeof LEARNING_MAX;
+const LEARNING_TEXTS = Object.keys(LEARNING_MAX) as LearningText[];
+
+/**
+ * The programme as it is stored: trimmed, empty fields and the defaults left
+ * out, so an untouched form stores nothing at all. Undefined when empty.
+ */
+export function cleanLearning(prefs: LearningPrefs | undefined): LearningPrefs | undefined {
+  if (!prefs) return undefined;
+  const out: LearningPrefs = {};
+  for (const key of LEARNING_TEXTS) {
+    const text = prefs[key]?.trim().replace(/\s+/g, " ");
+    if (text) out[key] = text.slice(0, LEARNING_MAX[key]);
+  }
+  if (prefs.difficulty === "easier" || prefs.difficulty === "stretch") out.difficulty = prefs.difficulty;
+  if (prefs.approval === true) out.approval = true;
+  return Object.keys(out).length ? out : undefined;
+}
+
+const DIFFICULTY_LINE: Record<Exclude<LearningDifficulty, "level">, string> = {
+  easier: "one step easier than their level - never more than one step",
+  stretch: "one step above their level, as a stretch - never more than one step",
+};
+
+/**
+ * The programme as lines for a model, without a heading: a group's plan puts
+ * several children's lines together (lessonPlan.ts describeLearners). The
+ * parent's wish is one of them - until this it reached only the message to
+ * the parent. Whether the tutor approves practice first is not the model's
+ * business, so it is left out.
+ */
+export function preferenceLines(profile: StudentProfile | undefined): string[] {
+  const p = profile?.learning ?? {};
+  const difficulty = p.difficulty && p.difficulty !== "level" ? DIFFICULTY_LINE[p.difficulty] : "";
+  const wish = profile?.parentWish?.trim();
+  return [
+    p.objectives?.trim() ? `- Objectives: ${p.objectives.trim()}` : "",
+    p.curriculum?.trim() ? `- Curriculum focus: ${p.curriculum.trim()}` : "",
+    p.include?.trim() ? `- Topics to include: ${p.include.trim()}` : "",
+    p.avoid?.trim() ? `- Topics to AVOID (a hard limit): ${p.avoid.trim()}` : "",
+    p.requirements?.trim() ? `- Content requirements: ${p.requirements.trim()}` : "",
+    difficulty ? `- Difficulty: ${difficulty}` : "",
+    wish ? `- The parents asked for: ${wish}` : "",
+  ].filter(Boolean);
+}
+
+/**
+ * The learner's programme as a short block for any prompt that writes
+ * learning content. Empty when nothing is set, so a learner without one gets
+ * exactly the prompt they always had. Smart Review and anything else that
+ * writes content for a learner calls this too.
+ */
+export function describePreferences(profile: StudentProfile | undefined): string {
+  const lines = preferenceLines(profile);
+  return lines.length ? `The learning programme the family and tutor chose:\n${lines.join("\n")}` : "";
+}
+
+/**
+ * How a model is to read that block. Added to the system prompt only when
+ * there is a block to read.
+ */
+export const PREFERENCE_RULES = `THE LEARNING PROGRAMME (given with the learner):
+- Topics to avoid are hard limits. Never use them anywhere: not in a sentence,
+  an option, an example, a name or a picture idea.
+- The curriculum focus and the topics to include guide what the content is
+  about; the content requirements say what it may be built from. Where they
+  cannot both be met, the requirements win.
+- Difficulty moves the level by one step at most, easier or harder.
+- The game theme - the hero, the adventure, the look - is decoration only. It
+  never replaces the learning content and never decides what is taught.
+- What the lesson needs and the tutor asks for here comes first. The
+  programme and what the parents asked for are worked in where they fit -
+  except topics to avoid, which always hold.`;
 
 /** Who the homework talks to: a child, or someone who is not one. */
 export function isChild(profile: StudentProfile | undefined): boolean {

@@ -1,24 +1,27 @@
 import { z } from "zod";
+import { checkedLesson, planPoints } from "./lessonContext";
 import { MODEL_FAST, complete } from "./llm";
 import { studentsOf, updateCard } from "./plans";
 import { recordLiveStory, storyFor } from "./storySlides";
 import { getLesson, getPlan, updateLesson, updatePlan } from "./store";
 import { promptLabel, type Lesson, type PlanCard, type PlanCheck } from "./types";
 
+export { lessonContext, planPoints } from "./lessonContext";
+
 /**
  * After a lesson taught from a plan card: what of the plan it reached.
  *
  * The plan's points are numbered and the model only says, per number, done,
- * partly or not reached - it cannot add a point the plan never had. The card
- * is then marked taught, and what was covered joins the children's history,
- * so the next plan does not repeat it.
+ * partly, not reached or unclear - it cannot add a point the plan never had.
+ * The card is then marked taught, and what was covered joins the children's
+ * history, so the next plan does not repeat it.
  */
 
 const CheckSchema = z.object({
   items: z.array(
     z.object({
       n: z.number().int(),
-      status: z.enum(["done", "partial", "missed"]),
+      status: z.enum(["done", "partial", "missed", "unclear"]),
     }),
   ),
 });
@@ -29,20 +32,11 @@ numbered, then what was said in the lesson and the tutor's notes afterwards.
 For every point, say whether the lesson did it ("done"), did some of it
 ("partial") or did not get to it ("missed"). A word counts as done when it
 was used or practised, not only mentioned once. Go by the evidence: the
-tutor's notes count as much as the transcript, and where there is no
-evidence either way, it is "missed".`;
-
-/** What the plan asked for, as points to tick. */
-export function planPoints(card: Pick<PlanCard, "goal" | "words" | "carried" | "story">): string[] {
-  // A Bible story: what it has to tell, fact by fact, and today's habit.
-  const story = storyFor(card.story?.storyId);
-  if (story) return [...story.facts.filter((f) => !f.frame).map((f) => f.say), card.goal].filter(Boolean);
-  return [
-    ...(card.goal ? [card.goal] : []),
-    ...card.words.map((w) => `the word "${w}"`),
-    ...(card.carried ?? []),
-  ];
-}
+tutor's notes count as much as the transcript. "missed" needs evidence too:
+the transcript covers the lesson and the point is not in it, or the notes say
+it was not reached. Where there is nothing to go by either way - no
+transcript of that part and the notes do not say - it is "unclear", and the
+tutor confirms it.`;
 
 const GROUP_PROMPT: Record<string, string> = {
   w: "What went well",
@@ -74,7 +68,13 @@ function render(lesson: Lesson, points: string[]): string {
 
 export async function checkPlan(lesson: Lesson, card: PlanCard): Promise<PlanCheck> {
   const points = planPoints(card);
-  const result: PlanCheck = { done: [], partial: [], missed: [], at: new Date().toISOString() };
+  const result: PlanCheck & { unclear: string[] } = {
+    done: [],
+    partial: [],
+    missed: [],
+    unclear: [],
+    at: new Date().toISOString(),
+  };
   if (!points.length) return result;
   const parsed = await complete({
     system: SYSTEM,
@@ -88,18 +88,37 @@ export async function checkPlan(lesson: Lesson, card: PlanCard): Promise<PlanChe
   });
   const status = new Map(parsed.items.map((i) => [i.n, i.status]));
   points.forEach((p, i) => {
-    const s = status.get(i + 1) ?? "missed";
+    // A point the model skipped has no verdict: the tutor confirms it.
+    const s = status.get(i + 1) ?? "unclear";
     result[s].push(p);
   });
   return result;
 }
 
 /**
+ * Checks in progress, by lesson. The group lesson's check is started when it
+ * is split, and each child's homework waits for it (ensurePlanCheck): both
+ * join the one run instead of paying twice - and a story told in the lesson
+ * is recorded once. On globalThis so every route bundle shares the map.
+ */
+const checking: Map<string, Promise<PlanCheck | null>> = ((globalThis as {
+  __aloudliPlanChecks?: Map<string, Promise<PlanCheck | null>>;
+}).__aloudliPlanChecks ??= new Map());
+
+/**
  * Check the lesson against its card and record it: on the lesson, and on the
  * card (taught, with what it covered). Never throws - a lesson without this
  * check is still a whole lesson.
  */
-export async function runPlanCheck(lessonId: string, summaryCovered: string[] = []): Promise<PlanCheck | null> {
+export function runPlanCheck(lessonId: string, summaryCovered: string[] = []): Promise<PlanCheck | null> {
+  const running = checking.get(lessonId);
+  if (running) return running;
+  const job = checkAndRecord(lessonId, summaryCovered).finally(() => checking.delete(lessonId));
+  checking.set(lessonId, job);
+  return job;
+}
+
+async function checkAndRecord(lessonId: string, summaryCovered: string[]): Promise<PlanCheck | null> {
   try {
     const lesson = await getLesson(lessonId);
     if (!lesson?.planCard || lesson.planCheck) return lesson?.planCheck ?? null;
@@ -123,6 +142,21 @@ export async function runPlanCheck(lessonId: string, summaryCovered: string[] = 
   }
 }
 
+/**
+ * Before games are built from a plan lesson: the plan check is there, so the
+ * games know what the lesson reached. A lesson on its own has it already -
+ * the summary waits for it - so this matters for a group's children, whose
+ * homework starts while the group's check may still be running; it joins
+ * that run, or makes it if it never happened. Instant for a lesson with no
+ * plan.
+ */
+export async function ensurePlanCheck(lesson: Pick<Lesson, "id" | "planCard" | "groupId">): Promise<void> {
+  // Neither the lesson nor a group it came from had a plan: nothing to wait for.
+  if (!lesson.planCard && !lesson.groupId) return;
+  const holder = await checkedLesson(lesson);
+  if (holder && !holder.planCheck) await runPlanCheck(holder.id);
+}
+
 /** Add what the summary says was covered to the card's history. */
 export async function recordCovered(lesson: Lesson, covered: string[]) {
   if (!lesson.planCard || !covered.length) return;
@@ -137,7 +171,8 @@ export async function recordCovered(lesson: Lesson, covered: string[]) {
  */
 export async function carryOver(lesson: Lesson, accept: boolean): Promise<{ to?: string } | null> {
   if (!lesson.planCard || !lesson.planCheck || lesson.planCheck.carried) return null;
-  const rest = [...lesson.planCheck.missed, ...lesson.planCheck.partial];
+  // What nobody could confirm goes too: taught again is better than skipped.
+  const rest = [...lesson.planCheck.missed, ...lesson.planCheck.partial, ...(lesson.planCheck.unclear ?? [])];
   let to: string | undefined;
   if (accept && rest.length) {
     const { planId, cardId } = lesson.planCard;
