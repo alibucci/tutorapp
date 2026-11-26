@@ -11,7 +11,9 @@
     "smoke": "node scripts/smoke.mjs",
     "release": "bash scripts/release.sh",
     "backup:pull": "bash scripts/backup-pull.sh",
-    "test:scoring": "node --test scripts/scoring.test.mjs"
+    "test:scoring": "node --test scripts/scoring.test.mjs",
+    "test:memory": "node --test scripts/memory.test.mjs",
+    "test": "node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "next": "16.3.8",

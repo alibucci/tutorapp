@@ -29,3 +29,13 @@ export async function tutorListed(variable: string, tutorId: string): Promise<bo
 export function plansOpenTo(tutorId: string): Promise<boolean> {
   return tutorListed("LESSON_PLANS_TUTORS", tutorId);
 }
+
+/**
+ * Continuous learning - the learner's memory shown to the tutor, Smart
+ * Review, the learning schedule - for the tutors listed in LEARNING_TUTORS.
+ * The memory itself is kept for everyone from the start, so a tutor it opens
+ * to later already has history.
+ */
+export function learningOpenTo(tutorId: string): Promise<boolean> {
+  return tutorListed("LEARNING_TUTORS", tutorId);
+}

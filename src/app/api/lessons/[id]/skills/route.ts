@@ -44,9 +44,11 @@ export async function PUT(request: Request, { params }: Params) {
   const parsed = await readJson<{ changes: SkillChange[] }>(request, LIMIT.medium);
   if (parsed instanceof Response) return parsed;
   const { changes } = parsed;
-  const skills = applySkillChanges(student.skills, changes ?? [], lesson.id);
-
-  await updateStudent(student.id, { skills });
+  // Under the student's lock: homework results write to the same skills.
+  const saved = await updateStudent(student.id, (current) => ({
+    skills: applySkillChanges(current.skills, changes ?? [], lesson.id),
+  }));
+  const skills = saved?.skills ?? [];
   await updateLesson(lesson.id, { skillsAppliedAt: new Date().toISOString() });
 
   return NextResponse.json({ skills });

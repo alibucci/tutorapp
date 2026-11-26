@@ -1,3 +1,4 @@
+import { skillsOfGame, withIds } from "./memory";
 import { z } from "zod";
 import { MODEL, MODEL_FAST, complete } from "./llm";
 import { describeLearner, formatsFor, isChild } from "./profile";
@@ -98,6 +99,11 @@ function schemaFor(formats: EnglishKind[], short: boolean) {
       .describe(
         "For the tutor, not the learner: the one thing every task practises, under 60 characters. Grammar words are fine here.",
       ),
+    skill_ids: z
+      .array(z.string())
+      .max(4)
+      .catch([])
+      .describe("The ids of the learner's tracked skills these tasks practise (from the list given), or an empty list"),
   };
   for (const kind of formats) {
     if (kind === "choose") Object.assign(fields, { chooseTitle: title, choose: list(Choose, kind) });
@@ -135,6 +141,7 @@ function schemaFor(formats: EnglishKind[], short: boolean) {
 
 type Parsed = {
   topic: string;
+  skill_ids?: string[];
   chooseTitle?: string;
   choose?: z.infer<typeof Choose>[];
   buildTitle?: string;
@@ -444,6 +451,7 @@ function describeRequest(lesson: Lesson, student: Student, interests: string, re
     "",
     `What the tutor wants practised: ${lesson.request ?? lesson.title}`,
     redo.length ? `\n${describeRedo(redo)}` : "",
+    describeSkills(student),
   ].join("\n");
 }
 
@@ -516,6 +524,7 @@ function describeLesson(lesson: Lesson, student: Student, interests: string, red
     s?.homeworkFocus ? `The tutor wants them to practise: ${s.homeworkFocus}` : "",
     weak ? `\nStill weak from earlier lessons:\n${weak}` : "",
     redo.length ? `\n${describeRedo(redo)}` : "",
+    describeSkills(student),
   ]
     .filter(Boolean)
     .join("\n");
@@ -590,6 +599,11 @@ export async function buildExercises(
     text.trim().length <= limit ? text.trim() : `${text.trim().slice(0, limit - 1)}…`;
   const topic = cut(parsed.topic);
   const title = (text: string | undefined) => cut(text ?? "", 50);
+  // The learner's skills these games practise, so their results reach the
+  // learner's memory. Only ids that are really theirs; else matched by topic.
+  const known = withIds(student.skills);
+  const skillIds = [...new Set(parsed.skill_ids ?? [])].filter((id) => known.some((k) => k.id === id));
+  const linked = skillIds.length ? skillIds : skillsOfGame(known, undefined, topic).map((k) => k.id!);
   // Fewer than this and it is not worth opening.
   const least = short ? 2 : 3;
 
@@ -662,7 +676,19 @@ export async function buildExercises(
     made.words = { kind: "words", title: title(parsed.wordsTitle), topic, rounds: words };
   }
 
-  return formats.map((kind) => made[kind]).filter((e): e is Exercise => Boolean(e));
+  return formats
+    .map((kind) => made[kind])
+    .filter((e): e is Exercise => Boolean(e))
+    .map((e) => (linked.length ? { ...e, skillIds: linked } : e));
+}
+
+/** The learner's tracked skills, with the ids the games name them by. */
+function describeSkills(student: Student): string {
+  const skills = withIds(student.skills).slice(0, 25);
+  if (!skills.length) return "";
+  return `\nSkills tracked for this learner (put the ids of the ones these tasks practise in skill_ids):\n${skills
+    .map((k) => `- ${k.id}: ${k.topic} [${k.status}]`)
+    .join("\n")}`;
 }
 
 export { MODEL as EXERCISE_MODEL };

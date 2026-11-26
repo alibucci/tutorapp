@@ -132,6 +132,11 @@ export type Lesson = {
    * the tutor asked for in their own words.
    */
   request?: string;
+  /**
+   * On "practice": a Smart Review - practice built from the learner's memory
+   * (memory.ts), not from one lesson. Absent on every other homework.
+   */
+  review?: SmartReview;
   /** The children in a group lesson. `studentId` is the first of them. */
   groupStudentIds?: string[];
   /** On a group lesson, once split: the lesson made for each child. */
@@ -166,6 +171,28 @@ export type Lesson = {
   skillsAppliedAt?: string;
 };
 
+/** Why and how a Smart Review was made, and what became of it. */
+export type SmartReview = {
+  /** Why, for the tutor: which skills, and what in the evidence chose them. */
+  reason: string;
+  /** The skills it practises. */
+  skillIds: string[];
+  /** How long it is meant to take. */
+  minutes: number;
+  /** The tutor pressed "Generate", or the learning schedule made it. */
+  by: "tutor" | "schedule";
+  /** The schedule's slot it belongs to ("2026-11-26"), so a slot is never filled twice. */
+  slot?: string;
+  /** What the tutor asked for when making it. */
+  comment?: string;
+  /** The newest evidence it was built on: newer results mean the draft may be out of date. */
+  builtOn?: string;
+  /** Set by the tutor or the queue; otherwise its state follows the homework. */
+  state?: "deferred" | "skipped" | "archived";
+  stateAt?: string;
+  stateReason?: string;
+};
+
 // ---------------------------------------------------------------------------
 // The student model: what accumulates across lessons.
 // ---------------------------------------------------------------------------
@@ -178,7 +205,65 @@ export const SKILL_STATUS_LABEL: Record<SkillStatus, string> = {
   solid: "Solid",
 };
 
+/**
+ * What kind of thing a skill is. A lesson's topic ("Animals at the zoo") is
+ * not a skill; "naming animals" is vocabulary, "it can + verb" is grammar.
+ */
+export const SKILL_AREAS = ["grammar", "vocabulary", "speaking", "comprehension", "pronunciation", "curriculum", "other"] as const;
+export type SkillArea = (typeof SKILL_AREAS)[number];
+
+export const SKILL_AREA_LABEL: Record<SkillArea, string> = {
+  grammar: "Grammar",
+  vocabulary: "Vocabulary",
+  speaking: "Speaking",
+  comprehension: "Understanding",
+  pronunciation: "Pronunciation",
+  curriculum: "Programme",
+  other: "Other",
+};
+
+/** One piece of evidence about a skill: a lesson, or a homework game. */
+export type SkillEvidence = {
+  at: string;
+  source: "lesson" | "homework" | "review";
+  lessonId: string;
+  /** Homework: first-attempt rounds right out of rounds marked. */
+  right?: number;
+  total?: number;
+  /** Lesson: the status the tutor accepted, with its reason. */
+  status?: SkillStatus;
+  note?: string;
+};
+
+/** A concrete thing the child got wrong, kept so practice can return to it. */
+export type SkillMistake = {
+  at: string;
+  lessonId: string;
+  asked: string;
+  answered: string;
+  correct?: string;
+};
+
+/**
+ * Where a skill stands for practice, worked out from its status and its
+ * evidence - never typed in, and never a made-up percentage.
+ */
+export type MemoryState = "not_assessed" | "learning" | "needs_review" | "improving" | "retained";
+
+export const MEMORY_STATE_LABEL: Record<MemoryState, string> = {
+  not_assessed: "Not assessed",
+  learning: "Learning",
+  needs_review: "Needs review",
+  improving: "Improving",
+  retained: "Retained",
+};
+
 export type Skill = {
+  /**
+   * Stable id: the skill keeps it when the tutor renames or merges it. Older
+   * records have none and are given one when next read (see memory.ts).
+   */
+  id?: string;
   /** Short topic name, stable enough to match across lessons. */
   topic: string;
   status: SkillStatus;
@@ -189,11 +274,31 @@ export type Skill = {
   firstSeen: string;
   lastSeen: string;
   lessonIds: string[];
+  area?: SkillArea;
+  /** The broader skill this is part of: "Past Simple" for "irregular verbs". */
+  parent?: string;
+  /** Names it was known by before a merge, so history and matching keep working. */
+  aliases?: string[];
+  /** Newest last, capped (memory.ts). */
+  evidence?: SkillEvidence[];
+  /** Newest last, capped. */
+  mistakes?: SkillMistake[];
+  /** Last time homework or a review practised it. */
+  lastPracticed?: string;
+  /** When it is due to come back in practice (spaced repetition). */
+  reviewAt?: string;
+  /** Spaced-repetition step: how far apart the reviews have grown. */
+  step?: number;
 };
 
 /** A status change the model proposes after a lesson, pending tutor approval. */
 export type SkillChange = {
+  /** The existing skill this is, when the model matched one (memory.ts ids). */
+  skillId?: string;
   topic: string;
+  area?: SkillArea;
+  /** The broader skill it belongs to, when there is one. */
+  parent?: string;
   /** Absent when the topic is new. */
   from?: SkillStatus;
   to: SkillStatus;
@@ -516,7 +621,7 @@ export type KindRound = {
   why: string;
 };
 
-export type Exercise =
+type ExerciseBody =
   | { kind: "choose"; title: string; topic: string; rounds: ChooseRound[] }
   | { kind: "questions"; title: string; topic: string; rounds: QuestionRound[] }
   | { kind: "recall"; title: string; topic: string; rounds: QuestionRound[] }
@@ -542,6 +647,12 @@ export type Exercise =
       rule: string;
       rounds: CatchRound[];
     };
+
+/**
+ * One game. `skillIds` are the learner's skills it practises (memory.ts), so
+ * its result is counted toward them; absent on games made before that.
+ */
+export type Exercise = ExerciseBody & { skillIds?: string[] };
 
 export type ExerciseKind = Exercise["kind"];
 

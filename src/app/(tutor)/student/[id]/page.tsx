@@ -20,7 +20,9 @@ import { Avatar, ChevronLeft, ChevronRight } from "@/components/ui";
 import { studentFor } from "@/lib/access";
 import { homeworkDone } from "@/lib/homework";
 import { listGroups, listLessons, listReports } from "@/lib/store";
-import { plansOpenTo } from "@/lib/tutorList";
+import { learningOpenTo, plansOpenTo } from "@/lib/tutorList";
+import { withIds } from "@/lib/memory";
+import { SkillTidy } from "@/components/SkillTidy";
 import type { Lesson } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +44,9 @@ export default async function StudentPage({
         .map((g) => g.name)
     : [];
   const christianity = moduleOf(student);
+  // The learner's memory, for the tutors continuous learning is open to.
+  const learning = await learningOpenTo(student.tutorId);
+  const skills = withIds(student.skills);
   const story = christianityOpen && !student.archivedAt ? await storyStatus(student) : null;
 
   const [lessons, reports] = await Promise.all([
@@ -110,7 +115,8 @@ export default async function StudentPage({
 
       <section className="space-y-3">
         <h2 className="t-title">Working on</h2>
-        <SkillList skills={student.skills} />
+        <SkillList skills={skills} memory={learning} />
+        {learning && skills.length > 1 && !student.archivedAt && <SkillTidy studentId={student.id} skills={skills} />}
       </section>
 
       {/* A child with no lessons yet has nothing to build from. This is how

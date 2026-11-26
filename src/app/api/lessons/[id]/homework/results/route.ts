@@ -4,7 +4,9 @@ import { LIMIT, readJson } from "@/lib/http";
 import { recordStoryResult } from "@/lib/christianity";
 import { noticeHomeworkDone } from "@/lib/notices";
 import { onHomeworkDone } from "@/lib/programmes";
-import { updateLesson } from "@/lib/store";
+import { recordGame } from "@/lib/memory";
+import { correctFor } from "@/lib/redo";
+import { updateLesson, updateStudent } from "@/lib/store";
 import { answered, saidRight } from "@/lib/speaking";
 import {
   ALL_EXERCISE_KINDS,
@@ -203,6 +205,22 @@ export async function POST(request: Request, { params }: Params) {
     };
   });
   noticeHomeworkDone(before, after);
+  // The learner's memory: the first play only - a replay from memory says
+  // nothing new - and only rounds that were marked, so a skip is no mistake.
+  if (after && firstPlay && !unscored && total > 0) {
+    await updateStudent(after.studentId, (student) => ({
+      skills: recordGame(student.skills, exercise.skillIds, exercise.topic, {
+        at: new Date().toISOString(),
+        lessonId: after.id,
+        source: after.review ? "review" : "homework",
+        right,
+        total,
+        mistakes: marked
+          .filter((r) => !r.right)
+          .map((r) => ({ asked: r.asked, answered: r.answered, ...(correctFor(exercise, r) && { correct: correctFor(exercise, r) }) })),
+      }),
+    })).catch((e) => console.error("[memory] homework", e));
+  }
   // A programme homework moves the learner's place, on the first play only.
   if (after && firstPlay) {
     await recordStoryResult(after, kind, right, total).catch((e) =>

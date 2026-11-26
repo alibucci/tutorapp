@@ -20,7 +20,7 @@ const KEPT = 12;
 const NOT_CARRIED = new Set(["kindness", "speak"]);
 
 /** The answer the round wanted, read from the game the learner played. */
-function correctFor(exercise: Exercise, round: RoundAnswer): string | undefined {
+export function correctFor(exercise: Exercise, round: RoundAnswer): string | undefined {
   switch (exercise.kind) {
     case "choose": {
       const r = exercise.rounds.find((x) => x.sentence === round.asked);
