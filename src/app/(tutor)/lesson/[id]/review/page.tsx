@@ -1,4 +1,5 @@
 import { ReviewActions } from "@/components/ReviewActions";
+import { reviewOutdated } from "@/lib/review";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChangeStudent } from "@/components/ChangeStudent";
@@ -176,6 +177,11 @@ export default async function ReviewPage({
           </ul>
           {lesson.review.comment && <p className="t-small t-muted">You asked: {lesson.review.comment}</p>}
           <p className="hint">New questions on these skills, from what the lessons covered. Nothing reaches the child until it is sent.</p>
+          {!lesson.homework?.sentAt && reviewOutdated(lesson.review, student.skills) && (
+            <p className="note note-warn t-small">
+              New results came in after this was made. &ldquo;Build different ones&rdquo; makes it again from them.
+            </p>
+          )}
           <ReviewActions lessonId={lesson.id} state={lesson.review.state} />
         </section>
       ) : practice ? (

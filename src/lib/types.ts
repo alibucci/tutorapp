@@ -397,6 +397,25 @@ export type Student = {
   redo?: RedoItem[];
   /** When Smart Reviews come by themselves (schedule.ts). Absent: never. */
   schedule?: LearningSchedule;
+  /** The tutor's last "before the next lesson" brief (brief.ts). */
+  brief?: LearningBrief;
+};
+
+/** A short learning summary for the tutor before the next lesson. */
+export type LearningBrief = {
+  at: string;
+  /** The newest piece of evidence it was written from: newer means it is out of date. */
+  upTo?: string;
+  headline: string;
+  covered: string[];
+  practiceDone: string[];
+  recurringMistakes: string[];
+  improving: string[];
+  needsPractice: string[];
+  unfinished: string[];
+  warmup: string;
+  objectives: string[];
+  model: string;
 };
 
 /**

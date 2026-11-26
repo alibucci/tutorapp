@@ -15,7 +15,7 @@ import { recentActivity, timeAgo } from "@/lib/feed";
 import { homeworkDone, sendsItself } from "@/lib/homework";
 import { hasParent } from "@/lib/profile";
 import { listGroupLessons, listLessons, listStudents } from "@/lib/store";
-import type { Lesson } from "@/lib/types";
+import type { Lesson, Student } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -52,9 +52,64 @@ function notSent(lesson: Lesson, name: string, what: string): Todo | null {
   return null;
 }
 
+/** How long a sent Smart Review can sit unfinished before the tutor hears of it. */
+const REVIEW_STALE_MS = 4 * 24 * 60 * 60 * 1000;
+
+/**
+ * A Smart Review needs the tutor when it waits for their yes, could not be
+ * made, or has sat unfinished for days. One the tutor set aside needs nothing.
+ */
+function reviewTodo(lesson: Lesson, name: string): Todo | null {
+  const review = lesson.review!;
+  if (review.state === "skipped" || review.state === "archived") return null;
+  const href = `/lesson/${lesson.id}/review#homework`;
+  const hw = lesson.homework;
+  if (!hw?.exercises?.length) {
+    return lesson.autoFailed
+      ? { href, title: `${name}'s Smart Review could not be made`, detail: `${lesson.title} · try again`, kind: "warn", icon: <ImageIcon /> }
+      : null;
+  }
+  if (!hw.sentAt) {
+    return {
+      href,
+      title: `Check ${name}'s Smart Review`,
+      detail: `${lesson.title} · ${review.by === "schedule" ? "made by the schedule" : "your draft"} - send it when it looks right`,
+      kind: "warn",
+      icon: <ImageIcon />,
+    };
+  }
+  if (!homeworkDone(hw) && Date.now() - Date.parse(hw.sentAt) > REVIEW_STALE_MS) {
+    return {
+      href,
+      title: `${name} has not finished a Smart Review`,
+      detail: `${lesson.title} · keep it, or archive it so the next one can come`,
+      kind: "accent",
+      icon: <ImageIcon />,
+    };
+  }
+  return null;
+}
+
+/** A schedule that could not make a review, or has been paused a long time. */
+function scheduleTodo(student: Student): Todo | null {
+  const s = student.schedule;
+  if (!s?.enabled || student.archivedAt) return null;
+  const href = `/student/${student.id}`;
+  const failed = (s.log ?? []).filter((e) => e.outcome === "failed" && !e.lessonId && Date.now() - Date.parse(e.at) < 3 * 86_400_000).at(-1);
+  if (failed) return { href, title: `The schedule could not make ${student.name}'s Smart Review`, detail: failed.reason, kind: "warn", icon: <ImageIcon /> };
+  if (!s.reviewDays.length && s.mode !== "manual") {
+    return { href, title: `${student.name}'s schedule has no days`, detail: "pick the days Smart Reviews come", kind: "accent", icon: <ImageIcon /> };
+  }
+  if (s.pausedAt && Date.now() - Date.parse(s.pausedAt) > TODO_WINDOW_MS) {
+    return { href, title: `${student.name}'s schedule has been paused two weeks`, detail: "resume it, or switch it off", kind: "accent", icon: <ImageIcon /> };
+  }
+  return null;
+}
+
 /** The one thing each recent lesson is still waiting for, if anything. */
 function todoFor(lesson: Lesson, name: string, parent: boolean): Todo | null {
   const base = `/lesson/${lesson.id}`;
+  if (lesson.review) return reviewTodo(lesson, name);
   if (lesson.kind === "practice") {
     if (lesson.homework?.sentAt) return null;
     // Extra homework and programme stories go out by themselves; only a
@@ -182,6 +237,7 @@ export default async function Home() {
         icon: <BookIcon />,
       })),
     ...recentTodos(lessons, names, adults),
+    ...students.map(scheduleTodo).filter((t): t is Todo => t !== null),
   ];
   const activity = recentActivity(lessons, students);
 

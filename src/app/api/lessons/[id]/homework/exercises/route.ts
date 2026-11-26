@@ -3,7 +3,8 @@ import { lessonFor } from "@/lib/access";
 import { StoryNotBuilt, buildStoryHomework, cardById } from "@/lib/christianity";
 import { buildGamesOnce } from "@/lib/autoHomework";
 import { homeworkDone } from "@/lib/homework";
-import { updateLesson } from "@/lib/store";
+import { getLesson, getStudent, updateLesson } from "@/lib/store";
+import { buildReviewGames } from "@/lib/review";
 import type { Lesson, Student } from "@/lib/types";
 import { withUsage } from "@/lib/usage";
 
@@ -59,6 +60,16 @@ export async function POST(_request: Request, { params }: Params) {
   // A programme homework is rebuilt from the same story card: text, checks
   // and all. The story stays the one the system picked.
   if (found.lesson.module) return withUsage(usage, () => rebuildStory(id, found.lesson, found.student));
+
+  // A Smart Review is rebuilt from the learner's memory, at its own length,
+  // without using up their "practise these next time" list.
+  if (found.lesson.review) {
+    const review = found.lesson.review;
+    const fresh = (await getStudent(found.student.id)) ?? found.student;
+    const ok = await withUsage(usage, () => buildReviewGames(id, fresh, review.minutes));
+    if (!ok) return NextResponse.json({ error: "Could not build it again. Try once more." }, { status: 502 });
+    return NextResponse.json((await getLesson(id))?.homework);
+  }
 
   const result = await withUsage(usage, () => buildGamesOnce(id, found.lesson, found.student));
   if (!result.ok) {

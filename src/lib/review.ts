@@ -139,7 +139,12 @@ export async function buildReviewGames(lessonId: string, student: Student, minut
     const saved = await updateLesson(lessonId, (current) =>
       current.homework?.results?.length || current.homework?.answers
         ? null
-        : { homework: { ...(current.homework ?? { focus: "" }), exercises: linked }, autoFailed: undefined },
+        : {
+            homework: { ...(current.homework ?? { focus: "" }), exercises: linked },
+            autoFailed: undefined,
+            // Made from the results up to now: an older draft warning goes away.
+            ...(current.review && { review: { ...current.review, ...(newestEvidence(student) && { builtOn: newestEvidence(student) }) } }),
+          },
     );
     return Boolean(saved);
   } catch (e) {
@@ -166,4 +171,14 @@ export function reviewState(lesson: Lesson): { state: string; tone: string } {
   const played = h.results?.length ?? 0;
   if (played >= h.exercises.length) return { state: "Done", tone: "text-live" };
   return { state: played ? "In progress" : "Sent", tone: "t-muted" };
+}
+
+/** Newer evidence than the review was made from: the draft may be out of date. */
+export function reviewOutdated(review: SmartReview, skills: Student["skills"]): boolean {
+  const newest = skills.flatMap((s) => (s.evidence ?? []).map((e) => e.at)).sort().at(-1);
+  return Boolean(newest && review.builtOn && newest > review.builtOn);
+}
+
+function newestEvidence(student: Student): string | undefined {
+  return student.skills.flatMap((s) => (s.evidence ?? []).map((e) => e.at)).sort().at(-1);
 }

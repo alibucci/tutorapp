@@ -27,6 +27,8 @@ import { SkillTidy } from "@/components/SkillTidy";
 import { SmartReviewPanel } from "@/components/SmartReviewPanel";
 import { reviewState } from "@/lib/review";
 import { scheduleView } from "@/lib/schedule";
+import { learningOverview } from "@/lib/overview";
+import { LearningOverviewCard } from "@/components/LearningOverviewCard";
 import { SchedulePanel } from "@/components/SchedulePanel";
 import type { Lesson } from "@/lib/types";
 
@@ -131,6 +133,10 @@ export default async function StudentPage({
         <SkillList skills={skills} memory={learning} />
         {learning && skills.length > 1 && !student.archivedAt && <SkillTidy studentId={student.id} skills={skills} />}
       </section>
+
+      {learning && !student.archivedAt && (
+        <LearningOverviewCard studentId={student.id} overview={learningOverview(student, lessons)} brief={student.brief} />
+      )}
 
       {/* A child with no lessons yet has nothing to build from. This is how
           they get a starting point without waiting for the first lesson. */}
