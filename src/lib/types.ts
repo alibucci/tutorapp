@@ -1026,6 +1026,16 @@ export type PlanCard = {
   covered?: string[];
   /** Points carried over from an earlier card that were not reached. */
   carried?: string[];
+  /**
+   * Review the last build worked in from the children's practice (planMemory.ts),
+   * one line each: "Warm-up: past tense - went, saw (came back in homework)".
+   * Kept apart from goal and words, which are only the new learning.
+   */
+  review?: string[];
+  /** Review lines the tutor took out: a rebuild is told not to put them back. */
+  reviewSkipped?: string[];
+  /** The tutor wants no review in this lesson: a rebuild leaves it out. */
+  reviewOff?: boolean;
   materials?: LessonMaterials;
   /** Materials being made in the background. */
   building?: { since: string; step: string };

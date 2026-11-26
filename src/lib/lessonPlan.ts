@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { MODEL_FAST, complete } from "./llm";
+import { type ChildMemory, cleanReview, describeMemory } from "./planMemory";
 import { LEVELS, PREFERENCE_RULES } from "./profile";
 import {
   SLIDE_PARTS,
@@ -35,6 +36,11 @@ export type Learner = {
    * empty. Optional so a Learner made before it existed still describes.
    */
   preferences?: string;
+  /**
+   * What their practice shows (planMemory.ts): weak points, what is coming along,
+   * what is solid. Topics only, no names. Absent for a child with no record.
+   */
+  memory?: ChildMemory;
 };
 
 /**
@@ -106,6 +112,9 @@ export function describeLearners(learners: Learner[]): string {
   return lines.join("\n");
 }
 
+/** The children's practice record for a prompt, or "" when none has one. */
+const memoryOf = (learners: Learner[]) => describeMemory(learners.map((l) => l.memory));
+
 /** Slides for a lesson of this length. */
 export function slideCount(minutes: number): number {
   return minutes <= 30 ? 8 : minutes <= 45 ? 11 : 14;
@@ -163,6 +172,22 @@ ${RULES}
   not put the same topic twice in this plan.
 - If the parents want something, work it in where it fits the children.`;
 
+/**
+ * Only when some child has a practice record. The month plans new topics; the
+ * review itself is worked in when each lesson is built, from the results as
+ * they are then - a month ahead they would be stale.
+ */
+const MONTH_MEMORY = `
+
+What the children's practice shows is given below. Plan with it:
+- Do not plan a lesson to teach again what is solid for them.
+- Weak points and mistakes that keep coming back are reviewed inside the
+  lessons when each one is built (a short warm-up); they are not extra
+  topics. Only a whole area they clearly need taught again may become a
+  lesson of its own, and at most one in the month.
+- Keep an order of new topics that builds, and pitch it to the results: where
+  little was right first time, go more slowly and keep the words simpler.`;
+
 export type MonthCard = Pick<PlanCard, "topic" | "words" | "goal" | "link">;
 
 export async function suggestMonth(opts: {
@@ -173,8 +198,10 @@ export async function suggestMonth(opts: {
   /** Topics already taught or already on the board. */
   had: string[];
 }): Promise<MonthCard[]> {
+  const memory = memoryOf(opts.learners);
   const user = [
     describeLearners(opts.learners),
+    memory,
     `Lessons: ${opts.count}, ${opts.minutes} minutes each.`,
     opts.parentWishes ? `The parents want: ${opts.parentWishes}` : "",
     opts.had.length ? `Already had (do not repeat):\n${opts.had.map((t) => `- ${t}`).join("\n")}` : "",
@@ -182,7 +209,7 @@ export async function suggestMonth(opts: {
     .filter(Boolean)
     .join("\n\n");
   const parsed = await complete({
-    system: withProgrammes(MONTH_SYSTEM, opts.learners),
+    system: withProgrammes(MONTH_SYSTEM + (memory ? MONTH_MEMORY : ""), opts.learners),
     user,
     schema: MonthSchema,
     schemaName: "MonthPlan",
@@ -251,6 +278,11 @@ const MaterialsSchema = z.object({
   topic: z.string().min(2).max(60),
   words: z.array(WORD).min(3).max(6),
   goal: z.string().min(5).max(140),
+  review: z
+    .array(z.string().max(160))
+    .max(4)
+    .catch([])
+    .describe('The review points worked in, one line each, e.g. "Warm-up: past tense - went, saw, ate (came back in homework)"; empty if none'),
   slides: z.array(SlideSchema).min(1),
   videos: z.array(VideoSchema).max(4),
   worksheet: z
@@ -340,12 +372,50 @@ const ONE_CHILD = `
 
 This is one child: give "harder" as null on every slide.`;
 
+/**
+ * Only when some child has a practice record: a lesson for children without
+ * one is asked exactly as before. The plan's order leads - review is worked
+ * into the lesson, never in place of it - and the new learning and the review
+ * stay apart, so the tutor can see and take out what was reviewed.
+ */
+const MATERIALS_MEMORY = `
+
+What the children's practice shows is given below (lessons, homework games,
+Smart Reviews). Use it like this:
+- This lesson's topic, words and goal stay as they are: it is the next lesson
+  in the plan's order. Review is worked into it and never replaces it.
+- A weak point or a mistake that keeps coming back: a short review on the
+  warm-up slide - a minute or two, e.g. a quick question round with the right
+  forms said aloud - and, where it fits naturally, once more in the activity
+  or speaking. Say in the warm-up's notes that it is review, and why.
+- Coming along and due for review: bring it back briefly in the same way, if
+  it fits. Coming along and not due: no review - its results only say how
+  hard to pitch the language around it.
+- What is solid: do not teach it again. It may be used as known language in
+  examples and model sentences.
+- Pitch the lesson to the results: where little was right first time, keep
+  the new language smaller and give more support; where they did well, one
+  step more.
+- At most 2 review points; the new topic gets most of the time. Fully covered
+  material is not repeated without a reason from the results above.
+- Keep the new learning and the review apart: "goal" and "words" are only the
+  new learning. List each review point you worked in under "review", one
+  short line saying where and what, e.g. "Warm-up: past tense - went, saw,
+  ate (came back in homework)". None worked in: an empty list.
+- Results are for the tutor: no score, mark or result on any slide.`;
+
+const MATERIALS_MEMORY_GROUP = `
+- A point only one child needs: keep it light, for everyone, and never single
+  that child out.`;
+
 export type SlideDraft = Omit<Slide, "id">;
 
 export type BuiltMaterials = {
   topic: string;
   words: string[];
   goal: string;
+  /** Review worked in from the children's practice, kept apart from the goal. */
+  review: string[];
   slides: Slide[];
   videos: VideoIdea[];
   sheets: Sheet[];
@@ -359,7 +429,7 @@ export type BuiltMaterials = {
 export async function buildMaterials(opts: {
   learners: Learner[];
   minutes: number;
-  card: Pick<PlanCard, "topic" | "words" | "goal" | "carried">;
+  card: Pick<PlanCard, "topic" | "words" | "goal" | "carried" | "reviewSkipped" | "reviewOff">;
   parentWishes?: string;
   had: string[];
   wish?: string;
@@ -370,9 +440,16 @@ export async function buildMaterials(opts: {
   const keep = (opts.keep ?? []).filter((k) => k.index < total);
   const toWrite = Math.max(1, total - keep.length);
   const topic = opts.card.topic.trim();
+  // The tutor said no review in this lesson: the record is not sent at all.
+  const memory = opts.card.reviewOff ? "" : memoryOf(opts.learners);
+  const skipped = opts.card.reviewSkipped ?? [];
 
   const user = [
     describeLearners(opts.learners),
+    memory,
+    memory && skipped.length
+      ? `The tutor took these review points out of this lesson. Do not work them in again:\n${skipped.map((r) => `- ${r}`).join("\n")}`
+      : "",
     `Lesson: ${opts.minutes} minutes, ${total} slides in all.`,
     topic ? `Topic: ${topic}` : "Topic: not chosen - pick one that suits these children.",
     opts.card.words.length ? `Words to learn: ${opts.card.words.join(", ")}` : "",
@@ -398,7 +475,12 @@ export async function buildMaterials(opts: {
     .join("\n\n");
 
   const parsed = await complete({
-    system: withProgrammes(MATERIALS_SYSTEM + (opts.learners.length > 1 ? MIXED_LEVELS : ONE_CHILD), opts.learners),
+    system: withProgrammes(
+      MATERIALS_SYSTEM +
+        (opts.learners.length > 1 ? MIXED_LEVELS : ONE_CHILD) +
+        (memory ? MATERIALS_MEMORY + (opts.learners.length > 1 ? MATERIALS_MEMORY_GROUP : "") : ""),
+      opts.learners,
+    ),
     user,
     schema: MaterialsSchema,
     schemaName: "LessonMaterials",
@@ -416,6 +498,8 @@ export async function buildMaterials(opts: {
     topic: topic || parsed.topic.trim(),
     words,
     goal: opts.card.goal || parsed.goal.trim(),
+    // No record sent, nothing reviewed: whatever came back is not from the results.
+    review: memory ? cleanReview(parsed.review, skipped) : [],
     slides,
     videos: cleanVideos(parsed.videos),
     sheets: makeSheets(topic || parsed.topic.trim(), words, parsed.worksheet, parsed.coloring, parsed),

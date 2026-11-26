@@ -11,7 +11,9 @@ import {
   listPlans,
   updatePlan,
 } from "./store";
+import * as memoryRules from "./memory";
 import { drawForCard, dropUnused, picturesOn } from "./planImages";
+import { childMemory } from "./planMemory";
 import { preferenceLines } from "./profile";
 import { buildStorySlides, storyFor, storyOpen } from "./storySlides";
 import { plansOpenTo } from "./tutorList";
@@ -60,7 +62,14 @@ export async function planName(plan: LessonPlan): Promise<string> {
   return group?.name ?? students[0]?.name ?? "Plan";
 }
 
+/**
+ * The children as the planner sees them. Their practice record goes in too,
+ * with every name in the group kept out of it: an answer that mentions a
+ * child is dropped, not sent.
+ */
 export async function learnersOf(students: Student[]): Promise<Learner[]> {
+  const now = new Date().toISOString();
+  const hide = students.map((s) => s.name);
   return Promise.all(
     students.map(async (s) => ({
       age: s.profile?.age,
@@ -68,6 +77,7 @@ export async function learnersOf(students: Student[]): Promise<Learner[]> {
       interests: [s.profile?.about ?? "", await interestsOf(s)].filter(Boolean).join(" "),
       // Lines without a heading: describeLearners puts a group's together.
       preferences: preferenceLines(s.profile).join("\n"),
+      memory: childMemory(s.skills ?? [],{ now, hide }, memoryRules),
     })),
   );
 }
@@ -243,6 +253,9 @@ export async function startBuild(
           topic: built.topic,
           words: built.words,
           goal: built.goal,
+          // Replaced on every build: what this build reviewed, from the
+          // results as they are now.
+          review: built.review.length ? built.review : undefined,
           materials: asMaterials(built, opts.wish),
           // The slides are there and usable; pictures follow where drawing is on.
           building: drawing ? { since: new Date().toISOString(), step: "Drawing pictures" } : undefined,

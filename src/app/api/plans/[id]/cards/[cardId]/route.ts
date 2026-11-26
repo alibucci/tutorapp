@@ -36,7 +36,34 @@ const CardIn = z.object({
   packed: z.boolean().optional(),
   mark: z.enum(["worked", "not", "none"]).optional(),
   sheetKinds: z.array(z.enum(SHEET_KINDS)).max(SHEET_KINDS.length).optional(),
+  /** The review lines the tutor keeps; the ones left out are remembered as taken out. */
+  review: z.array(z.string().max(200)).max(10).optional(),
+  reviewOff: z.boolean().optional(),
 });
+
+/** How many taken-out review lines a card remembers: the newest. */
+const SKIPPED_KEPT = 12;
+
+/**
+ * The tutor's say over the review a build worked in. A line taken out is kept
+ * on the card so the next rebuild is told not to put it back; "no review"
+ * empties the list and the next rebuild sends no practice record at all.
+ * Neither changes the slides, so neither makes the offline file stale.
+ */
+function reviewPatch(card: PlanCard, body: { review?: string[]; reviewOff?: boolean }): Partial<PlanCard> {
+  const patch: Partial<PlanCard> = {};
+  if (body.review) {
+    const kept = (card.review ?? []).filter((r) => body.review!.includes(r));
+    const out = (card.review ?? []).filter((r) => !kept.includes(r));
+    patch.review = kept.length ? kept : undefined;
+    if (out.length) patch.reviewSkipped = [...(card.reviewSkipped ?? []), ...out].slice(-SKIPPED_KEPT);
+  }
+  if (body.reviewOff !== undefined) {
+    patch.reviewOff = body.reviewOff || undefined;
+    if (body.reviewOff) patch.review = undefined;
+  }
+  return patch;
+}
 
 /** Same words on screen and in the notes: not a change worth keeping on a rebuild. */
 function sameSlide(a: Slide, b: Omit<Slide, "id">): boolean {
@@ -86,6 +113,10 @@ export async function PATCH(request: Request, { params }: Params) {
       if (Object.keys(body).length === 1) patch.updatedAt = card.updatedAt;
     }
     if (body.plannedDate !== undefined) patch.plannedDate = body.plannedDate ?? undefined;
+    if (body.review || body.reviewOff !== undefined) {
+      Object.assign(patch, reviewPatch(card, body));
+      if (Object.keys(body).every((k) => k === "review" || k === "reviewOff")) patch.updatedAt = card.updatedAt;
+    }
     if (body.packed) {
       patch.packAt = new Date().toISOString();
       // Saving the pack is not a change to the lesson.
