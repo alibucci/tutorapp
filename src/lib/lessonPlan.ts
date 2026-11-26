@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { MODEL_FAST, complete } from "./llm";
-import { LEVELS } from "./profile";
+import { LEVELS, PREFERENCE_RULES } from "./profile";
 import {
   SLIDE_PARTS,
   type LessonMaterials,
@@ -30,7 +30,52 @@ export type Learner = {
   level?: string;
   /** The tutor's line about them and what they said they like. */
   interests: string;
+  /**
+   * Their learning programme as lines (preferenceLines in profile.ts), or
+   * empty. Optional so a Learner made before it existed still describes.
+   */
+  preferences?: string;
 };
+
+/**
+ * The children's programmes, without names. One child, or a group whose
+ * families all chose the same, gets it once. Different ones are listed child
+ * by child: what any family wants avoided is avoided for the whole group -
+ * a shared lesson cannot leave it out for one child only.
+ */
+export function describeProgrammes(learners: Learner[]): string {
+  const each = learners.map((l) => (l.preferences ?? "").trim());
+  const set = [...new Set(each.filter(Boolean))];
+  if (!set.length) return "";
+  if (learners.length === 1) return `The learning programme the family chose:\n${set[0]}`;
+  if (set.length === 1 && each.every(Boolean)) {
+    return `The learning programme the families chose (the same for every child):\n${set[0]}`;
+  }
+  const indent = (lines: string) => lines.replace(/^/gm, "  ");
+  return [
+    "The families' learning programmes, child by child. A topic any family wants avoided is avoided for the whole group; the rest is worked in where it suits the group:",
+    ...set.map((p) => `One child:\n${indent(p)}`),
+  ].join("\n");
+}
+
+/** Whether the plan's prompts need the programme rules at all. */
+const hasProgrammes = (learners: Learner[]) => learners.some((l) => (l.preferences ?? "").trim());
+
+/**
+ * The system prompt with the programme rules, only when some child has a
+ * programme: a plan for children without one is asked exactly as before.
+ * The no-religion rule gives way to a curriculum the family chose - a
+ * family that asked for Bible stories gets them - and to nothing else.
+ */
+function withProgrammes(system: string, learners: Learner[]): string {
+  if (!hasProgrammes(learners)) return system;
+  return `${system}
+
+${PREFERENCE_RULES}
+- A curriculum focus the family chose is taught even where the rules above
+  would leave it out (for example Bible stories: told simply and kindly, as
+  the story goes). Nothing else those rules forbid becomes allowed.`;
+}
 
 /** The group as the model sees it: no names, the youngest and weakest first. */
 export function describeLearners(learners: Learner[]): string {
@@ -53,6 +98,8 @@ export function describeLearners(learners: Learner[]): string {
         }`
       : "What they are into: not recorded - pick a neutral, friendly theme.",
   );
+  const programmes = describeProgrammes(learners);
+  if (programmes) lines.push(programmes);
   return lines.join("\n");
 }
 
@@ -132,7 +179,7 @@ export async function suggestMonth(opts: {
     .filter(Boolean)
     .join("\n\n");
   const parsed = await complete({
-    system: MONTH_SYSTEM,
+    system: withProgrammes(MONTH_SYSTEM, opts.learners),
     user,
     schema: MonthSchema,
     schemaName: "MonthPlan",
@@ -348,7 +395,7 @@ export async function buildMaterials(opts: {
     .join("\n\n");
 
   const parsed = await complete({
-    system: MATERIALS_SYSTEM + (opts.learners.length > 1 ? MIXED_LEVELS : ONE_CHILD),
+    system: withProgrammes(MATERIALS_SYSTEM + (opts.learners.length > 1 ? MIXED_LEVELS : ONE_CHILD), opts.learners),
     user,
     schema: MaterialsSchema,
     schemaName: "LessonMaterials",
@@ -387,7 +434,7 @@ export async function buildExtraSheets(opts: {
   card: Pick<PlanCard, "topic" | "words" | "goal">;
 }): Promise<Sheet[]> {
   const parsed = await complete({
-    system: EXTRA_SYSTEM,
+    system: withProgrammes(EXTRA_SYSTEM, opts.learners),
     user: [
       describeLearners(opts.learners),
       `Topic: ${opts.card.topic}. Words: ${opts.card.words.join(", ")}. Goal: ${opts.card.goal}`,
@@ -444,7 +491,7 @@ export async function rebuildSlide(opts: {
     `The tutor asks: ${opts.wish}`,
   ].join("\n\n");
   const parsed = await complete({
-    system: ONE_SLIDE_SYSTEM + (opts.learners.length > 1 ? MIXED_LEVELS : ONE_CHILD),
+    system: withProgrammes(ONE_SLIDE_SYSTEM + (opts.learners.length > 1 ? MIXED_LEVELS : ONE_CHILD), opts.learners),
     user,
     schema: SlideSchema,
     schemaName: "Slide",

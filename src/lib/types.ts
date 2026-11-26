@@ -505,10 +505,43 @@ export type StudentProfile = {
   look?: "game" | "plain";
   /**
    * What the parent asked for, in the tutor's words: "wants more speaking".
-   * Read only by the message to the parent; the homework never sees it, and
-   * neither the parent nor the child is shown it.
+   * Read by the message to the parent and, as one line of the learning
+   * programme (describePreferences in profile.ts), by everything that writes
+   * lessons and homework. Neither the parent nor the child is shown it.
    */
   parentWish?: string;
+  /**
+   * What the learning programme is for and about, set once so the tutor never
+   * repeats the parents' wishes at each generation. Absent on older records,
+   * which need nothing done to them. Kept apart from the game theme
+   * (`Student.gameStyle`, `look`): that is how homework looks, this is what
+   * it teaches.
+   */
+  learning?: LearningPrefs;
+};
+
+/** How far from the learner's level the content may move: one step at most. */
+export type LearningDifficulty = "easier" | "level" | "stretch";
+
+/** Every field optional: an empty programme is simply not mentioned to the model. */
+export type LearningPrefs = {
+  /** "Conversational English, vocabulary, grammar and sentence building". */
+  objectives?: string;
+  /** What the content is about, e.g. "Bible stories" - whatever the game theme. */
+  curriculum?: string;
+  /** Topics to work in. */
+  include?: string;
+  /** Topics never to use: a hard limit. */
+  avoid?: string;
+  /** "Homework uses only material covered in lessons". */
+  requirements?: string;
+  /** Absent means "level". */
+  difficulty?: LearningDifficulty;
+  /**
+   * Practice the app makes by itself waits for the tutor's OK before it is
+   * sent. Only stored here; the schedule that sends such practice reads it.
+   */
+  approval?: boolean;
 };
 
 export type CustomStyle = {
@@ -1013,6 +1046,11 @@ export type PlanCheck = {
   done: string[];
   partial: string[];
   missed: string[];
+  /**
+   * Points with no evidence either way, for the tutor to confirm. Absent on
+   * checks from before it existed, which counted such points as missed.
+   */
+  unclear?: string[];
   at: string;
   /** The tutor's answer on carrying the rest to the next card. */
   carried?: "yes" | "no";

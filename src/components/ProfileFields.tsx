@@ -118,8 +118,9 @@ export function ProfileFields({
             className="field"
           />
           <span className="hint">
-            Only the message to the parent uses this, and only when a lesson
-            shows a step towards it. Nobody in the family sees it here.
+            New lessons and homework work it in where it fits, and the message
+            to the parent mentions it when a lesson shows a step towards it.
+            Nobody in the family sees it here.
           </span>
         </label>
       )}

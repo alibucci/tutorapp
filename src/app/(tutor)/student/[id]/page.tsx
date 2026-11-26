@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { ArchiveStudent } from "@/components/ArchiveStudent";
 import { FamilyLogin } from "@/components/FamilyLogin";
 import { IntroNoteButton } from "@/components/IntroNoteButton";
+import { LearningPanel } from "@/components/LearningPanel";
 import { ProfilePanel } from "@/components/ProfilePanel";
 import { styleFor } from "@/lib/gameStyles";
 import { hasParent } from "@/lib/profile";
@@ -110,12 +111,19 @@ export default async function StudentPage({
       <div className="stack-lg min-w-0">
       <ProfilePanel
         // Saved values in the key: a save from elsewhere starts the form again.
-        key={JSON.stringify(student.profile ?? {})}
+        // Not the learning programme's: saving that must not reset this form.
+        key={JSON.stringify({ ...student.profile, learning: undefined })}
         studentId={student.id}
         studentName={student.name}
         profile={student.profile}
         themeName={styleFor(student).name}
         ownTheme={student.gameStyle === "custom" && Boolean(student.customStyle)}
+      />
+
+      <LearningPanel
+        key={JSON.stringify(student.profile?.learning ?? {})}
+        studentId={student.id}
+        learning={student.profile?.learning}
       />
 
       <section className="space-y-3">

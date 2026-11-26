@@ -12,6 +12,7 @@ import {
   updatePlan,
 } from "./store";
 import { drawForCard, dropUnused, picturesOn } from "./planImages";
+import { preferenceLines } from "./profile";
 import { buildStorySlides, storyFor, storyOpen } from "./storySlides";
 import { plansOpenTo } from "./tutorList";
 import type { LessonPlan, PlanCard, Student, StudentGroup } from "./types";
@@ -65,6 +66,8 @@ export async function learnersOf(students: Student[]): Promise<Learner[]> {
       age: s.profile?.age,
       level: s.profile?.level,
       interests: [s.profile?.about ?? "", await interestsOf(s)].filter(Boolean).join(" "),
+      // Lines without a heading: describeLearners puts a group's together.
+      preferences: preferenceLines(s.profile).join("\n"),
     })),
   );
 }

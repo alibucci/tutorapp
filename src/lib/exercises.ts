@@ -1,7 +1,9 @@
 import { skillsOfGame, withIds } from "./memory";
 import { z } from "zod";
+import { LESSON_CONTEXT_RULES, describeLessonContext, type LessonContext } from "./coverage";
+import { lessonContext } from "./lessonContext";
 import { MODEL, MODEL_FAST, complete } from "./llm";
-import { describeLearner, formatsFor, isChild } from "./profile";
+import { PREFERENCE_RULES, describeLearner, describePreferences, formatsFor, isChild } from "./profile";
 import { listLessons } from "./store";
 import { type NumbersPlan, numbersHomework, sumFrom, type Sum } from "./sums";
 import { describeRedo } from "./redo";
@@ -445,9 +447,11 @@ ${EXERCISE_KINDS.map((k) => `- ${KIND_HINT[k]}`).join("\n")}`,
 
 /** What the model needs for extra homework: the learner and the request. */
 function describeRequest(lesson: Lesson, student: Student, interests: string, redo: RedoItem[]): string {
+  const preferences = describePreferences(student.profile);
   return [
     describeLearner(student.name, student.profile),
     interests ? `What they are into: ${interests}` : "What they are into: not recorded",
+    ...(preferences ? ["", preferences] : []),
     "",
     `What the tutor wants practised: ${lesson.request ?? lesson.title}`,
     redo.length ? `\n${describeRedo(redo)}` : "",
@@ -499,17 +503,29 @@ export async function interestsOf(student: Student): Promise<string> {
     .join(" ");
 }
 
-/** Everything the model needs about this lesson, and nothing else. */
-function describeLesson(lesson: Lesson, student: Student, interests: string, redo: RedoItem[]): string {
+/**
+ * Everything the model needs about this lesson, and nothing else. A lesson
+ * taught from a plan also says which of the plan it reached: the summary
+ * stays the source of truth, the plan only keeps out what was never taught.
+ */
+function describeLesson(
+  lesson: Lesson,
+  student: Student,
+  interests: string,
+  redo: RedoItem[],
+  context: LessonContext | null,
+): string {
   const s = lesson.summary;
   const weak = student.skills
     .filter((k) => k.status !== "solid")
     .map((k) => `- ${k.topic}: ${k.note}`)
     .join("\n");
+  const preferences = describePreferences(student.profile);
 
   return [
     describeLearner(student.name, student.profile),
     interests ? `What they are into: ${interests}` : "What they are into: not recorded",
+    preferences ? `\n${preferences}\n` : "",
     `Lesson: ${lesson.title}`,
     "",
     "What they got wrong today:",
@@ -522,6 +538,7 @@ function describeLesson(lesson: Lesson, student: Student, interests: string, red
     "",
     `Topics covered: ${s?.covered.join(", ") || "general English"}`,
     s?.homeworkFocus ? `The tutor wants them to practise: ${s.homeworkFocus}` : "",
+    context ? `\n${describeLessonContext(context)}` : "",
     weak ? `\nStill weak from earlier lessons:\n${weak}` : "",
     redo.length ? `\n${describeRedo(redo)}` : "",
     describeSkills(student),
@@ -575,12 +592,21 @@ export async function buildExercises(
   const formats = plan ? plan.kinds : formatsFor(student.profile);
   const usual = !practice && child && !short && formats.join() === "choose,build,catch";
   const interests = await interestsOf(student);
+  // Extra homework has no lesson behind it, so no plan either.
+  const context = practice ? null : await lessonContext(lesson);
+  // The rules for the programme and the plan go in only when there is one to
+  // follow: a learner with neither gets exactly the prompt they always had.
+  const rules = [
+    describePreferences(student.profile) ? PREFERENCE_RULES : "",
+    context ? LESSON_CONTEXT_RULES : "",
+  ].filter(Boolean);
+  const base = practice ? systemForPractice(formats, child) : usual ? KID_SCHOOL : systemFor(formats, child);
 
   const parsed = (await complete({
-    system: practice ? systemForPractice(formats, child) : usual ? KID_SCHOOL : systemFor(formats, child),
+    system: [base, ...rules].join("\n\n"),
     user: practice
       ? describeRequest(lesson, student, interests, redo)
-      : describeLesson(lesson, student, interests, redo),
+      : describeLesson(lesson, student, interests, redo, context),
     schema: schemaFor(formats, short),
     schemaName: "Homework",
     maxTokens: 8000,
