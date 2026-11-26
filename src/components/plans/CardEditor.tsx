@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { PART_LABEL, packFresh, videoSearchUrl } from "@/lib/planShared";
-import { SLIDE_PARTS, type PlanCard, type Slide, type SlidePart } from "@/lib/types";
+import { PART_LABEL, SHEET_LABEL, chosenKinds, packFresh, videoSearchUrl } from "@/lib/planShared";
+import { SHEET_KINDS, SLIDE_PARTS, type PlanCard, type SheetKind, type Slide, type SlidePart } from "@/lib/types";
 import { useRefreshWhile } from "./PlanBoard";
 
 type Draft = Omit<Slide, "id" | "editedAt"> & { id?: string; key: string; removeImage?: boolean };
@@ -113,27 +113,14 @@ export function CardEditor({
                 : undefined
             }
           />
-          {materials.sheets.length > 0 && (
-            <section className="card card-pad stack-sm">
-              <h2 className="font-semibold">Sheets to print</h2>
-              <ul className="t-small list-disc pl-5">
-                {materials.sheets.map((sh) => (
-                  <li key={sh.id}>
-                    {sh.title}
-                    {sh.kind === "coloring" && !sh.image && <span className="t-muted"> - the word in outline (no drawing)</span>}
-                  </li>
-                ))}
-              </ul>
-              <a
-                href={`/api/plans/${planId}/cards/${card.id}/deck?print=1`}
-                target="_blank"
-                rel="noopener"
-                className="btn btn-quiet self-start"
-              >
-                Print sheets
-              </a>
-              <span className="hint">A4. They are in the offline file too, behind its &ldquo;Print sheets&rdquo; button.</span>
-            </section>
+          {!card.story && materials.sheets.length > 0 && (
+            <SheetPicker
+              card={card}
+              planId={planId}
+              busy={busy === "sheets"}
+              disabled={busy !== null || building}
+              onSave={(sheetKinds) => call("sheets", base, { method: "PATCH", json: { sheetKinds } })}
+            />
           )}
           {materials.videos.length > 0 && (
             <section className="card card-pad stack-sm">
@@ -496,5 +483,78 @@ function AskSlide({ busy, onAsk }: { busy: boolean; onAsk: (wish: string) => Pro
         {busy ? "Writing…" : "Rewrite"}
       </button>
     </form>
+  );
+}
+
+/**
+ * Which sheets this lesson prints: a tick per kind. Match and reading on an
+ * older lesson are written when ticked, which takes a few seconds.
+ */
+function SheetPicker({
+  card,
+  planId,
+  busy,
+  disabled,
+  onSave,
+}: {
+  card: PlanCard;
+  planId: string;
+  busy: boolean;
+  disabled: boolean;
+  onSave: (kinds: SheetKind[]) => Promise<unknown>;
+}) {
+  const [on, setOn] = useState<SheetKind[]>(chosenKinds(card));
+  const saved = chosenKinds(card);
+  const changed = on.length !== saved.length || on.some((k) => !saved.includes(k));
+  const has = new Set(card.materials?.sheets.map((s) => s.kind));
+  // The word search is made from the words on the spot; the rest come with the lesson.
+  const toWrite = on.filter((k) => k !== "wordsearch" && !has.has(k));
+  const coloring = card.materials?.sheets.find((s) => s.kind === "coloring");
+
+  return (
+    <section className="card card-pad stack-sm">
+      <h2 className="font-semibold">Sheets to print</h2>
+      <p className="t-small t-muted">Tick the ones you want for this lesson. Each is one A4 page.</p>
+      <ul className="stack-sm">
+        {SHEET_KINDS.map((k) => (
+          <li key={k}>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={on.includes(k)}
+                disabled={disabled}
+                onChange={(e) => setOn(e.target.checked ? [...on, k] : on.filter((x) => x !== k))}
+              />
+              <span>
+                <span className="font-medium">{SHEET_LABEL[k].name}</span>
+                <span className="t-small t-muted"> - {SHEET_LABEL[k].what}</span>
+                {k === "coloring" && coloring && !coloring.image && (
+                  <span className="t-small t-muted"> (the word in outline, no drawing)</span>
+                )}
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      {changed ? (
+        <button className="btn btn-primary self-start" disabled={disabled || on.length === 0} onClick={() => void onSave(on)}>
+          {busy ? (toWrite.length ? "Writing the new sheets…" : "Saving…") : toWrite.length ? "Save and write the new sheets" : "Save"}
+        </button>
+      ) : (
+        <a
+          href={`/api/plans/${planId}/cards/${card.id}/deck?print=1`}
+          target="_blank"
+          rel="noopener"
+          className={`btn btn-quiet self-start ${on.length === 0 ? "pointer-events-none opacity-50" : ""}`}
+        >
+          Print {on.length} {on.length === 1 ? "sheet" : "sheets"}
+        </a>
+      )}
+      {changed && toWrite.length > 0 && (
+        <span className="hint">This lesson was made before these sheets existed: writing them takes about half a minute.</span>
+      )}
+      <span className="hint">A4. The ticked ones are in the offline file too, behind its &ldquo;Print sheets&rdquo; button.</span>
+    </section>
   );
 }

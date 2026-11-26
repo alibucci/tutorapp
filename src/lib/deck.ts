@@ -118,6 +118,17 @@ color:#fff;font-size:22px;line-height:44px;text-align:center;opacity:.55}.exit:h
 .colour img{max-width:100%;max-height:200mm}
 .outline{font-size:72pt;font-weight:900;color:#fff;-webkit-text-stroke:2px #000;text-align:center}
 .answers{font-size:11pt;color:#555;margin-top:10mm;border-top:1px solid #aaa;padding-top:4mm}
+.hint-line{font-size:14pt;margin:0 0 8mm}
+.match{display:grid;grid-template-columns:1fr 30mm 1fr;row-gap:9mm;align-items:center}
+.match .w{font-size:24pt;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.match .e{font-size:40pt;display:flex;gap:6mm;align-items:center}
+.match .dot{display:inline-block;width:5mm;height:5mm;border-radius:50%;background:#000}
+.grid{border-collapse:collapse;margin:0 auto 8mm}
+.grid td{width:13mm;height:13mm;border:1px solid #888;text-align:center;font-size:20pt;font-weight:700;font-family:ui-monospace,Menlo,Consolas,monospace}
+.find{display:flex;flex-wrap:wrap;gap:4mm 10mm;font-size:18pt;font-weight:700}
+.find span::before{content:"";display:inline-block;width:5mm;height:5mm;border:2px solid #000;margin-right:3mm;vertical-align:middle}
+.read{font-size:20pt;line-height:1.6;border:2px solid #000;border-radius:4mm;padding:6mm;margin-bottom:10mm}
+.q{font-size:17pt;margin:0 0 4mm}.q+.write{border-bottom:2px solid #888;height:10mm;margin-bottom:8mm}
 </style>
 </head>
 <body>
@@ -262,6 +273,12 @@ color:#fff;font-size:22px;line-height:44px;text-align:center;opacity:.55}.exit:h
 </html>`;
 }
 
+function hash(s: string): number {
+  let h = 2166136261;
+  for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return h;
+}
+
 /** One A4 page. A picture that is missing becomes a word to colour in, never a hole. */
 function renderSheet(sheet: Sheet, input: DeckInput): string {
   const img = sheet.image ? input.imageSrc(sheet.image) : undefined;
@@ -274,6 +291,33 @@ function renderSheet(sheet: Sheet, input: DeckInput): string {
   if (sheet.kind === "worksheet") {
     return `<section class="sheet">${head}${sheet.items
       .map((line, n) => `<p class="line">${n + 1}. ${esc(line).replace(/_{2,}/g, "______________")}</p>`)
+      .join("")}${
+      sheet.answers?.length
+        ? `<div class="answers">For the tutor: ${sheet.answers.map((a, n) => `${n + 1}. ${esc(a)}`).join(" &nbsp; ")}</div>`
+        : ""
+    }</section>`;
+  }
+  if (sheet.kind === "match") {
+    const pairs = sheet.pairs ?? [];
+    // The pictures in another order, the same every time for the same words.
+    const right = pairs.map((p, k) => ({ p, k })).sort((a, b) => hash(a.p.word) - hash(b.p.word));
+    if (right.every((r, k) => r.k === k) && right.length > 1) right.push(right.shift()!);
+    return `<section class="sheet">${head}<p class="hint-line">Draw a line from each word to its picture.</p><div class="match">${pairs
+      .map(
+        (p, k) =>
+          `<div class="w">${esc(p.word)}<span class="dot"></span></div><div></div><div class="e"><span class="dot"></span>${esc(right[k].p.emoji)}</div>`,
+      )
+      .join("")}</div></section>`;
+  }
+  if (sheet.kind === "wordsearch") {
+    const rows = sheet.grid ?? [];
+    return `<section class="sheet">${head}<p class="hint-line">Find the words. They go &rarr; or &darr;. Tick each one you find.</p><table class="grid">${rows
+      .map((r) => `<tr>${[...r].map((ch) => `<td>${esc(ch)}</td>`).join("")}</tr>`)
+      .join("")}</table><div class="find">${sheet.items.map((w) => `<span>${esc(w)}</span>`).join("")}</div></section>`;
+  }
+  if (sheet.kind === "reading") {
+    return `<section class="sheet">${head}<div class="read">${esc(sheet.text ?? "")}</div>${sheet.items
+      .map((q, n) => `<p class="q">${n + 1}. ${esc(q)}</p><div class="write"></div>`)
       .join("")}${
       sheet.answers?.length
         ? `<div class="answers">For the tutor: ${sheet.answers.map((a, n) => `${n + 1}. ${esc(a)}`).join(" &nbsp; ")}</div>`

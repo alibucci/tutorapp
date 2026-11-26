@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { LIMIT, readJson } from "@/lib/http";
-import { cleanSlide } from "@/lib/lessonPlan";
-import { planFor, storyCardOpen, studentsOf, updateCard } from "@/lib/plans";
+import { buildExtraSheets, cleanSlide } from "@/lib/lessonPlan";
+import { learnersOf, planFor, storyCardOpen, studentsOf, updateCard } from "@/lib/plans";
 import { recordLiveStory, storyFor } from "@/lib/storySlides";
 import { deletePlanImage, listPlans, updatePlan } from "@/lib/store";
-import { SLIDE_PARTS, type PlanCard, type Slide } from "@/lib/types";
+import { SHEET_KINDS, SLIDE_PARTS, type PlanCard, type Sheet, type Slide } from "@/lib/types";
 import { randomUUID } from "crypto";
 
 type Params = { params: Promise<{ id: string; cardId: string }> };
@@ -35,6 +35,7 @@ const CardIn = z.object({
   slides: z.array(SlideIn).max(30).optional(),
   packed: z.boolean().optional(),
   mark: z.enum(["worked", "not", "none"]).optional(),
+  sheetKinds: z.array(z.enum(SHEET_KINDS)).max(SHEET_KINDS.length).optional(),
 });
 
 /** Same words on screen and in the notes: not a change worth keeping on a rebuild. */
@@ -58,6 +59,19 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!parsed.success) return NextResponse.json({ error: "Check the lesson's fields." }, { status: 400 });
   const body = parsed.data;
 
+  // Ticking match or reading on a lesson made before they existed: write just
+  // those two now, so the tutor does not have to rebuild the whole lesson.
+  let extra: Sheet[] = [];
+  const has = new Set(before?.materials?.sheets.map((s) => s.kind));
+  if (before?.materials && !before.story && body.sheetKinds?.some((k) => (k === "match" || k === "reading") && !has.has(k))) {
+    try {
+      const learners = await learnersOf((await studentsOf(found.plan)).students);
+      extra = (await buildExtraSheets({ learners, card: before })).filter((s) => !has.has(s.kind));
+    } catch {
+      return NextResponse.json({ error: "Those sheets could not be written just now. Try again." }, { status: 502 });
+    }
+  }
+
   const result = await updateCard(id, cardId, (card) => {
     const patch: Partial<PlanCard> = {};
     if (body.topic !== undefined) patch.topic = body.topic.trim() || card.topic;
@@ -77,6 +91,13 @@ export async function PATCH(request: Request, { params }: Params) {
       // Saving the pack is not a change to the lesson.
       if (Object.keys(body).length === 1) patch.updatedAt = card.updatedAt;
     }
+    if (body.sheetKinds) {
+      patch.sheetKinds = SHEET_KINDS.filter((k) => body.sheetKinds!.includes(k));
+      if (extra.length && card.materials) {
+        const now = new Set(card.materials.sheets.map((s) => s.kind));
+        patch.materials = { ...card.materials, sheets: [...card.materials.sheets, ...extra.filter((s) => !now.has(s.kind))] };
+      }
+    }
     if (body.slides && card.materials) {
       const before = new Map(card.materials.slides.map((s) => [s.id, s]));
       // A picture can only be one this lesson already has: never a path or a
@@ -93,7 +114,7 @@ export async function PATCH(request: Request, { params }: Params) {
         if (old && sameSlide(old, next)) slides.push(old);
         else slides.push({ id: old?.id ?? randomUUID(), ...next, editedAt: now });
       }
-      patch.materials = { ...card.materials, slides };
+      patch.materials = { ...(patch.materials ?? card.materials), slides };
     }
     return patch;
   });

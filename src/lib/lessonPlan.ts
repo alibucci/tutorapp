@@ -218,7 +218,32 @@ const MaterialsSchema = z.object({
       picture: z.string().min(10).max(200).describe("One simple object or animal to colour in, for an outline drawing"),
     })
     .describe("A colouring page"),
+  ...ExtraSheetsShape(),
 });
+
+/** The two sheets that need the model beyond the lesson itself: match and reading. */
+function ExtraSheetsShape() {
+  return {
+    match: z
+      .array(z.object({ word: WORD.describe("One of the lesson's words"), emoji: z.string().min(1).max(16).describe("One emoji that clearly shows it") }))
+      .max(6)
+      .catch([])
+      .describe("Match the word to the picture: each lesson word that an emoji can show, with that emoji"),
+    reading: z
+      .object({
+        text: z.string().min(20).max(400).describe("3 to 5 very short sentences on the topic, using the lesson's words"),
+        questions: z
+          .array(z.object({ question: z.string().min(5).max(90), answer: z.string().min(1).max(40).describe("One to three words") }))
+          .max(4),
+      })
+      .nullable()
+      .catch(null)
+      .describe("Read and answer: a tiny text and 3 questions about it, answered from the text"),
+  };
+}
+
+const ExtraSheetsSchema = z.object(ExtraSheetsShape());
+type ExtraSheets = z.infer<typeof ExtraSheetsSchema>;
 
 const MATERIALS_SYSTEM = `You prepare one live English lesson: the slides a tutor
 shows and talks through, and ideas for short videos to look up.
@@ -235,8 +260,10 @@ phrase to listen to, an emoji. The tutor's notes say what to do and what to
 ask - that is where the teaching goes, not on the slide.
 
 Printed sheets: a fill-the-gap worksheet (4 to 6 short sentences, each with
-one gap "___" that one of the lesson's words fills) and a colouring page of one
-simple thing from the lesson.
+one gap "___" that one of the lesson's words fills), a colouring page of one
+simple thing from the lesson, a match-the-word-to-the-picture list (each word
+with one emoji that shows it plainly) and a tiny text to read with 3 questions
+answered from it.
 
 Videos: 2 to 4 searches the tutor can run, for both YouTube and Bilibili
 (YouTube does not open in mainland China without a VPN). These are search
@@ -341,8 +368,38 @@ export async function buildMaterials(opts: {
     goal: opts.card.goal || parsed.goal.trim(),
     slides,
     videos: cleanVideos(parsed.videos),
-    sheets: makeSheets(topic || parsed.topic.trim(), words, parsed.worksheet, parsed.coloring),
+    sheets: makeSheets(topic || parsed.topic.trim(), words, parsed.worksheet, parsed.coloring, parsed),
   };
+}
+
+const EXTRA_SYSTEM = `You write two printed sheets for an English lesson that
+already exists: a match-the-word-to-the-picture list (each word with one emoji
+that shows it plainly) and a tiny text to read with 3 questions answered from it.
+
+${RULES}`;
+
+/**
+ * Match and reading for a card built before those sheets existed, so a tutor
+ * who ticks them does not have to rebuild the whole lesson.
+ */
+export async function buildExtraSheets(opts: {
+  learners: Learner[];
+  card: Pick<PlanCard, "topic" | "words" | "goal">;
+}): Promise<Sheet[]> {
+  const parsed = await complete({
+    system: EXTRA_SYSTEM,
+    user: [
+      describeLearners(opts.learners),
+      `Topic: ${opts.card.topic}. Words: ${opts.card.words.join(", ")}. Goal: ${opts.card.goal}`,
+    ].join("\n\n"),
+    schema: ExtraSheetsSchema,
+    schemaName: "ExtraSheets",
+    maxTokens: 2000,
+    effort: "low",
+    timeoutMs: 60_000,
+    fallbackModel: MODEL_FAST,
+  });
+  return extraSheets(opts.card.topic, parsed);
 }
 
 /** The kept slides back at their places, the new ones around them in order. */
@@ -467,6 +524,7 @@ export function makeSheets(
   words: string[],
   worksheet: { line: string; answer: string }[],
   coloring: { word: string; picture: string },
+  extra?: ExtraSheets,
 ): Sheet[] {
   const sheets: Sheet[] = [];
   if (words.length) sheets.push({ id: randomUUID(), kind: "wordcards", title: `${topic}: word cards`, items: words });
@@ -490,7 +548,75 @@ export function makeSheets(
     items: [coloring.word.trim() || words[0] || topic],
     picture: coloring.picture.trim(),
   });
+  const search = wordSearch(topic, words);
+  if (search) sheets.push(search);
+  if (extra) sheets.push(...extraSheets(topic, extra));
   return sheets;
+}
+
+/** Match and reading, only where there is enough of each to be a page. */
+function extraSheets(topic: string, extra: ExtraSheets): Sheet[] {
+  const out: Sheet[] = [];
+  const pairs = extra.match
+    .map((p) => ({ word: p.word.trim(), emoji: p.emoji.trim() }))
+    .filter((p, i, all) => p.word && p.emoji && all.findIndex((q) => q.word.toLowerCase() === p.word.toLowerCase()) === i)
+    .slice(0, 6);
+  if (pairs.length >= 3) {
+    out.push({ id: randomUUID(), kind: "match", title: `${topic}: match the word and the picture`, items: pairs.map((p) => p.word), pairs });
+  }
+  const reading = extra.reading;
+  const qs = (reading?.questions ?? []).filter((q) => q.question.trim() && q.answer.trim()).slice(0, 4);
+  if (reading && reading.text.trim() && qs.length >= 2) {
+    out.push({
+      id: randomUUID(),
+      kind: "reading",
+      title: `${topic}: read and answer`,
+      text: reading.text.trim(),
+      items: qs.map((q) => q.question.trim()),
+      answers: qs.map((q) => q.answer.trim()),
+    });
+  }
+  return out;
+}
+
+/**
+ * A word search made here from the lesson's words, never by the model: left
+ * to right and top to bottom only, which a six-year-old can find. The same
+ * words always give the same grid.
+ */
+export function wordSearch(topic: string, words: string[]): Sheet | null {
+  const wanted = words
+    .map((w) => w.toUpperCase().replace(/[^A-Z]/g, ""))
+    .filter((w, i, all) => w.length >= 2 && w.length <= 10 && all.indexOf(w) === i);
+  if (wanted.length < 2) return null;
+  const size = Math.min(12, Math.max(8, ...wanted.map((w) => w.length + 2)));
+  let seed = 2166136261;
+  for (const ch of wanted.join("|")) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const rand = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  };
+  const grid: string[][] = Array.from({ length: size }, () => Array<string>(size).fill(""));
+  const placed: string[] = [];
+  for (const word of [...wanted].sort((a, b) => b.length - a.length)) {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const down = rand() < 0.5;
+      const r = Math.floor(rand() * (down ? size - word.length + 1 : size));
+      const c = Math.floor(rand() * (down ? size : size - word.length + 1));
+      const cells = [...word].map((_, k) => (down ? [r + k, c] : [r, c + k]));
+      if (cells.every(([y, x], k) => grid[y][x] === "" || grid[y][x] === word[k])) {
+        cells.forEach(([y, x], k) => (grid[y][x] = word[k]));
+        placed.push(word);
+        break;
+      }
+    }
+  }
+  if (placed.length < 2) return null;
+  const ABC = "ABCDEFGHIJKLMNOPRSTUVWY";
+  const rows = grid.map((row) => row.map((ch) => ch || ABC[Math.floor(rand() * ABC.length)]).join(""));
+  // In the order the lesson taught them, not the order they were placed.
+  const items = wanted.filter((w) => placed.includes(w));
+  return { id: randomUUID(), kind: "wordsearch", title: `${topic}: find the words`, items, grid: rows };
 }
 
 /** Materials as stored on a card. */

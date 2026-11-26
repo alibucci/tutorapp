@@ -3,8 +3,10 @@ import { PLAIN_STYLE, styleFor } from "./gameStyles";
 import { studentsOf } from "./plans";
 import { promises as fs } from "fs";
 import path from "path";
+import { wordSearch } from "./lessonPlan";
+import { sheetsToPrint } from "./planShared";
 import { readPlanImage } from "./store";
-import type { LessonPlan, PlanCard } from "./types";
+import type { LessonPlan, PlanCard, Sheet } from "./types";
 
 const TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
@@ -40,13 +42,23 @@ export async function deckFor(plan: LessonPlan, card: PlanCard, pack: boolean): 
     title: card.topic || "Lesson",
     card,
     slides: materials.slides,
-    sheets: materials.sheets,
+    sheets: printable(card),
     videos: materials.videos,
     style,
     imageSrc: (name) => (pack ? inline.get(name) : `/api/plan-images/${encodeURIComponent(name)}`),
     offline: pack,
     savedAt: pack ? `${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC` : undefined,
   });
+}
+
+/**
+ * The ticked sheets, in print order. A card made before the word search
+ * existed gets one from its words here: it needs no model.
+ */
+export function printable(card: PlanCard): Sheet[] {
+  const sheets = card.materials?.sheets ?? [];
+  const search = sheets.some((s) => s.kind === "wordsearch") || card.story ? null : wordSearch(card.topic, card.words);
+  return sheetsToPrint(card, search ? [...sheets, search] : sheets);
 }
 
 export function packFileName(topic: string): string {

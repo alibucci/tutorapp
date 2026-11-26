@@ -740,20 +740,32 @@ export type Slide = {
 
 export type SlideStep = { title?: string; text?: string; say?: string };
 
-export type SheetKind = "coloring" | "wordcards" | "worksheet";
+export const SHEET_KINDS = ["wordcards", "worksheet", "coloring", "match", "wordsearch", "reading"] as const;
+export type SheetKind = (typeof SHEET_KINDS)[number];
+/** What a card prints when the tutor has not chosen: the three it always had. */
+export const DEFAULT_SHEETS: SheetKind[] = ["wordcards", "worksheet", "coloring"];
 
 /** One printable A4 page. */
 export type Sheet = {
   id: string;
   kind: SheetKind;
   title: string;
-  /** Word cards: the words. Worksheet: the lines, with ___ for a gap. */
+  /**
+   * Word cards: the words. Worksheet: the lines, with ___ for a gap.
+   * Word search: the words hidden in the grid. Reading: the questions.
+   */
   items: string[];
-  /** Worksheet with gaps: the answers, for the tutor's copy. */
+  /** Worksheet and reading: the answers, for the tutor's copy. */
   answers?: string[];
   /** Colouring page: what the outline drawing shows. */
   picture?: string;
   image?: string;
+  /** Match: each word with the emoji that shows it. */
+  pairs?: { word: string; emoji: string }[];
+  /** Word search: the rows of letters. */
+  grid?: string[];
+  /** Reading: the short text to read. */
+  text?: string;
 };
 
 /** A search to run, not a checked video: the tutor watches it first. */
@@ -795,6 +807,8 @@ export type PlanCard = {
   buildError?: string;
   /** When the offline pack was last downloaded; stale once updatedAt passes it. */
   packAt?: string;
+  /** The sheets the tutor ticked to print; DEFAULT_SHEETS until they choose. */
+  sheetKinds?: SheetKind[];
   /** Who the materials were written for, without naming anyone: for the library. */
   audience?: { ages: number[]; level?: string };
   /** The tutor's own note on how it went. */
