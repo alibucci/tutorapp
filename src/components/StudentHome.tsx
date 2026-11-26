@@ -3,7 +3,9 @@ import { gameFonts } from "@/lib/fonts";
 import { paletteVars, skinOf, styleFor, themeOf } from "@/lib/gameStyles";
 import { gameScore, homeworkDone, homeworkImageUrl } from "@/lib/homework";
 import { listLessons } from "@/lib/store";
+import { learningOpenTo } from "@/lib/tutorList";
 import type { Lesson, Skill, Student } from "@/lib/types";
+import { type StudentWeek, plannedMinutes, studentWeek } from "@/lib/week";
 
 /**
  * The student's own screen.
@@ -32,7 +34,8 @@ export async function StudentHome({
   /** The private link's key, when the child came in by link. */
   linkKey?: string;
 }) {
-  const quests = (await listLessons(student.id)).filter(
+  const lessons = await listLessons(student.id);
+  const quests = lessons.filter(
     (l) => l.homework?.sentAt,
   );
   const open = quests.filter((l) => !homeworkDone(l.homework));
@@ -42,6 +45,9 @@ export async function StudentHome({
   const working = student.skills.filter((s) => s.status !== "solid").slice(0, 3);
   const done = student.skills.filter((s) => s.status === "solid");
   const [first, ...rest] = working;
+  // The weekly strip is part of continuous learning: without it the screen
+  // stays exactly as it was.
+  const learning = (await learningOpenTo(student.tutorId)) ? studentWeek(student, lessons) : null;
 
   return (
     <div className="stack-lg">
@@ -70,40 +76,16 @@ export async function StudentHome({
         </h1>
       </header>
 
-      {open.length > 0 && (
-        <section className="space-y-2">
-          {open.map((lesson) => (
-            <Link
-              key={lesson.id}
-              href={questHref(lesson.id)}
-              className={`game-entry game-entry-${skinOf(style)} ${themeOf(style)} ${gameFonts}`}
-              style={paletteVars(style) as React.CSSProperties}
-            >
-              <span>
-                <span className="game-entry-kicker">
-                  {lesson.module ? "Bible story" : style.plain ? "Homework" : `${style.name} homework`}
-                </span>
-                <span className="game-entry-title">
-                  {lesson.module
-                    ? lesson.title
-                    : lesson.homework?.imageFile
-                    ? "Describe the picture"
-                    : style.plain
-                      ? `${lesson.homework?.exercises?.length ?? 0} ${
-                          lesson.homework?.exercises?.length === 1 ? "task" : "tasks"
-                        }`
-                      : `${lesson.homework?.exercises?.length ?? 0} quick ${
-                          lesson.homework?.exercises?.length === 1 ? "game" : "games"
-                        }`}
-                </span>
-                <span className="game-entry-meta">
-                  From {lesson.title} · {taskCount(lesson)}
-                </span>
-              </span>
-              <span aria-hidden className="game-entry-title">→</span>
-            </Link>
-          ))}
-        </section>
+      {learning ? (
+        <WeekStrip week={learning} style={style} questHref={questHref} hasQuests={quests.length > 0} />
+      ) : (
+        open.length > 0 && (
+          <section className="space-y-2">
+            {open.map((lesson) => (
+              <QuestEntry key={lesson.id} lesson={lesson} style={style} href={questHref(lesson.id)} />
+            ))}
+          </section>
+        )
       )}
 
       {done.length > 0 && (
@@ -170,7 +152,9 @@ export async function StudentHome({
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{lesson.title}</span>
+                      <span className="block truncate font-semibold">
+                        {learning && lesson.review ? practiceTitle(lesson) : lesson.title}
+                      </span>
                       <span className="block t-small t-muted">
                         {score.total > 0
                           ? `${score.right} of ${score.total} right`
@@ -189,6 +173,120 @@ export async function StudentHome({
       )}
 
     </div>
+  );
+}
+
+type Style = ReturnType<typeof styleFor>;
+
+const DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+
+/** A Smart Review, as the child knows it: practice, not a system's name. */
+function practiceTitle(lesson: Lesson): string {
+  return `Practice · ${DATE.format(new Date(lesson.homework?.sentAt ?? lesson.createdAt))}`;
+}
+
+/**
+ * The doorway into one homework, in the game's world. With `learning` on, a
+ * Smart Review is shown as plain practice with how long it should take -
+ * the only homework whose length is known.
+ */
+function QuestEntry({ lesson, style, href, learning = false }: { lesson: Lesson; style: Style; href: string; learning?: boolean }) {
+  const practice = learning && lesson.review;
+  const minutes = plannedMinutes(lesson);
+  return (
+    <Link
+      href={href}
+      className={`game-entry game-entry-${skinOf(style)} ${themeOf(style)} ${gameFonts}`}
+      style={paletteVars(style) as React.CSSProperties}
+    >
+      <span>
+        <span className="game-entry-kicker">
+          {practice
+            ? style.plain ? "Practice" : `${style.name} practice`
+            : lesson.module ? "Bible story" : style.plain ? "Homework" : `${style.name} homework`}
+        </span>
+        <span className="game-entry-title">
+          {lesson.module
+            ? lesson.title
+            : lesson.homework?.imageFile
+            ? "Describe the picture"
+            : style.plain
+              ? `${lesson.homework?.exercises?.length ?? 0} ${
+                  lesson.homework?.exercises?.length === 1 ? "task" : "tasks"
+                }`
+              : `${lesson.homework?.exercises?.length ?? 0} quick ${
+                  lesson.homework?.exercises?.length === 1 ? "game" : "games"
+                }`}
+        </span>
+        <span className="game-entry-meta">
+          {practice
+            ? `${minutes ? `About ${minutes} minutes · ` : ""}${taskCount(lesson)}`
+            : `From ${lesson.title} · ${taskCount(lesson)}`}
+        </span>
+      </span>
+      <span aria-hidden className="game-entry-title">→</span>
+    </Link>
+  );
+}
+
+/**
+ * This week, in one compact block: how many quests are done since Monday,
+ * the one to do now, and when the next practice comes - its day and time
+ * only, because what it holds is not made until then. Anything else open
+ * folds behind a count, so a child never faces a pile.
+ */
+function WeekStrip({
+  week,
+  style,
+  questHref,
+  hasQuests,
+}: {
+  week: StudentWeek;
+  style: Style;
+  questHref: (lessonId: string) => string;
+  hasQuests: boolean;
+}) {
+  if (!hasQuests && !week.next) return null;
+  const note = week.current
+    ? week.next
+      ? `Next practice ${week.next}.`
+      : style.plain
+        ? "Start with this one."
+        : "Start with this quest."
+    : !hasQuests
+      ? `Your first practice comes ${week.next}.`
+      : week.next
+        ? `All done for now - next practice ${week.next}.`
+        : "All done for now.";
+  const more = week.others.length;
+  return (
+    <section className="space-y-2">
+      <div
+        className={`game-stats game-stats-${skinOf(style)} ${themeOf(style)} ${gameFonts}`}
+        style={paletteVars(style) as React.CSSProperties}
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="game-stats-level">This week</span>
+          {week.doneCount > 0 && <span className="game-stats-xp">{week.doneCount} done</span>}
+        </div>
+        <p className="game-stats-note">{note}</p>
+      </div>
+
+      {week.current && <QuestEntry lesson={week.current} style={style} href={questHref(week.current.id)} learning />}
+
+      {more > 0 && (
+        <details>
+          <summary className="cursor-pointer px-1 py-1 t-small font-semibold text-accent">
+            {more} more {style.plain ? "waiting" : more === 1 ? "quest waiting" : "quests waiting"}
+          </summary>
+          <div className="mt-2 space-y-2">
+            {week.others.map((lesson) => (
+              <QuestEntry key={lesson.id} lesson={lesson} style={style} href={questHref(lesson.id)} learning />
+            ))}
+          </div>
+        </details>
+      )}
+    </section>
   );
 }
 
