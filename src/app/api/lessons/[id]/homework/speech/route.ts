@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { homeworkFor } from "@/lib/access";
 import { readBytes } from "@/lib/http";
 import { TranscribeError, acceptsCompressed, canTranscribe, transcribe } from "@/lib/speech";
+import { withUsage } from "@/lib/usage";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -51,7 +52,9 @@ export async function POST(request: Request, { params }: Params) {
 
   try {
     // Homework answers are in English, whatever the lesson was taught in.
-    return NextResponse.json({ text: await transcribe(audio, kind, "en-US") });
+    const usage = { purpose: "speech", lessonId: id, studentId: found.student.id, tutorId: found.student.tutorId } as const;
+    const text = await withUsage(usage, () => transcribe(audio, kind, "en-US"));
+    return NextResponse.json({ text });
   } catch (e) {
     if (e instanceof TranscribeError && e.status === 400 && kind !== "audio/wav") {
       return NextResponse.json(asWav, { status: 422 });

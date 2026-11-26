@@ -2,6 +2,7 @@ import { PictureError, canDrawPictures, drawPictures } from "./imageGen";
 import { deletePlanImage, getPlan, getTutor, listPlans, savePlanImage, updateTutor } from "./store";
 import { updateCard } from "./plans";
 import type { LessonMaterials, PlanCard } from "./types";
+import { withUsage } from "./usage";
 
 /**
  * Pictures for slides and colouring pages. Drawn once, when the lesson is
@@ -93,7 +94,10 @@ export async function drawForCard(planId: string, cardId: string, only?: string)
     );
     let name: string | undefined;
     try {
-      const [image] = await oneAtATime(() => drawPictures(item.prompt, 1));
+      // Pictures are priced apart from the plan's writing, still the plan's tutor's.
+      const [image] = await withUsage({ purpose: "image", tutorId: plan.tutorId }, () =>
+        oneAtATime(() => drawPictures(item.prompt, 1)),
+      );
       name = await savePlanImage(planId, image.data, image.ext);
     } catch (e) {
       // Refused or unreachable: this slide keeps its emoji, and the picture

@@ -6,6 +6,7 @@ import { picturePrompt, writeScene } from "@/lib/scenePrompt";
 import { homeworkDone } from "@/lib/homework";
 import { deleteImage, saveImage, updateLesson } from "@/lib/store";
 import type { Lesson, Student } from "@/lib/types";
+import { withUsage } from "@/lib/usage";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -42,7 +43,9 @@ export async function POST(_request: Request, { params }: Params) {
 
   let job = running.get(id);
   if (!job) {
-    job = draw(id, found.lesson, found.student).finally(() => running.delete(id));
+    // The scene is written by the model too: part of what a picture costs.
+    const usage = { purpose: "image", lessonId: id, studentId: found.student.id, tutorId: found.student.tutorId } as const;
+    job = withUsage(usage, () => draw(id, found.lesson, found.student)).finally(() => running.delete(id));
     running.set(id, job);
   }
   return (await job).clone();

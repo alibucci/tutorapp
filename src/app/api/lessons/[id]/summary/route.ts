@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { lessonFor } from "@/lib/access";
 import { autoHomeworkAfter, summarizeOnce } from "@/lib/autoHomework";
+import { withUsage } from "@/lib/usage";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -18,7 +19,14 @@ export async function POST(_request: Request, { params }: Params) {
   if (!found) {
     return NextResponse.json({ error: "No such lesson." }, { status: 404 });
   }
-  const result = await summarizeOnce(id, found.lesson, found.student);
+  // A summary already there is being paid for a second time.
+  const usage = {
+    purpose: found.lesson.summary ? "regeneration" : "lesson_summary",
+    lessonId: id,
+    studentId: found.student.id,
+    tutorId: found.student.tutorId,
+  } as const;
+  const result = await withUsage(usage, () => summarizeOnce(id, found.lesson, found.student));
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

@@ -4,6 +4,7 @@ import { lessonFor } from "@/lib/access";
 import { updateLesson, updateStudent } from "@/lib/store";
 import { applySkillChanges, proposeSkillChanges } from "@/lib/skills";
 import type { SkillChange } from "@/lib/types";
+import { withUsage } from "@/lib/usage";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -24,7 +25,10 @@ export async function POST(_request: Request, { params }: Params) {
 
   try {
     return NextResponse.json({
-      changes: await proposeSkillChanges(lesson, student),
+      changes: await withUsage(
+        { purpose: "skills", lessonId: lesson.id, studentId: student.id, tutorId: student.tutorId },
+        () => proposeSkillChanges(lesson, student),
+      ),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not read the lesson.";

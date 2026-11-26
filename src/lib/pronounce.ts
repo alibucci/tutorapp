@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "crypto";
 import type { Pronounced, PronouncedWord } from "./types";
+import { recordUsage } from "./usage";
 
 /**
  * Pronunciation scoring by SpeechSuper (api.speechsuper.com).
@@ -39,6 +40,10 @@ export function canScoreVoice(): boolean {
   const { app, secret } = keys();
   return app.length > 0 && secret.length > 0;
 }
+
+/** One score is one paid call; one that came back with nothing is counted as failed. */
+const meter = (ok: boolean) =>
+  recordUsage({ provider: "speechsuper", model: CORE, meter: "calls", units: ok ? 1 : 0, ok, purpose: "pronunciation" });
 
 const sha1 = (text: string) => createHash("sha1").update(text).digest("hex");
 
@@ -108,11 +113,13 @@ export async function scoreLine(wav: Uint8Array, line: string): Promise<Pronounc
       );
     }
   } catch (e) {
+    meter(false);
     if (e instanceof PronounceError) throw e;
     throw new PronounceError("Could not reach the pronunciation check. Try again.");
   }
 
   const r = reply.result;
+  meter(Boolean(r && typeof r.overall === "number"));
   if (!r || typeof r.overall !== "number") {
     console.error("[pronounce]", reply.errId ?? "", reply.error ?? "no result");
     throw new PronounceError("The pronunciation check failed. Try again.");

@@ -1,3 +1,5 @@
+import { recordUsage } from "./usage";
+
 /**
  * The one place the app turns speech into text, called from the server.
  *
@@ -64,7 +66,32 @@ type AsrResponse = {
   error?: { message?: string; code?: string };
   code?: string;
   message?: string;
+  usage?: { seconds?: number };
 };
+
+/**
+ * How long a clip is, near enough for the usage log, without decoding it.
+ * WAV says its own byte rate; compressed audio runs at about 4 KB a second.
+ */
+export function clipSeconds(audio: Uint8Array, mimeType: string): number {
+  if (mimeType === "audio/wav" && audio.byteLength > 44) {
+    const byteRate = new DataView(audio.buffer, audio.byteOffset, audio.byteLength).getUint32(28, true);
+    if (byteRate > 0) return (audio.byteLength - 44) / byteRate;
+  }
+  return audio.byteLength / 4000;
+}
+
+/** Put one recognition down: billed by the second, and only when it worked. */
+function meter(provider: "deepgram" | "dashscope", model: string, seconds: number, ok: boolean): void {
+  recordUsage({
+    provider,
+    model,
+    meter: "audio_seconds",
+    units: ok ? Math.round(seconds * 10) / 10 : 0,
+    ok,
+    purpose: "speech",
+  });
+}
 
 /** Text of one short recording. Empty when nothing was said. */
 export async function transcribe(
@@ -78,6 +105,7 @@ export async function transcribe(
 }
 
 type DeepgramResponse = {
+  metadata?: { duration?: number };
   results?: {
     channels?: { alternatives?: { transcript?: string }[] }[];
     utterances?: { start?: number; transcript?: string }[];
@@ -138,8 +166,12 @@ async function askDeepgram(
     headers: { Authorization: `Token ${DEEPGRAM_KEY()}`, "Content-Type": mimeType },
     body: audio as BodyInit,
     signal: AbortSignal.timeout(60_000),
+  }).catch((e: unknown) => {
+    meter("deepgram", "nova-3", 0, false);
+    throw e;
   });
   const body = (await res.json().catch(() => ({}))) as DeepgramResponse;
+  meter("deepgram", "nova-3", body.metadata?.duration ?? clipSeconds(audio, mimeType), res.ok);
   if (!res.ok) {
     throw new TranscribeError(
       `Speech service error (${res.status}): ${body.err_msg ?? "request failed"}`,
@@ -182,8 +214,12 @@ async function transcribeQwen(
       asr_options: { enable_itn: true, ...(language && { language }) },
     }),
     signal: AbortSignal.timeout(60_000),
+  }).catch((e: unknown) => {
+    meter("dashscope", ASR_MODEL, 0, false);
+    throw e;
   });
   const body = (await res.json().catch(() => ({}))) as AsrResponse;
+  meter("dashscope", ASR_MODEL, body.usage?.seconds ?? clipSeconds(audio, mimeType), res.ok);
   if (!res.ok) {
     const code = body.error?.code ?? body.code ?? String(res.status);
     const message = body.error?.message ?? body.message ?? "request failed";

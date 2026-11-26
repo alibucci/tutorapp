@@ -64,10 +64,13 @@ feature is hidden, not broken. `.env.example` lists every key and what it does.
 | `PARENT_QUOTE_TUTORS` | which tutors' parent messages quote the child (tried with Victor first) |
 | `LESSON_PLANS_TUTORS` | lesson plans, slides, sheets, offline file, saved groups, library (Victor first) |
 | `PLAN_IMAGES_PER_CARD`, `PLAN_IMAGES_PER_MONTH` | caps on plan pictures (default 6 a lesson, 150 a tutor a month) |
+| `PRICE_<MODEL>_IN` / `_OUT` (per million tokens, e.g. `PRICE_DEEPSEEK_V4_PRO_IN`), `PRICE_IMAGE`, `PRICE_ASR_PER_MIN`, `PRICE_PRONOUNCE` | the prices the admin's Usage page estimates costs with. The defaults in `src/lib/usageCost.ts` are placeholders: set the real ones. |
 
 All data lives in `data/` as JSON files plus images. The folder is gitignored
 and is the only storage. `src/lib/store.ts` is the only file that knows this,
-so it can be swapped for a database without touching any caller.
+so it can be swapped for a database without touching any caller. The one
+exception is the usage log, `data/usage/<month>.jsonl`, one line per paid AI
+call, appended by `src/lib/usage.ts`.
 
 ---
 

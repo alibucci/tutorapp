@@ -15,6 +15,7 @@ import { drawForCard, dropUnused, picturesOn } from "./planImages";
 import { buildStorySlides, storyFor, storyOpen } from "./storySlides";
 import { plansOpenTo } from "./tutorList";
 import type { LessonPlan, PlanCard, Student, StudentGroup } from "./types";
+import { withUsage } from "./usage";
 
 /**
  * Lesson plans: who may see one, who it is for, and the slow work of writing
@@ -134,10 +135,13 @@ export async function updateCard(
 
 const jobs = new Map<string, Promise<unknown>>();
 
-/** One job per key at a time: a second tap joins the first. */
-function once(key: string, run: () => Promise<unknown>): void {
+/**
+ * One job per key at a time: a second tap joins the first. Every model and
+ * picture call in it is put down against the plan's tutor (and child).
+ */
+function once(key: string, plan: Pick<LessonPlan, "tutorId" | "studentId">, run: () => Promise<unknown>): void {
   if (jobs.has(key)) return;
-  const job = run()
+  const job = withUsage({ purpose: "lesson_plan", tutorId: plan.tutorId, studentId: plan.studentId }, run)
     .catch((e) => console.error(`[plans] ${key}`, e))
     .finally(() => jobs.delete(key));
   jobs.set(key, job);
@@ -162,7 +166,7 @@ function message(e: unknown): string {
 export async function startMonth(plan: LessonPlan, count: number): Promise<LessonPlan | null> {
   const marked = await updatePlan(plan.id, { suggesting: { since: new Date().toISOString() }, suggestError: undefined });
   after(() =>
-    once(`month:${plan.id}`, async () => {
+    once(`month:${plan.id}`, plan, async () => {
       try {
         const fresh = (await getPlan(plan.id)) ?? plan;
         const { students } = await studentsOf(fresh);
@@ -203,7 +207,7 @@ export async function startBuild(
   }));
   if (!marked) return null;
   after(() =>
-    once(`build:${cardId}`, async () => {
+    once(`build:${cardId}`, marked.plan, async () => {
       try {
         const plan = await getPlan(planId);
         const card = plan?.cards.find((c) => c.id === cardId);
@@ -326,7 +330,7 @@ export async function startRedraw(plan: LessonPlan, card: PlanCard, slideId: str
       : null,
   );
   after(() =>
-    once(`redraw:${slideId}`, async () => {
+    once(`redraw:${slideId}`, plan, async () => {
       await drawForCard(plan.id, card.id, slideId).catch((e) => console.error("[plan images]", e));
       await updateCard(plan.id, card.id, () => ({ building: undefined }));
       if (old) await dropUnused(plan.tutorId, { slides: [{ ...slide, image: old }], sheets: [], videos: [], builtAt: "" });

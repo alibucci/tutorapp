@@ -9,6 +9,7 @@ import { getLesson, getStudent, updateLesson } from "./store";
 import { summarizeLesson } from "./summarize";
 import { recordCovered, runPlanCheck } from "./planCheck";
 import { markUsed, redoFor } from "./redo";
+import { withUsage } from "./usage";
 import type { Homework, Lesson, Student } from "./types";
 
 /**
@@ -79,7 +80,9 @@ async function writeSummary(id: string, lesson: Lesson, student: Student): Promi
     const [summary, parentMessage] = await Promise.all([
       summarizeLesson(working, student),
       // A tutor's edited message is theirs; regenerating must not overwrite it.
-      lesson.parentMessage?.editedAt ? Promise.resolve(lesson.parentMessage) : writeParentMessage(working, student),
+      lesson.parentMessage?.editedAt
+        ? Promise.resolve(lesson.parentMessage)
+        : withUsage({ purpose: "parent_message" }, () => writeParentMessage(working, student)),
       // Taught from a plan: what of it the lesson reached. Its own record; it
       // never holds up or fails the summary.
       lesson.planCard && !lesson.groupId ? runPlanCheck(id) : Promise.resolve(null),
@@ -186,6 +189,10 @@ async function pipeline(id: string): Promise<Outcome<Homework | undefined>> {
   const student = lesson ? await getStudent(lesson.studentId) : null;
   if (!lesson || !student) return fail("No such lesson.", 404);
   if (!autoApplies(lesson, student)) return { ok: true, value: lesson.homework };
+  // Whose the calls below are. Extra homework is told apart from a lesson's
+  // own: it is priced as a thing of its own.
+  const who = { lessonId: id, studentId: student.id, tutorId: student.tutorId };
+  const games = lesson.kind === "practice" ? "extra_homework" : "lesson_homework";
 
   const failed = async (error: string, status: number) => {
     console.error(`[auto] lesson ${id}: ${error}`);
@@ -196,7 +203,8 @@ async function pipeline(id: string): Promise<Outcome<Homework | undefined>> {
   };
 
   if (!lesson.summary && lesson.kind !== "practice") {
-    const written = await summarizeOnce(id, lesson, student);
+    const current = lesson;
+    const written = await withUsage({ purpose: "lesson_summary", ...who }, () => summarizeOnce(id, current, student));
     if (!written.ok) return failed(written.error, written.status);
     if (!written.value) return fail("This lesson changed in the meantime.", 409);
     lesson = written.value;
@@ -208,7 +216,8 @@ async function pipeline(id: string): Promise<Outcome<Homework | undefined>> {
     return failed("This item was not built. Build it again from the student's page.", 409);
   }
   if (!lesson.homework?.exercises?.length) {
-    const built = await buildGamesOnce(id, lesson, student);
+    const current = lesson;
+    const built = await withUsage({ purpose: games, ...who }, () => buildGamesOnce(id, current, student));
     if (!built.ok) return failed(built.error, built.status);
   }
 

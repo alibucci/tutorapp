@@ -7,6 +7,7 @@ import {
   lessonsInWeek,
   weekBounds,
 } from "@/lib/parentReport";
+import { withUsage } from "@/lib/usage";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -41,7 +42,10 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   try {
-    const report = await draftParentReport(student, lessons, start, end);
+    const report = await withUsage(
+      { purpose: "parent_report", studentId: student.id, tutorId: student.tutorId },
+      () => draftParentReport(student, lessons, start, end),
+    );
     return NextResponse.json(await saveReport(report), { status: 201 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not draft the report.";

@@ -1,3 +1,5 @@
+import { recordUsage } from "./usage";
+
 /**
  * The one place the app asks for a picture to be drawn: Alibaba Model Studio
  * (Wan), reached from the server in its own region. Swapping providers means
@@ -148,11 +150,25 @@ async function download(url: string): Promise<DrawnImage | null> {
 export async function drawPictures(prompt: string, count: number): Promise<DrawnImage[]> {
   if (!canDrawPictures()) throw new PictureError("Picture drawing is not set up on this server.");
   const deadline = Date.now() + 180_000;
-  const taskId = await createTask(prompt, count);
-  const links = await waitFor(taskId, deadline);
-  const images = (await Promise.all(links.map(download))).filter(
-    (i): i is DrawnImage => i !== null,
-  );
+  // Drawn is what is paid for, whether or not the download then works; a
+  // refused or failed task draws nothing.
+  let drawn = 0;
+  let images: DrawnImage[] = [];
+  try {
+    const taskId = await createTask(prompt, count);
+    const links = await waitFor(taskId, deadline);
+    drawn = links.length;
+    images = (await Promise.all(links.map(download))).filter((i): i is DrawnImage => i !== null);
+  } finally {
+    recordUsage({
+      provider: "dashscope",
+      model: IMAGE_MODEL,
+      meter: "images",
+      units: drawn,
+      ok: images.length > 0,
+      purpose: "image",
+    });
+  }
   if (!images.length) throw new PictureError("The pictures were drawn but could not be downloaded.");
   return images;
 }
