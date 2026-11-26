@@ -46,3 +46,6 @@ backups/
 
 # local previews
 .tmp-preview/
+
+# local MCP servers
+.mcp.json
