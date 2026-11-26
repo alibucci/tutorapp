@@ -51,6 +51,14 @@ export function CardEditor({
   return (
     <div className="stack-lg">
       <Basics card={card} onSave={(json) => call("basics", base, { method: "PATCH", json })} busy={busy === "basics"} />
+      {!card.story && (card.review?.length || card.reviewOff) ? (
+        <ReviewWorkedIn
+          card={card}
+          busy={busy === "review"}
+          disabled={busy !== null || building}
+          onSave={(json) => call("review", base, { method: "PATCH", json })}
+        />
+      ) : null}
 
       {building && (
         <p className="note note-accent">
@@ -173,7 +181,7 @@ function Basics({
           <input className="field" value={topic} maxLength={60} onChange={(e) => setTopic(e.target.value)} />
         </label>
         <label className="block">
-          <span className="label">Goal</span>
+          <span className="label">Goal - the new learning</span>
           <input className="field" value={goal} maxLength={140} onChange={(e) => setGoal(e.target.value)} />
         </label>
       </div>
@@ -193,6 +201,72 @@ function Basics({
           {busy ? "Saving…" : "Save"}
         </button>
       )}
+    </section>
+  );
+}
+
+/**
+ * The review a build worked in from the children's practice, apart from the
+ * goal: the tutor sees what is new and what is going back over, and has the
+ * last word on the second. What they take out stays out on the next rebuild.
+ */
+function ReviewWorkedIn({
+  card,
+  busy,
+  disabled,
+  onSave,
+}: {
+  card: PlanCard;
+  busy: boolean;
+  disabled: boolean;
+  onSave: (json: { review?: string[]; reviewOff?: boolean }) => Promise<unknown>;
+}) {
+  const review = card.review ?? [];
+  if (card.reviewOff) {
+    return (
+      <section className="card card-pad stack-sm">
+        <h2 className="font-semibold">Review worked in</h2>
+        <p className="t-small t-muted">
+          None: you left review out of this lesson. A rebuild teaches only the new topic.
+        </p>
+        <button className="btn btn-quiet btn-sm self-start" disabled={disabled} onClick={() => void onSave({ reviewOff: false })}>
+          {busy ? "Saving…" : "Work review in again"}
+        </button>
+        <span className="hint">It comes back with the next rebuild, from the newest results.</span>
+      </section>
+    );
+  }
+  return (
+    <section className="card card-pad stack-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="font-semibold">Review worked in</h2>
+        <span className="tag tag-info">Review</span>
+      </div>
+      <p className="t-small t-muted">
+        Going back over what came up in the children&rsquo;s homework and Smart Reviews. Kept apart from the goal
+        above, which is the new learning.
+      </p>
+      <ul className="stack-sm">
+        {review.map((line) => (
+          <li key={line} className="flex items-start gap-2">
+            <span className="flex-1">{line}</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              disabled={disabled}
+              onClick={() => void onSave({ review: review.filter((r) => r !== line) })}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button className="btn btn-quiet btn-sm self-start" disabled={disabled} onClick={() => void onSave({ reviewOff: true })}>
+        {busy ? "Saving…" : "No review in this lesson"}
+      </button>
+      <span className="hint">
+        Removing does not change the slides: rebuild the lesson to take it out of them. A rebuild uses the newest
+        results and leaves out what you removed.
+      </span>
     </section>
   );
 }
