@@ -17,7 +17,12 @@ export function LearningOverviewCard({
 }) {
   return (
     <section className="space-y-3">
-      <h2 className="t-title">Continuous learning</h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="t-title">Continuous learning</h2>
+        <Link href={`/student/${studentId}/pilot`} className="t-small underline">
+          Pilot report
+        </Link>
+      </div>
       <div className="card card-pad stack-sm">
         <p className="t-small">
           {o.status}

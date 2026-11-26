@@ -399,6 +399,16 @@ export type Student = {
   schedule?: LearningSchedule;
   /** The tutor's last "before the next lesson" brief (brief.ts). */
   brief?: LearningBrief;
+  /** A pilot of practice between lessons being measured (pilot.ts). */
+  pilot?: PilotRecord;
+};
+
+/** When a pilot began, and what the tutor heard that the data cannot show. */
+export type PilotRecord = {
+  startedAt: string;
+  weeks: number;
+  /** Week by week, newest last: the parent's words, the tutor's own observations. */
+  notes: { week: string; parent?: string; tutor?: string }[];
 };
 
 /**
