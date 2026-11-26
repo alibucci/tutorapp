@@ -2,8 +2,8 @@ import { markSent } from "./autoHomework";
 import { homeworkDone } from "./homework";
 import { noticeReviewWaiting } from "./notices";
 import { makeSmartReview } from "./review";
-import { type QueuedReview, decide, logged } from "./schedule";
-import { getStudent, listLessons, listStudents, updateLesson, updateStudent } from "./store";
+import { type QueuedReview, decide, effectiveMode, logged } from "./schedule";
+import { getLearningPolicy, getStudent, listLessons, listStudents, updateLesson, updateStudent } from "./store";
 import { learningOpenTo } from "./tutorList";
 import type { Lesson, ScheduleEvent } from "./types";
 
@@ -73,8 +73,8 @@ export async function runSchedule(studentId: string, now = Date.now()): Promise<
     return e;
   }
   const lessonId = made.lesson.id;
-  // "I approve practice first" in the learning programme overrides "sent by itself".
-  if (schedule.mode === "auto" && !student.profile?.learning?.approval) {
+  // The agency's policy and "I approve practice first" both override "sent by itself".
+  if (effectiveMode(schedule, await getLearningPolicy(), student.profile?.learning?.approval) === "auto") {
     const sent = await updateLesson(lessonId, (current) => {
       const r = markSent(current, student);
       return "error" in r ? null : { homework: r.homework };

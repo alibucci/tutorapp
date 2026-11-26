@@ -4,7 +4,7 @@ import { studentFor } from "@/lib/access";
 import { LIMIT, readJson } from "@/lib/http";
 import { REVIEW_MINUTES } from "@/lib/review";
 import { defaultSchedule, validTimezone } from "@/lib/schedule";
-import { updateStudent } from "@/lib/store";
+import { getLearningPolicy, updateStudent } from "@/lib/store";
 import { learningOpenTo } from "@/lib/tutorList";
 
 type Params = { params: Promise<{ id: string }> };
@@ -38,8 +38,11 @@ export async function PUT(request: Request, { params }: Params) {
   if (!parsed.success) return NextResponse.json({ error: "Check the schedule's settings." }, { status: 400 });
   const { paused, ...b } = parsed.data;
   const now = new Date().toISOString();
+  const policy = await getLearningPolicy();
+  // Within the agency's limit: a tutor personalises, the admin sets the ceiling.
+  if (policy && b.maxPerWeek) b.maxPerWeek = Math.min(b.maxPerWeek, policy.maxPerWeekCap);
   const saved = await updateStudent(found.student.id, (s) => {
-    const current = s.schedule ?? defaultSchedule(now);
+    const current = s.schedule ?? defaultSchedule(now, policy);
     const next = {
       ...current,
       ...b,

@@ -17,7 +17,7 @@ export default async function AdminLayout({
         name={session.name}
         context="Administration"
         homeHref="/admin"
-        links={[{ href: "/admin/usage", label: "Usage" }]}
+        links={[{ href: "/admin/learning", label: "Learning" }, { href: "/admin/usage", label: "Usage" }]}
       />
       <div className="page page-wide flex-1 py-8">
         <IssuedPasswords>{children}</IssuedPasswords>

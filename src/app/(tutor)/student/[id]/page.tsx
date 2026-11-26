@@ -20,7 +20,7 @@ import { SkillList } from "@/components/SkillList";
 import { Avatar, ChevronLeft, ChevronRight } from "@/components/ui";
 import { studentFor } from "@/lib/access";
 import { homeworkDone } from "@/lib/homework";
-import { listGroups, listLessons, listReports } from "@/lib/store";
+import { getLearningPolicy, listGroups, listLessons, listReports } from "@/lib/store";
 import { learningOpenTo, plansOpenTo } from "@/lib/tutorList";
 import { withIds } from "@/lib/memory";
 import { SkillTidy } from "@/components/SkillTidy";
@@ -45,16 +45,18 @@ export default async function StudentPage({
   const { student, session } = found;
   const christianityOpen = await christianityOpenTo(session);
   // Saved groups this child is in, so archiving can say it takes them out.
-  const inGroups = (await plansOpenTo(student.tutorId))
+  const myGroups = (await plansOpenTo(student.tutorId))
     ? (await listGroups(student.tutorId))
         .filter((g) => !g.archivedAt && g.studentIds.includes(student.id))
-        .map((g) => g.name)
+        .map((g) => ({ id: g.id, name: g.name }))
     : [];
+  const inGroups = myGroups.map((g) => g.name);
   const christianity = moduleOf(student);
   // The learner's memory, for the tutors continuous learning is open to.
   const learning = await learningOpenTo(student.tutorId);
   const skills = withIds(student.skills);
-  const { schedule, next: nextAt } = scheduleView(student.schedule);
+  const policy = await getLearningPolicy();
+  const { schedule, next: nextAt } = scheduleView(student.schedule, undefined, policy);
   const story = christianityOpen && !student.archivedAt ? await storyStatus(student) : null;
 
   const [lessons, reports] = await Promise.all([
@@ -135,7 +137,7 @@ export default async function StudentPage({
       </section>
 
       {learning && !student.archivedAt && (
-        <LearningOverviewCard studentId={student.id} overview={learningOverview(student, lessons)} brief={student.brief} />
+        <LearningOverviewCard studentId={student.id} overview={learningOverview(student, lessons, undefined, policy)} brief={student.brief} />
       )}
 
       {/* A child with no lessons yet has nothing to build from. This is how
@@ -199,6 +201,7 @@ export default async function StudentPage({
           studentName={student.name}
           schedule={schedule}
           next={nextAt}
+          groups={myGroups}
         />
       )}
 

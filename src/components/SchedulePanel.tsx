@@ -34,10 +34,13 @@ export function SchedulePanel({
   studentName,
   schedule,
   next,
+  groups = [],
 }: {
   studentId: string;
   studentName: string;
   schedule: LearningSchedule;
+  /** Saved groups this child is in: the same schedule for all of them in one go. */
+  groups?: { id: string; name: string }[];
   /** The next slot in the learner's time, already worded: "Wed 27 Nov, 17:00". */
   next: string | null;
 }) {
@@ -46,6 +49,7 @@ export function SchedulePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const zones = ZONES.includes(s.timezone) ? ZONES : [s.timezone, ...ZONES];
 
   async function save(patch: Partial<LearningSchedule> & { paused?: boolean }) {
@@ -189,6 +193,29 @@ export function SchedulePanel({
                 ? `Next: ${next} (their time).`
                 : "No day chosen yet."}
       </p>
+
+      {groups.length > 0 && schedule.updatedAt && (
+        <div className="flex flex-wrap items-center gap-2">
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              className="btn btn-quiet btn-sm"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                const r = await api<{ changed: number }>(`/api/students/${studentId}/schedule/group`, { method: "POST", json: { groupId: g.id } });
+                setBusy(false);
+                if (!r.ok) return setError(r.error);
+                setNote(`The same schedule for ${r.data.changed} more ${r.data.changed === 1 ? "child" : "children"} in ${g.name}.`);
+              }}
+            >
+              Use for everyone in {g.name}
+            </button>
+          ))}
+          {note && <span className="t-small t-muted">{note}</span>}
+        </div>
+      )}
 
       {(s.log ?? []).length > 0 && (
         <details className="t-small">

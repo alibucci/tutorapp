@@ -401,6 +401,20 @@ export type Student = {
   brief?: LearningBrief;
 };
 
+/**
+ * The agency's rules for practice between lessons, set by the admin: the
+ * schedule every new learner starts from, and the limits a tutor works within.
+ */
+export type LearningPolicy = {
+  /** What a learner's schedule starts as, before the tutor changes it. */
+  template: Pick<LearningSchedule, "reviewDays" | "time" | "timezone" | "minutes" | "maxPerWeek" | "mode">;
+  /** Nothing the schedule makes reaches a child before a tutor approves it. */
+  requireApproval: boolean;
+  /** No learner's schedule may go above this many a week. */
+  maxPerWeekCap: number;
+  updatedAt: string;
+};
+
 /** A short learning summary for the tutor before the next lesson. */
 export type LearningBrief = {
   at: string;

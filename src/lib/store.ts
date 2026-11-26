@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomBytes, randomUUID } from "crypto";
-import type { Lesson, LessonPlan, ParentReport, Student, StudentGroup, Tutor } from "./types";
+import type { LearningPolicy, Lesson, LessonPlan, ParentReport, Student, StudentGroup, Tutor } from "./types";
 
 /**
  * File-backed store. One JSON file per record, plus homework pictures.
@@ -456,4 +456,22 @@ export async function readImage(name: string): Promise<Buffer | null> {
 export async function deleteImage(name: string | undefined): Promise<void> {
   if (!name || !IMAGE_NAME.test(name)) return;
   await fs.rm(path.join(IMAGE_DIR, name), { force: true });
+}
+
+// --- the agency's learning policy -------------------------------------------
+
+const SETTINGS_DIR = path.join(DATA_DIR, "settings");
+const POLICY_FILE = path.join(SETTINGS_DIR, "learning.json");
+
+/** The admin's learning policy, or null when none has been set. */
+export async function getLearningPolicy(): Promise<LearningPolicy | null> {
+  return readJson<LearningPolicy>(POLICY_FILE);
+}
+
+export async function saveLearningPolicy(policy: LearningPolicy): Promise<LearningPolicy> {
+  await fs.mkdir(SETTINGS_DIR, { recursive: true });
+  return withLock(POLICY_FILE, async () => {
+    await writeJson(POLICY_FILE, policy);
+    return policy;
+  });
 }

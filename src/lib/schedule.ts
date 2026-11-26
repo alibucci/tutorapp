@@ -1,4 +1,4 @@
-import type { LearningSchedule, ScheduleEvent } from "./types";
+import type { LearningPolicy, LearningSchedule, ScheduleEvent } from "./types";
 
 /**
  * The learning schedule: when a learner's Smart Reviews come, and what the
@@ -22,17 +22,27 @@ const LOG_KEPT = 20;
 
 export const DEFAULT_TIMEZONE = "Asia/Shanghai";
 
-export function defaultSchedule(now: string): LearningSchedule {
-  return {
-    enabled: false,
-    reviewDays: [3],
-    time: "17:00",
-    timezone: DEFAULT_TIMEZONE,
-    minutes: 10,
-    maxPerWeek: 2,
-    mode: "approval",
-    updatedAt: now,
-  };
+/** The agency's template when the admin set one; otherwise Wednesdays at five, approved by the tutor. */
+export const BUILT_IN_TEMPLATE: LearningPolicy["template"] = {
+  reviewDays: [3],
+  time: "17:00",
+  timezone: DEFAULT_TIMEZONE,
+  minutes: 10,
+  maxPerWeek: 2,
+  mode: "approval",
+};
+
+export function defaultSchedule(now: string, policy?: LearningPolicy | null): LearningSchedule {
+  return { enabled: false, ...(policy?.template ?? BUILT_IN_TEMPLATE), updatedAt: now };
+}
+
+/**
+ * How a schedule really delivers under the agency's policy and the learner's
+ * own programme: either can insist the tutor approves first.
+ */
+export function effectiveMode(s: LearningSchedule, policy: LearningPolicy | null | undefined, learnerApproval: boolean | undefined): LearningSchedule["mode"] {
+  if (s.mode === "auto" && (policy?.requireApproval || learnerApproval)) return "approval";
+  return s.mode;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,8 +182,8 @@ export function logged(s: LearningSchedule, e: ScheduleEvent): LearningSchedule 
 }
 
 /** The schedule as the tutor sees it now, and its next slot in the learner's own time. */
-export function scheduleView(s: LearningSchedule | undefined, now = Date.now()): { schedule: LearningSchedule; next: string | null } {
-  const schedule = s ?? defaultSchedule(new Date(now).toISOString());
+export function scheduleView(s: LearningSchedule | undefined, now = Date.now(), policy?: LearningPolicy | null): { schedule: LearningSchedule; next: string | null } {
+  const schedule = s ?? defaultSchedule(new Date(now).toISOString(), policy);
   const slot = nextSlot(schedule, now);
   const next = slot
     ? new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: schedule.timezone }).format(slot.at)
