@@ -98,6 +98,10 @@ align-items:center;justify-content:center;text-align:center;gap:2.5cqh;padding:5
 .slide.up .emo,.slide.online.up .emo{font-size:11cqh}.slide.up .pic{max-height:22cqh}.btn[hidden]{display:none}
 .screen{position:fixed;inset:0;container-type:size;background:var(--panel)}
 .here{position:fixed;inset:0;z-index:9;container-type:size}.here[hidden]{display:none}
+a.btn{text-decoration:none;display:inline-block}
+/* Out of full screen without a keyboard: a quiet corner button, brighter on hover. */
+.exit{position:fixed;top:12px;right:12px;z-index:10;width:44px;height:44px;border-radius:99px;border:0;background:rgba(0,0,0,.35);
+color:#fff;font-size:22px;line-height:44px;text-align:center;opacity:.55}.exit:hover,.exit:focus-visible{opacity:1}.exit[hidden]{display:none}
 .sheets{display:none}
 @media print{
   @page{size:A4;margin:14mm}
@@ -122,9 +126,10 @@ align-items:center;justify-content:center;text-align:center;gap:2.5cqh;padding:5
     <h1>${esc(input.title)}${input.offline && input.savedAt ? ` <span class="hint">· saved ${esc(input.savedAt)}</span>` : ""}</h1>
     <button class="btn" data-mode="online">Online</button>
     <button class="btn" data-mode="room">In the room</button>
-    <button class="btn primary" id="open">Child's screen</button>
-    <button class="btn" id="full">Full screen here</button>
+    <button class="btn primary" id="open" title="The slide alone in a second window: share it on the call or put it on the projector. Your notes stay here.">Child's screen</button>
+    <button class="btn" id="full" title="One screen only: the slide fills this screen, without your notes. Esc or ✕ brings them back.">Full screen here</button>
     ${input.sheets.length ? `<button class="btn" id="print">Print sheets</button>` : ""}
+    ${input.offline ? "" : `<a class="btn" href="?pack=1" download>Save for offline</a>`}
   </div>
   <div class="wrap">
     <div>
@@ -135,6 +140,7 @@ align-items:center;justify-content:center;text-align:center;gap:2.5cqh;padding:5
         <span class="count" id="count"></span>
         <button class="btn primary" id="next">Next &rarr;</button>
       </div>
+      <p class="hint"><b>Child's screen</b> - a second window, for a video call or a projector. <b>Full screen here</b> - one screen only, the slide without your notes; Esc or &#10005; brings them back.</p>
       <p class="hint">Arrow keys or space move the slides, in either window. Notes and the next slide are on this page only.<span id="uphint" hidden> This slide has a harder step for the stronger children: "Harder" or the H key shows it on the child's screen.</span></p>
     </div>
     <div class="side">
@@ -158,6 +164,7 @@ align-items:center;justify-content:center;text-align:center;gap:2.5cqh;padding:5
   </div>
 </div>
 <div class="here" id="here" hidden></div>
+<button class="exit" id="exit" type="button" aria-label="Leave full screen" title="Leave full screen (Esc)" hidden>&#10005;</button>
 <div class="sheets">${input.sheets.map((s) => renderSheet(s, input)).join("")}</div>
 <script type="application/json" id="deck">${safeJson(data)}</script>
 <script>
@@ -208,8 +215,19 @@ align-items:center;justify-content:center;text-align:center;gap:2.5cqh;padding:5
     if(ev.key==="ArrowRight"||ev.key===" "||ev.key==="PageDown"){ev.preventDefault();go(1)}
     else if(ev.key==="ArrowLeft"||ev.key==="PageUp"){ev.preventDefault();go(-1)}
     else if(ev.key==="h"||ev.key==="H"||ev.key==="ArrowUp"||ev.key==="ArrowDown"){if(S[i]&&S[i].harder){ev.preventDefault();toggleUp()}}
-    else if(ev.key==="Escape"){document.getElementById("here").hidden=true;if(document.fullscreenElement)document.exitFullscreen().catch(function(){})}
+    else if(ev.key==="Escape"){leave()}
   }
+  // Full screen, with Safari's older webkit names. The slide is an overlay on
+  // the page whether or not the browser grants full screen, so leaving always
+  // takes the overlay away - not only when the browser says it left.
+  function fsEl(){return document.fullscreenElement||document.webkitFullscreenElement||null}
+  function fsEnter(el){try{var r=el.requestFullscreen?el.requestFullscreen():el.webkitRequestFullscreen?el.webkitRequestFullscreen():null;if(r&&r.catch)r.catch(function(){})}catch(e){}}
+  function fsExit(){try{var r=document.exitFullscreen?document.exitFullscreen():document.webkitExitFullscreen?document.webkitExitFullscreen():null;if(r&&r.catch)r.catch(function(){})}catch(e){}}
+  function shown(on){document.getElementById("here").hidden=!on;document.getElementById("exit").hidden=!on}
+  function leave(){shown(false);if(fsEl())fsExit()}
+  function fsChanged(){if(!fsEl())shown(false)}
+  document.addEventListener("fullscreenchange",fsChanged);
+  document.addEventListener("webkitfullscreenchange",fsChanged);
   document.addEventListener("keydown",keys);
   document.getElementById("prev").onclick=function(){go(-1)};
   document.getElementById("next").onclick=function(){go(1)};
@@ -228,11 +246,12 @@ align-items:center;justify-content:center;text-align:center;gap:2.5cqh;padding:5
     draw();
   };
   document.getElementById("full").onclick=function(){
-    var here=document.getElementById("here");here.hidden=false;draw();
+    var here=document.getElementById("here");shown(true);draw();
     here.onclick=function(){go(1)};
-    if(here.requestFullscreen)here.requestFullscreen().catch(function(){});
-    document.addEventListener("fullscreenchange",function(){if(!document.fullscreenElement)here.hidden=true},{once:true});
+    // The whole page goes full screen, so the exit button is in it too.
+    fsEnter(document.documentElement);
   };
+  document.getElementById("exit").onclick=function(ev){ev.stopPropagation();leave()};
   var pr=document.getElementById("print");if(pr)pr.onclick=function(){window.print()};
   if(pr&&/[?&]print=1/.test(location.search))setTimeout(function(){window.print()},400);
   window.addEventListener("beforeunload",function(){if(child&&!child.closed)child.close()});

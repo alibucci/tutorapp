@@ -349,7 +349,7 @@ export const HELP_FILMS: HelpFilm[] = [
       "Arrow keys or space move the slides, in either window. \"Listen\" reads the word aloud.",
       "With a group, a slide may have a harder step for the stronger children: \"Harder\" or the H key shows it under the easy one.",
     ],
-    tip: "One screen only? \"Full screen here\" shows the slide without your notes; Esc brings them back.",
+    tip: "One screen only? \"Full screen here\" shows the slide without your notes; Esc or the ✕ in the corner brings them back. Need your notes on the slides too? Use \"Child's screen\" and a second screen.",
   },
   {
     id: "P4", title: "Changing a lesson", needs: ["plans"],
