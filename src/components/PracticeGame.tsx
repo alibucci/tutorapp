@@ -831,9 +831,9 @@ function SayIt({
 
 // --- Read and answer ---------------------------------------------------------
 //
-// Asked about a story the child has just read. Nothing here punishes: a wrong
-// tap shows the right answer and why, and the child goes on. No second go to
-// win a point back, no shaking, no "wrong".
+// Asked about a story the child has just read. A wrong tap is marked as wrong,
+// as in every other homework, and the right answer is shown beside it with
+// why; then the child goes on. No second go to win a point back.
 
 function Questions({
   rounds,
@@ -884,17 +884,29 @@ function Questions({
             type="button"
             onClick={() => pick(i)}
             disabled={answered}
-            className={`game-option ${answered && i === round.answer ? "game-option-yes" : ""}`}
+            className={`game-option ${
+              answered && i === round.answer
+                ? "game-option-yes"
+                : answered && i === picked
+                  ? "game-option-no"
+                  : ""
+            }`}
             aria-pressed={answered && i === picked}
           >
-            {answered && i === round.answer ? `✓ ${option}` : option}
+            {answered && i === round.answer
+              ? `✓ ${option}`
+              : answered && i === picked
+                ? `✗ ${option}`
+                : option}
           </button>
         ))}
       </div>
       {answered && (
         <>
-          <div className={`game-verdict ${correct ? "game-verdict-yes" : "game-verdict-soft"}`}>
-            <p className="game-verdict-head">{correct ? "Yes!" : `The story says: ${round.options[round.answer]}`}</p>
+          <div className={`game-verdict ${correct ? "game-verdict-yes" : "game-verdict-no"}`}>
+            <p className="game-verdict-head">
+              {correct ? "Yes!" : `Not quite. The story says: ${round.options[round.answer]}`}
+            </p>
             <p className="game-verdict-why">{round.why}</p>
           </div>
           <button onClick={next} className="game-button mt-4">
