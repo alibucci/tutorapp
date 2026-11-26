@@ -78,7 +78,10 @@ function mark(
     }
     const said = spoken(reply);
     if (said === null) return null;
-    return { asked: target, answered: said || "(nothing)", right: saidRight(target, said) };
+    // Nothing heard is not a wrong answer: a skip, or the mic or the
+    // recogniser failing. Kept for the tutor, never counted.
+    if (!said) return { asked: target, answered: "(nothing heard)", right: false, skipped: true };
+    return { asked: target, answered: said, right: saidRight(target, said) };
   }
   if (exercise.kind === "questions" || exercise.kind === "recall") {
     const round = exercise.rounds[index];
@@ -115,8 +118,9 @@ function mark(
     const round = exercise.rounds[index];
     const said = spoken(reply);
     if (!round || said === null) return null;
+    if (!said) return { asked: round.question, answered: "(nothing heard)", right: false, skipped: true };
     // No one right answer: a real attempt in English is what counts.
-    return { asked: round.question, answered: said || "(nothing)", right: answered(said) };
+    return { asked: round.question, answered: said, right: answered(said) };
   }
   if (exercise.kind !== "catch") return null;
   const round = exercise.rounds[index];
@@ -163,8 +167,11 @@ export async function POST(request: Request, { params }: Params) {
   // "What would you do?" is not a score: kept with a total of 0, so no sum
   // anywhere (notices, home rows, progress) counts it for or against the child.
   const unscored = kind === "kindness";
-  const right = unscored ? 0 : rounds.filter((r) => r.right).length;
-  const total = unscored ? 0 : exercise.rounds.length;
+  // Only what was marked counts: a round with no answer, or with nothing
+  // heard, is neither right nor wrong.
+  const marked = rounds.filter((r) => !r.skipped);
+  const right = unscored ? 0 : marked.filter((r) => r.right).length;
+  const total = unscored ? 0 : marked.length;
 
   const before = found.lesson;
   let firstPlay = false;
@@ -189,6 +196,7 @@ export async function POST(request: Request, { params }: Params) {
             attempts: (previous?.attempts ?? 0) + 1,
             // Set once, on the first play, and carried through every replay.
             firstRight: previous?.firstRight ?? previous?.right ?? right,
+            firstTotal: previous ? (previous.firstTotal ?? previous.total) : total,
           },
         ],
       },

@@ -588,6 +588,12 @@ export type RoundAnswer = {
   answered: string;
   right: boolean;
   /**
+   * Not marked at all: nothing was said, or nothing could be heard (a
+   * microphone or recogniser failure). Never counted as wrong - a skipped
+   * question is not proof the child does not know it.
+   */
+  skipped?: boolean;
+  /**
    * "What would you do?" only: whether the child picked the kindest of the
    * kind options. Shown to the tutor, never scored (`right` is always true).
    */
@@ -613,6 +619,8 @@ export type ExerciseResult = {
    * - which is exactly what the parent's progress is built from.
    */
   firstRight?: number;
+  /** How many rounds were marked that first time (see `skipped`). */
+  firstTotal?: number;
 };
 
 export type Homework = {

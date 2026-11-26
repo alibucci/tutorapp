@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { homeworkDone, scored, sendsItself } from "@/lib/homework";
+import { homeworkDone, resultScore, sendsItself, unassessed } from "@/lib/homework";
 import { ADJECTIVES_TASK, HOMEWORK_TASKS, type Lesson } from "@/lib/types";
 
 /** Longest side of a stored picture. Plenty for a phone screen. */
@@ -82,7 +82,7 @@ export function HomeworkPanel({
   // is kind) and not "answer aloud" (no one right answer).
   const mistakes = (homework?.results ?? [])
     .filter((r) => r.kind !== "kindness" && r.kind !== "speak")
-    .reduce((n, r) => n + (r.rounds ?? []).filter((x) => !x.right).length, 0);
+    .reduce((n, r) => n + (r.rounds ?? []).filter((x) => !x.right && !unassessed(r.kind, x)).length, 0);
   const [seconds, setSeconds] = useState(0);
   // Homework goes out by itself - not a Bible story, which the tutor checks
   // and sends. Once the tutor takes it back, sending it is theirs again.
@@ -322,26 +322,31 @@ export function HomeworkPanel({
             <ul className="space-y-2">
               {exercises.map((exercise) => {
                 const result = (homework?.results ?? []).find((r) => r.kind === exercise.kind);
+                const now = result && resultScore(result);
+                const first = result && resultScore(result, "first");
                 return (
                   <li key={exercise.kind} className="rounded-[var(--radius)] bg-sunken p-3">
                     <div className="flex items-center justify-between gap-3">
                       <span className="t-small font-semibold">{exercise.title}</span>
-                      {result && !scored(result) ? (
+                      {result && result.kind === "kindness" ? (
                         // "What would you do?": no score, only that it was played.
                         <span className="tag tag-done">Done</span>
-                      ) : result ? (
+                      ) : result && now && !now.total ? (
+                        // Played, but nothing could be marked: skipped, or not heard.
+                        <span className="tag tag-quiet">Played · nothing heard</span>
+                      ) : result && now && first ? (
                         <span className="flex items-center gap-2">
-                          {(result.attempts ?? 1) > 1 && (
+                          {(result.attempts ?? 1) > 1 && first.total > 0 && (
                             <span className="t-caption t-muted">
-                              first go {result.firstRight ?? result.right}/{result.total}
+                              first go {first.right}/{first.total}
                             </span>
                           )}
                           <span
                             className={`tag ${
-                              result.right / result.total >= 0.7 ? "tag-done" : "tag-warn"
+                              now.right / now.total >= 0.7 ? "tag-done" : "tag-warn"
                             }`}
                           >
-                            {result.right}/{result.total}
+                            {now.right}/{now.total}
                           </span>
                         </span>
                       ) : (

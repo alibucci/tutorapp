@@ -10,7 +10,8 @@
     "dev:https": "next dev --experimental-https",
     "smoke": "node scripts/smoke.mjs",
     "release": "bash scripts/release.sh",
-    "backup:pull": "bash scripts/backup-pull.sh"
+    "backup:pull": "bash scripts/backup-pull.sh",
+    "test:scoring": "node --test scripts/scoring.test.mjs"
   },
   "dependencies": {
     "next": "16.3.8",

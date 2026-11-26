@@ -1,3 +1,4 @@
+import { unassessed } from "./homework";
 import { updateStudent } from "./store";
 import type { Exercise, Lesson, RedoItem, RoundAnswer, Student } from "./types";
 
@@ -60,7 +61,8 @@ export function mistakesOf(lesson: Lesson): RedoItem[] {
     if (NOT_CARRIED.has(result.kind)) continue;
     const exercise = homework?.exercises?.find((e) => e.kind === result.kind);
     for (const round of result.rounds ?? []) {
-      if (round.right || round.kindest !== undefined) continue;
+      // Not marked (skipped, nothing heard) is not a mistake to practise.
+      if (round.right || round.kindest !== undefined || unassessed(result.kind, round)) continue;
       const key = `${result.kind}:${round.asked}`;
       if (seen.has(key)) continue;
       seen.add(key);

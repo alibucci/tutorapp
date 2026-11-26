@@ -1,4 +1,4 @@
-import { gameScore, homeworkDone, homeworkImageUrl, progressByTopic, scored } from "@/lib/homework";
+import { gameScore, homeworkDone, homeworkImageUrl, progressByTopic, resultScore } from "@/lib/homework";
 import { listLessons, listReports } from "@/lib/store";
 import { parentTimeline, type ParentItem } from "@/lib/timeline";
 import {
@@ -267,12 +267,15 @@ function HomeworkHistory({
 
               {(homework.results ?? []).length > 0 && (
                 <div className="space-y-2.5 px-4 pt-3">
-                  {(homework.results ?? []).filter(scored).map((r) => {
-                    const percent = r.total ? Math.round((r.right / r.total) * 100) : 0;
+                  {(homework.results ?? []).map((result) => {
+                    const r = resultScore(result);
+                    // Nothing marked (skipped, or not heard) is no score at all - not 0%.
+                    if (!r.total) return null;
+                    const percent = Math.round((r.right / r.total) * 100);
                     return (
-                      <div key={r.kind}>
+                      <div key={result.kind}>
                         <div className="flex items-baseline justify-between gap-3">
-                          <span className="t-small">{EXERCISE_LABEL[r.kind]}</span>
+                          <span className="t-small">{EXERCISE_LABEL[result.kind]}</span>
                           <span className="t-small t-muted tabular-nums">
                             {r.right}/{r.total}
                           </span>

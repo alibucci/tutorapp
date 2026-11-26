@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { AnswerMicContext, useAnswerMic } from "@/hooks/useAnswerMic";
 import { gameFonts } from "@/lib/fonts";
 import { type GameStyle, paletteVars, skinOf, themeOf } from "@/lib/gameStyles";
-import { scored } from "@/lib/homework";
+import { resultScore, scored } from "@/lib/homework";
 import { PracticeGame } from "@/components/PracticeGame";
 import { ListenButton, MicButton } from "@/components/SpokenAnswer";
 import type { VoiceProps, VoiceState } from "@/components/VoiceCheck";
@@ -124,11 +124,11 @@ export function HomeworkGame({
   /** This sitting's scores, so the last screen can say how it went. */
   const [scores, setScores] = useState<
     { kind: Exercise["kind"]; right: number; total: number }[]
-  >(() => (results ?? []).map((r) => ({ kind: r.kind, right: r.right, total: r.total })));
+  >(() => (results ?? []).map((r) => ({ kind: r.kind, ...resultScore(r) })));
   /** Rounds answered right first time, across the whole quest. */
   // Opening a finished quest shows what was scored before, not a zero.
   const [points, setPoints] = useState(() =>
-    finished ? (results ?? []).filter(scored).reduce((n, r) => n + r.right, 0) : 0,
+    finished ? (results ?? []).reduce((n, r) => n + resultScore(r).right, 0) : 0,
   );
   /** Bumped on a replay so the game starts from a clean slate. */
   const [replay, setReplay] = useState(0);

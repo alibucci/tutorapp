@@ -1,4 +1,4 @@
-import { gameScore, scored, homeworkDone } from "./homework";
+import { gameScore, homeworkDone, resultScore } from "./homework";
 import { getStudent, getTutor } from "./store";
 import { canEmail, escapeHtml, sendEmail, siteUrl } from "./email";
 import { canNotify, notify } from "./telegram";
@@ -42,8 +42,9 @@ async function send(lesson: Lesson): Promise<void> {
   if (score.total > 0) {
     details.push(`${score.right} of ${score.total} right${struggled ? " - worth going over again" : ""}`);
   }
-  for (const result of (lesson.homework?.results ?? []).filter(scored)) {
-    details.push(`${result.topic}: ${result.right}/${result.total}`);
+  for (const result of lesson.homework?.results ?? []) {
+    const r = resultScore(result);
+    if (r.total) details.push(`${result.topic}: ${r.right}/${r.total}`);
   }
   const link = `${siteUrl()}/lesson/${lesson.id}/review#homework`;
 

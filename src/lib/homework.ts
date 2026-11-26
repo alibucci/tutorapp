@@ -1,4 +1,4 @@
-import type { Homework, Lesson } from "./types";
+import type { ExerciseResult, Homework, Lesson, RoundAnswer } from "./types";
 
 /**
  * Homework has gone out by itself since this release. Lessons made before it
@@ -55,15 +55,49 @@ export function scored(result: { kind: string; total: number }): boolean {
   return result.kind !== "kindness" && result.total > 0;
 }
 
-/** How the games went, added up. `total` of 0 means there were none. */
+/** Games answered out loud: an empty answer there is silence, not a mistake. */
+const SPOKEN = new Set(["repeat", "dialogue", "speak"]);
+
+/**
+ * A round nobody could mark: skipped, or nothing heard. Results saved before
+ * `skipped` existed wrote these as "(nothing)" and counted them wrong.
+ */
+export function unassessed(kind: string, round: RoundAnswer): boolean {
+  return Boolean(round.skipped) || (SPOKEN.has(kind) && /^\(nothing/.test(round.answered));
+}
+
+/**
+ * One game's score, counting only the rounds that were really marked - the
+ * one rule every page uses, so the tutor's and the parent's numbers agree.
+ * "first" is the first attempt: a replay from memory must not make it look
+ * better than what the child knew.
+ */
+export function resultScore(r: ExerciseResult, attempt: "latest" | "first" = "latest"): { right: number; total: number } {
+  if (r.kind === "kindness") return { right: 0, total: 0 };
+  let right = r.right;
+  let total = r.total;
+  if (r.rounds?.length) {
+    const marked = r.rounds.filter((x) => !unassessed(r.kind, x));
+    right = marked.filter((x) => x.right).length;
+    total = marked.length;
+  }
+  if (attempt === "first" && r.firstRight !== undefined) {
+    if (r.firstTotal !== undefined) return { right: r.firstRight, total: r.firstTotal };
+    // Older results kept no first total: the marked rounds stand in for it.
+    return { right: Math.min(r.firstRight, total), total };
+  }
+  return { right, total };
+}
+
+/** How the games went, added up. `total` of 0 means nothing was marked yet. */
 export function gameScore(homework: Homework | undefined): {
   right: number;
   total: number;
   percent: number;
 } {
-  const results = (homework?.results ?? []).filter(scored);
-  const right = results.reduce((n, r) => n + r.right, 0);
-  const total = results.reduce((n, r) => n + r.total, 0);
+  const scores = (homework?.results ?? []).map((r) => resultScore(r));
+  const right = scores.reduce((n, r) => n + r.right, 0);
+  const total = scores.reduce((n, r) => n + r.total, 0);
   return { right, total, percent: total ? Math.round((right / total) * 100) : 0 };
 }
 
@@ -77,12 +111,15 @@ export function progressByTopic(
 ): { topic: string; right: number; total: number; percent: number }[] {
   const byTopic = new Map<string, { right: number; total: number }>();
   for (const lesson of lessons) {
-    for (const result of (lesson.homework?.results ?? []).filter(scored)) {
-      const at = byTopic.get(result.topic) ?? { right: 0, total: 0 };
+    for (const result of lesson.homework?.results ?? []) {
       // The first attempt, always: a child replaying from memory should not
       // make the picture look better than what they actually knew.
-      at.right += result.firstRight ?? result.right;
-      at.total += result.total;
+      const first = resultScore(result, "first");
+      // Nothing marked - skipped, or not heard - is no data, not a low score.
+      if (!first.total) continue;
+      const at = byTopic.get(result.topic) ?? { right: 0, total: 0 };
+      at.right += first.right;
+      at.total += first.total;
       byTopic.set(result.topic, at);
     }
   }
@@ -90,7 +127,7 @@ export function progressByTopic(
     .map(([topic, n]) => ({
       topic,
       ...n,
-      percent: n.total ? Math.round((n.right / n.total) * 100) : 0,
+      percent: Math.round((n.right / n.total) * 100),
     }))
     // Weakest first: that is the one worth ten minutes at home.
     .sort((a, b) => a.percent - b.percent);
