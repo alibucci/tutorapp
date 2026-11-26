@@ -3,6 +3,7 @@ import { homeworkFor } from "@/lib/access";
 import { LIMIT, readBytes, readJson } from "@/lib/http";
 import { PronounceError, canScoreVoice, scoreLine } from "@/lib/pronounce";
 import { updateLesson, updateStudent } from "@/lib/store";
+import { withUsage } from "@/lib/usage";
 import {
   VOICE_CONSENT_VERSION,
   VOICE_MAX_SECONDS,
@@ -102,7 +103,11 @@ export async function POST(request: Request, { params }: Params) {
 
   let result;
   try {
-    result = await scoreLine(audio, line);
+    const { student } = found;
+    result = await withUsage(
+      { purpose: "pronunciation", lessonId: id, studentId: student.id, tutorId: student.tutorId },
+      () => scoreLine(audio, line),
+    );
   } catch (e) {
     const status = e instanceof PronounceError ? e.status : 502;
     const message = e instanceof PronounceError ? e.message : "The pronunciation check failed. Try again.";

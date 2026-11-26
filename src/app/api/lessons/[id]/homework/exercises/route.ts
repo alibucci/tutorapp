@@ -5,6 +5,7 @@ import { buildGamesOnce } from "@/lib/autoHomework";
 import { homeworkDone } from "@/lib/homework";
 import { updateLesson } from "@/lib/store";
 import type { Lesson, Student } from "@/lib/types";
+import { withUsage } from "@/lib/usage";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -42,11 +43,24 @@ export async function POST(_request: Request, { params }: Params) {
     );
   }
 
+  // Games already there: the tutor is paying for a second set. None yet: the
+  // first build failed by itself and this is it again.
+  const usage = {
+    purpose: found.lesson.homework?.exercises?.length
+      ? "regeneration"
+      : found.lesson.kind === "practice"
+        ? "extra_homework"
+        : "lesson_homework",
+    lessonId: id,
+    studentId: found.student.id,
+    tutorId: found.student.tutorId,
+  } as const;
+
   // A programme homework is rebuilt from the same story card: text, checks
   // and all. The story stays the one the system picked.
-  if (found.lesson.module) return rebuildStory(id, found.lesson, found.student);
+  if (found.lesson.module) return withUsage(usage, () => rebuildStory(id, found.lesson, found.student));
 
-  const result = await buildGamesOnce(id, found.lesson, found.student);
+  const result = await withUsage(usage, () => buildGamesOnce(id, found.lesson, found.student));
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

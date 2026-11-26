@@ -13,7 +13,12 @@ export default async function AdminLayout({
     <>
       {/* Straight to the admin home: going by "/" passes through the tutor layout,
           and leaving this layout would lose a password still on screen. */}
-      <AppHeader name={session.name} context="Administration" homeHref="/admin" />
+      <AppHeader
+        name={session.name}
+        context="Administration"
+        homeHref="/admin"
+        links={[{ href: "/admin/usage", label: "Usage" }]}
+      />
       <div className="page page-wide flex-1 py-8">
         <IssuedPasswords>{children}</IssuedPasswords>
       </div>

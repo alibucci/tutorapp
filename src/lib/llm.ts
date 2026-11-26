@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { recordUsage } from "./usage";
 
 /**
  * The single place the app talks to a language model.
@@ -32,10 +33,29 @@ function apiKey(): string {
 
 type Message = { role: "system" | "user" | "assistant"; content: string };
 
+type Usage = { prompt_tokens?: number; completion_tokens?: number };
+
 type ChatResponse = {
   choices?: { message?: { content?: string }; finish_reason?: string }[];
   error?: { message?: string };
+  usage?: Usage;
 };
+
+/**
+ * Put one call down in the usage log. Every attempt counts, the ones whose
+ * answer was thrown away too: they are paid for all the same. Completion
+ * tokens include the reasoning, which is most of the bill.
+ */
+function meter(model: string, usage: Usage | undefined, ok: boolean): void {
+  recordUsage({
+    provider: "deepseek",
+    model,
+    meter: "tokens",
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    ok,
+  });
+}
 
 /**
  * How hard the model thinks before answering. Both models default to "high",
@@ -59,7 +79,7 @@ async function chat(
   maxTokens: number,
   effort: Effort | undefined,
   timeoutMs: number,
-): Promise<string> {
+): Promise<{ content: string; usage?: Usage }> {
   let res: Response;
   let body: ChatResponse;
   try {
@@ -84,6 +104,9 @@ async function chat(
     });
     body = (await res.json()) as ChatResponse;
   } catch (e) {
+    // Nothing came back to count; a timed-out call may still be billed, but
+    // there is no way to know how much.
+    meter(model, undefined, false);
     throw new ModelUnavailable(
       e instanceof Error && e.name === "TimeoutError"
         ? `${model} took longer than ${Math.round(timeoutMs / 1000)} s - DeepSeek may be busy. Try again in a minute.`
@@ -92,6 +115,7 @@ async function chat(
   }
 
   if (!res.ok) {
+    meter(model, body.usage, false);
     const message = `DeepSeek ${res.status}: ${body.error?.message ?? "request failed"}`;
     // Busy or broken on their side: worth another model. A bad key or an
     // empty balance is not.
@@ -103,6 +127,7 @@ async function chat(
   const content = choice?.message?.content ?? "";
   if (!content.trim()) {
     if (choice?.finish_reason === "length") {
+      meter(model, body.usage, false);
       // A thinking model can spend the whole limit thinking. The fallback,
       // where there is one, is worth asking rather than giving up.
       throw new ModelUnavailable(
@@ -110,9 +135,9 @@ async function chat(
       );
     }
     // Happens now and then for no reason the API reports. Worth one more go.
-    return "";
+    return { content: "", usage: body.usage };
   }
-  return content;
+  return { content, usage: body.usage };
 }
 
 function schemaBlock(schema: z.ZodType, name: string): string {
@@ -206,8 +231,9 @@ async function completeWith<T>(
 
   let lastError = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await chat(messages, model, maxTokens, opts.effort, timeoutMs);
+    const { content: raw, usage } = await chat(messages, model, maxTokens, opts.effort, timeoutMs);
     if (!raw) {
+      meter(model, usage, false);
       lastError = `${model} returned an empty response.`;
       continue;
     }
@@ -216,6 +242,7 @@ async function completeWith<T>(
     try {
       parsed = JSON.parse(unfence(raw));
     } catch {
+      meter(model, usage, false);
       lastError = "That was not valid JSON.";
       messages.push({ role: "assistant", content: raw });
       messages.push({ role: "user", content: `${lastError} Reply again, JSON only.` });
@@ -223,6 +250,7 @@ async function completeWith<T>(
     }
 
     const result = schema.safeParse(parsed);
+    meter(model, usage, result.success);
     if (result.success) return result.data;
 
     lastError = result.error.issues

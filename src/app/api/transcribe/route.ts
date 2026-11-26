@@ -10,6 +10,7 @@ import {
   transcribeLines,
 } from "@/lib/speech";
 import { DEFAULT_LANGUAGE, LESSON_LANGUAGES } from "@/lib/types";
+import { withUsage } from "@/lib/usage";
 
 /**
  * One short recording in, its text out. The body is the audio itself, as the
@@ -53,14 +54,16 @@ export async function POST(request: Request) {
   if (audio instanceof Response) return audio;
   if (audio.byteLength === 0) return NextResponse.json({ text: "" });
 
+  // The clip does not say which lesson it is from; the tutor is known.
+  const usage = { purpose: "speech" as const, tutorId: session.role === "tutor" ? session.id : undefined };
   try {
     // A group lesson wants each sentence separately, to credit it to someone.
     if (query.get("lines")) {
       return NextResponse.json({
-        lines: await transcribeLines(audio, kind, language),
+        lines: await withUsage(usage, () => transcribeLines(audio, kind, language)),
       });
     }
-    const text = await transcribe(audio, kind, language);
+    const text = await withUsage(usage, () => transcribe(audio, kind, language));
     return NextResponse.json({ text });
   } catch (e) {
     // A container the provider could not read - Safari's fragmented MP4 is
