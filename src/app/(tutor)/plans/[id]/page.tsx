@@ -41,6 +41,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
             ? {
                 next: next ? { id: next.id, title: next.title } : null,
                 all: PROGRAMME.filter((c) => c.approved).map((c) => ({ id: c.id, title: c.title })),
+                on: students.map((s) => s.name),
               }
             : undefined
         }

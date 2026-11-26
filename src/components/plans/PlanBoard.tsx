@@ -30,7 +30,7 @@ export function PlanBoard({
   building: string[];
   suggesting: boolean;
   /** The Bible story track, where it is open for these children. */
-  stories?: { next: { id: string; title: string } | null; all: { id: string; title: string }[] };
+  stories?: Stories;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(plan.suggestError ?? null);
@@ -400,12 +400,19 @@ function CardRow({
  * adds a story, the tutor does. The next one follows the programme, the same
  * place the homework uses.
  */
+type Stories = {
+  next: { id: string; title: string } | null;
+  all: { id: string; title: string }[];
+  /** The children it is switched on for: every child here, or it is not shown. */
+  on: string[];
+};
+
 function StoryTrack({
   stories,
   busy,
   onAdd,
 }: {
-  stories: { next: { id: string; title: string } | null; all: { id: string; title: string }[] };
+  stories: Stories;
   busy: boolean;
   onAdd: (storyId: string) => void;
 }) {
@@ -413,6 +420,11 @@ function StoryTrack({
   return (
     <section className="card card-pad stack-sm">
       <h2 className="font-semibold">Bible story for a live lesson</h2>
+      {/* Shown only because someone switched it on; say for whom and where. */}
+      <p className="t-small">
+        Switched on for {stories.on.join(" and ")}, at the parent&rsquo;s request. Switch it off on the child&rsquo;s
+        page, under &ldquo;Christianity&rdquo;.
+      </p>
       <p className="t-small t-muted">
         Told from the same story cards as the homework, and checked the same way. Telling one in a lesson moves the
         homework on too.
